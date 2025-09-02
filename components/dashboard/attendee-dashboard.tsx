@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar, MapPin, Clock, Users, Star } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 
 const myEvents = [
   {
@@ -45,11 +46,15 @@ const statusLabels = {
 }
 
 export function AttendeeDashboard() {
+  const { user } = useAuth()
+  
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-serif font-bold">Chào mừng trở lại!</h1>
+        <h1 className="text-3xl font-serif font-bold">
+          Chào mừng trở lại, {user?.name || 'Người dùng'}!
+        </h1>
         <p className="text-muted-foreground">Quản lý các sự kiện và hội nghị của bạn</p>
       </div>
 

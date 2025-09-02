@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Users, CheckCircle, Clock, QrCode } from "lucide-react"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
+import { useAuth } from "@/hooks/use-auth"
 
 const todayStats = [
   {
@@ -30,12 +31,16 @@ const todayStats = [
 ]
 
 export function StaffDashboard() {
+  const { user } = useAuth()
+  
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-serif font-bold">Bảng điều khiển nhân viên</h1>
+          <h1 className="text-3xl font-serif font-bold">
+            Chào mừng, {user?.name || 'Nhân viên'}!
+          </h1>
           <p className="text-muted-foreground">Quản lý check-in và hỗ trợ người tham dự</p>
         </div>
         <Button>

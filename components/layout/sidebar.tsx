@@ -80,7 +80,10 @@ const roleColors = {
 export function Sidebar({ userRole }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
-  const items = navigationItems[userRole];
+  
+  // Ensure userRole is valid, fallback to attendee if not
+  const validRole = userRole && navigationItems[userRole] ? userRole : "attendee";
+  const items = navigationItems[validRole];
 
   return (
     <div
@@ -96,8 +99,8 @@ export function Sidebar({ userRole }: SidebarProps) {
             <h1 className="font-serif font-bold text-lg text-sidebar-foreground">
               ConferenceMS
             </h1>
-            <Badge className={cn("text-xs mt-1 w-fit", roleColors[userRole])}>
-              {roleLabels[userRole]}
+            <Badge className={cn("text-xs mt-1 w-fit", roleColors[validRole])}>
+              {roleLabels[validRole]}
             </Badge>
           </div>
         )}
@@ -117,7 +120,7 @@ export function Sidebar({ userRole }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 p-2 space-y-1">
-        {items.map((item) => {
+        {items?.map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link key={item.href} href={item.href}>

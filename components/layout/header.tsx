@@ -1,6 +1,8 @@
 "use client";
 
 import { Bell, Search, User, LogOut, Moon, Sun } from "lucide-react";
+import { useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,10 +15,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/use-auth";
 
 interface HeaderProps {
   userName: string;
   userRole: "admin" | "staff" | "attendee";
+  userAvatar?: string;
 }
 
 const fakeNotifications = [
@@ -40,15 +44,24 @@ const fakeNotifications = [
   },
 ];
 
-export function Header({ userName, userRole }: HeaderProps) {
+export function Header({ userName, userRole, userAvatar }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
+  const { logout, isLoading } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const handleLogout = () => {
-    // Xóa token/session ở đây nếu có
-    // localStorage.removeItem("token");
-    // Xử lý các bước logout khác nếu cần
-    router.push("/login");
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      router.push("/login");
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Even if logout fails, redirect to login
+      router.push("/login");
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -123,8 +136,18 @@ export function Header({ userName, userRole }: HeaderProps) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <User className="h-4 w-4 text-primary-foreground" />
+              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center overflow-hidden">
+                {userAvatar ? (
+                  <Image
+                    src={userAvatar}
+                    alt={userName}
+                    width={32}
+                    height={32}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="h-4 w-4 text-primary-foreground" />
+                )}
               </div>
               <span className="font-medium">{userName}</span>
             </Button>
@@ -148,9 +171,22 @@ export function Header({ userName, userRole }: HeaderProps) {
               </a>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-600" onSelect={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Đăng xuất
+            <DropdownMenuItem 
+              className="text-red-600" 
+              onSelect={handleLogout}
+              disabled={isLoggingOut || isLoading}
+            >
+              {isLoggingOut ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                  Đang đăng xuất...
+                </div>
+              ) : (
+                <>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Đăng xuất
+                </>
+              )}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

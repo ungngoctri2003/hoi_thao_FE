@@ -11,8 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Settings, Mail, Key, Shield, Bell, Save, RefreshCw, Eye, EyeOff, CheckCircle } from "lucide-react"
+import { useNotification } from "@/hooks/use-notification"
 
 export function SystemSettings() {
+  const { showSuccess, showError } = useNotification()
+  
   const [smtpSettings, setSmtpSettings] = useState({
     host: "smtp.gmail.com",
     port: "587",
@@ -66,7 +69,7 @@ export function SystemSettings() {
 
   const testSmtpConnection = async () => {
     // Simulate SMTP test
-    alert("Kết nối SMTP thành công!")
+    showSuccess("Kết nối SMTP thành công!", "Cấu hình email đã được kiểm tra và hoạt động bình thường")
   }
 
   return (
@@ -78,10 +81,12 @@ export function SystemSettings() {
           <p className="text-muted-foreground">Cấu hình và quản lý các thiết lập hệ thống</p>
         </div>
         {saveSuccess && (
-          <Alert className="w-auto">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>Cài đặt đã được lưu thành công!</AlertDescription>
-          </Alert>
+          <div className="w-auto p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <span className="text-sm text-green-800 dark:text-green-200">Cài đặt đã được lưu thành công!</span>
+            </div>
+          </div>
         )}
       </div>
 
@@ -440,12 +445,14 @@ export function SystemSettings() {
               <CardDescription>Cấu hình các thiết lập bảo mật hệ thống</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Alert>
-                <Shield className="h-4 w-4" />
-                <AlertDescription>
-                  Các cài đặt bảo mật này ảnh hưởng đến toàn bộ hệ thống. Vui lòng cân nhắc kỹ trước khi thay đổi.
-                </AlertDescription>
-              </Alert>
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                  <span className="text-sm text-blue-800 dark:text-blue-200">
+                    Các cài đặt bảo mật này ảnh hưởng đến toàn bộ hệ thống. Vui lòng cân nhắc kỹ trước khi thay đổi.
+                  </span>
+                </div>
+              </div>
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">

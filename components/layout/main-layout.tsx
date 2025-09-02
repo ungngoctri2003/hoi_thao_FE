@@ -9,14 +9,15 @@ interface MainLayoutProps {
   children: React.ReactNode
   userRole: "admin" | "staff" | "attendee"
   userName: string
+  userAvatar?: string
 }
 
-export function MainLayout({ children, userRole, userName }: MainLayoutProps) {
+export function MainLayout({ children, userRole, userName, userAvatar }: MainLayoutProps) {
   return (
     <div className="flex h-screen bg-background">
       <Sidebar userRole={userRole} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header userName={userName} userRole={userRole} />
+        <Header userName={userName} userRole={userRole} userAvatar={userAvatar} />
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
     </div>

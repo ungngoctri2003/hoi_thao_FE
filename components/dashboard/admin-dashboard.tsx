@@ -9,6 +9,7 @@ import { Users, Calendar, CheckCircle, TrendingUp, Clock, AlertTriangle, BarChar
 import { RealtimeChart } from "@/components/charts/realtime-chart"
 import { RegistrationChart } from "@/components/charts/registration-chart"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
+import { useAuth } from "@/hooks/use-auth"
 
 const statsData = [
   {
@@ -79,12 +80,16 @@ const statusLabels = {
 }
 
 export function AdminDashboard() {
+  const { user } = useAuth()
+  
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-serif font-bold">Tổng quan hệ thống</h1>
+          <h1 className="text-3xl font-serif font-bold">
+            Chào mừng, {user?.name || 'Quản trị viên'}!
+          </h1>
           <p className="text-muted-foreground">Theo dõi và quản lý toàn bộ hoạt động hội nghị</p>
         </div>
         <div className="flex items-center space-x-2">

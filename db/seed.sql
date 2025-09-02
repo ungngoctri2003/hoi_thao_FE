@@ -14,7 +14,7 @@ DELETE FROM ROOMS;
 DELETE FROM FLOORS;
 DELETE FROM CONFERENCES;
 DELETE FROM ATTENDEES;
-DELETE FROM USERS;
+DELETE FROM APP_USERS;
 DELETE FROM ROLES;
 DELETE FROM PERMISSIONS;
 
@@ -34,25 +34,40 @@ INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (7, 'chec
 INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (8, 'role_manage', 'Quản lý vai trò', 'Hệ thống', 'Phân quyền người dùng');
 INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (9, 'settings_manage', 'Quản lý cài đặt', 'Hệ thống', 'Cấu hình hệ thống');
 INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (10, 'audit_view', 'Xem nhật ký', 'Hệ thống', 'Xem nhật ký hoạt động');
+INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (11, 'roles.admin', 'Quyền quản trị', 'Hệ thống', 'Quyền quản trị viên toàn hệ thống');
+-- Permissions used in code
+INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (12, 'conferences.read', 'Đọc hội nghị', 'Hội nghị', 'Xem thông tin hội nghị');
+INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (13, 'conferences.write', 'Ghi hội nghị', 'Hội nghị', 'Tạo/sửa/xóa hội nghị');
+INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (14, 'attendees.read', 'Đọc người tham dự', 'Người tham dự', 'Xem thông tin người tham dự');
+INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (15, 'attendees.write', 'Ghi người tham dự', 'Người tham dự', 'Tạo/sửa/xóa người tham dự');
+INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (16, 'checkin.process', 'Xử lý check-in', 'Check-in', 'Thực hiện check-in');
+INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (17, 'sessions.write', 'Ghi phiên họp', 'Phiên họp', 'Tạo/sửa/xóa phiên họp');
+INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (18, 'registrations.read', 'Đọc đăng ký', 'Đăng ký', 'Xem thông tin đăng ký');
+INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (19, 'registrations.write', 'Ghi đăng ký', 'Đăng ký', 'Tạo/sửa/xóa đăng ký');
+INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (20, 'analytics.read', 'Đọc phân tích', 'Phân tích', 'Xem báo cáo và thống kê');
+INSERT INTO PERMISSIONS (ID, CODE, NAME, CATEGORY, DESCRIPTION) VALUES (21, 'audit.read', 'Đọc nhật ký', 'Nhật ký', 'Xem nhật ký hệ thống');
 
 -- ROLE_PERMISSIONS
--- admin: all
+-- admin: all permissions including roles.admin
 INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) SELECT 1, ID FROM PERMISSIONS;
--- staff: dashboard_view, attendee_view, attendee_edit, checkin_perform
-INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (2, 1);
-INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (2, 5);
-INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (2, 6);
-INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (2, 7);
--- attendee: dashboard_view
-INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (3, 1);
+-- staff: dashboard_view, attendees.read, attendees.write, checkin.process, conferences.read
+INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (2, 1);  -- dashboard_view
+INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (2, 12); -- conferences.read
+INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (2, 14); -- attendees.read
+INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (2, 15); -- attendees.write
+INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (2, 16); -- checkin.process
+-- attendee: dashboard_view, conferences.read, registrations.read
+INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (3, 1);  -- dashboard_view
+INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (3, 12); -- conferences.read
+INSERT INTO ROLE_PERMISSIONS (ROLE_ID, PERMISSION_ID) VALUES (3, 18); -- registrations.read
 
--- USERS
-INSERT INTO USERS (ID, EMAIL, NAME, PASSWORD_HASH, STATUS, CREATED_AT, LAST_LOGIN)
-VALUES (1, 'admin@conference.vn', 'Nguyễn Văn Admin', 'hash_admin123', 'active', SYSTIMESTAMP, SYSTIMESTAMP);
-INSERT INTO USERS (ID, EMAIL, NAME, PASSWORD_HASH, STATUS, CREATED_AT, LAST_LOGIN)
-VALUES (2, 'staff@conference.vn', 'Trần Thị Staff', 'hash_staff123', 'active', SYSTIMESTAMP, SYSTIMESTAMP);
-INSERT INTO USERS (ID, EMAIL, NAME, PASSWORD_HASH, STATUS, CREATED_AT, LAST_LOGIN)
-VALUES (3, 'user@conference.vn', 'Lê Văn User', 'hash_user123', 'active', SYSTIMESTAMP, NULL);
+-- APP_USERS
+INSERT INTO APP_USERS (ID, EMAIL, NAME, PASSWORD_HASH, STATUS, CREATED_AT, LAST_LOGIN, AVATAR_URL)
+VALUES (1, 'admin@conference.vn', 'Nguyễn Văn Admin', 'hash_admin123', 'active', SYSTIMESTAMP, SYSTIMESTAMP, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face');
+INSERT INTO APP_USERS (ID, EMAIL, NAME, PASSWORD_HASH, STATUS, CREATED_AT, LAST_LOGIN, AVATAR_URL)
+VALUES (2, 'staff@conference.vn', 'Trần Thị Staff', 'hash_staff123', 'active', SYSTIMESTAMP, SYSTIMESTAMP, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face');
+INSERT INTO APP_USERS (ID, EMAIL, NAME, PASSWORD_HASH, STATUS, CREATED_AT, LAST_LOGIN, AVATAR_URL)
+VALUES (3, 'user@conference.vn', 'Lê Văn User', 'hash_user123', 'active', SYSTIMESTAMP, NULL, NULL);
 
 -- USER_ROLES
 INSERT INTO USER_ROLES (USER_ID, ROLE_ID, ASSIGNED_AT) VALUES (1, 1, SYSTIMESTAMP);
