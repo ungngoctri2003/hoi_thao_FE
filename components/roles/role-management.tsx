@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,94 +10,35 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, MoreHorizontal, Edit, Trash2, Shield, Users, Key, Settings, Eye, UserPlus } from "lucide-react"
+import { Search, MoreHorizontal, Edit, Trash2, Shield, Users, Key, Settings, Eye, UserPlus, Plus } from "lucide-react"
 import { UserRoleDialog } from "./user-role-dialog"
+import { UserDetailDialog } from "./user-detail-dialog"
 import { PermissionMatrix } from "./permission-matrix"
+import { CreateRoleDialog } from "./create-role-dialog"
+import { EditRoleDialog } from "./edit-role-dialog"
+import { AuthErrorHandler } from "../auth/auth-error-handler"
+import { apiClient, Role, Permission as ApiPermission, User, CreateUserRequest, UpdateUserRequest } from "@/lib/api"
+import { toast } from "sonner"
 
-interface User {
-  id: string
-  name: string
-  email: string
-  role: "admin" | "staff" | "attendee"
-  status: "active" | "inactive" | "suspended"
-  lastLogin: string
-  createdAt: string
-  avatar?: string
-}
+// Role permissions mapping - will be loaded from API
+let rolePermissionsCache: Record<string, string[]> = {}
 
-interface Permission {
-  id: string
-  name: string
-  description: string
-  category: string
-}
-
-const mockUsers: User[] = [
-  {
-    id: "1",
-    name: "Nguyễn Văn Admin",
-    email: "admin@conference.vn",
-    role: "admin",
-    status: "active",
-    lastLogin: "2024-12-14 09:30",
-    createdAt: "2024-01-15",
-  },
-  {
-    id: "2",
-    name: "Trần Thị Staff",
-    email: "staff@conference.vn",
-    role: "staff",
-    status: "active",
-    lastLogin: "2024-12-14 08:45",
-    createdAt: "2024-02-20",
-  },
-  {
-    id: "3",
-    name: "Lê Văn User",
-    email: "user@conference.vn",
-    role: "attendee",
-    status: "active",
-    lastLogin: "2024-12-13 16:20",
-    createdAt: "2024-11-10",
-  },
-  {
-    id: "4",
-    name: "Phạm Thị Inactive",
-    email: "inactive@conference.vn",
-    role: "staff",
-    status: "inactive",
-    lastLogin: "2024-11-20 14:15",
-    createdAt: "2024-03-05",
-  },
-]
-
-const permissions: Permission[] = [
-  { id: "dashboard_view", name: "Xem dashboard", description: "Truy cập trang tổng quan", category: "Dashboard" },
-  { id: "conference_create", name: "Tạo hội nghị", description: "Tạo hội nghị mới", category: "Hội nghị" },
-  { id: "conference_edit", name: "Sửa hội nghị", description: "Chỉnh sửa thông tin hội nghị", category: "Hội nghị" },
-  { id: "conference_delete", name: "Xóa hội nghị", description: "Xóa hội nghị", category: "Hội nghị" },
-  {
-    id: "attendee_view",
-    name: "Xem người tham dự",
-    description: "Xem danh sách người tham dự",
-    category: "Người tham dự",
-  },
-  {
-    id: "attendee_edit",
-    name: "Sửa người tham dự",
-    description: "Chỉnh sửa thông tin người tham dự",
-    category: "Người tham dự",
-  },
-  { id: "checkin_perform", name: "Thực hiện check-in", description: "Check-in người tham dự", category: "Check-in" },
-  { id: "role_manage", name: "Quản lý vai trò", description: "Phân quyền người dùng", category: "Hệ thống" },
-  { id: "settings_manage", name: "Quản lý cài đặt", description: "Cấu hình hệ thống", category: "Hệ thống" },
-  { id: "audit_view", name: "Xem nhật ký", description: "Xem nhật ký hoạt động", category: "Hệ thống" },
-]
-
-const rolePermissions = {
-  admin: permissions.map((p) => p.id),
-  staff: ["dashboard_view", "attendee_view", "attendee_edit", "checkin_perform"],
-  attendee: ["dashboard_view"],
+// Load role permissions from API
+const loadRolePermissions = async (roles: Role[]) => {
+  const rolePermissions: Record<string, string[]> = {}
+  
+  for (const role of roles) {
+    try {
+      const response = await apiClient.getRolePermissions(role.id)
+      rolePermissions[role.code] = response.data.map(p => p.id.toString())
+    } catch (error) {
+      console.error(`Error loading permissions for role ${role.code}:`, error)
+      rolePermissions[role.code] = []
+    }
+  }
+  
+  rolePermissionsCache = rolePermissions
+  return rolePermissions
 }
 
 const roleColors = {
@@ -125,26 +66,130 @@ const statusLabels = {
 }
 
 export function RoleManagement() {
-  const [users, setUsers] = useState<User[]>(mockUsers)
+  const [users, setUsers] = useState<User[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
+  const [permissions, setPermissions] = useState<ApiPermission[]>([])
+  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({})
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isUserDetailDialogOpen, setIsUserDetailDialogOpen] = useState(false)
+  const [isCreateRoleDialogOpen, setIsCreateRoleDialogOpen] = useState(false)
+  const [isEditRoleDialogOpen, setIsEditRoleDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [viewingUser, setViewingUser] = useState<User | null>(null)
+  const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [allUsers, setAllUsers] = useState<User[]>([]) // Store all users for client-side filtering
   const itemsPerPage = 10
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesRole = roleFilter === "all" || user.role === roleFilter
-    const matchesStatus = statusFilter === "all" || user.status === statusFilter
-    return matchesSearch && matchesRole && matchesStatus
-  })
+  // Load data on component mount
+  useEffect(() => {
+    loadData()
+  }, [])
 
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearchTerm, roleFilter, statusFilter])
+
+  // Load users when page changes or filters change
+  useEffect(() => {
+    loadUsers()
+  }, [currentPage, debouncedSearchTerm, roleFilter, statusFilter])
+
+  const loadUsers = async () => {
+    try {
+      // For now, we'll load all users and do client-side filtering
+      // In a real app, you'd want to implement server-side filtering
+      const usersResponse = await apiClient.getUsers(1, 1000) // Load more users for filtering
+      setAllUsers(usersResponse.data)
+      
+      // Apply client-side filtering
+      const filtered = usersResponse.data.filter((user) => {
+        const matchesSearch =
+          user.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+          user.email.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+        const matchesRole = roleFilter === "all" || user.role === roleFilter
+        const matchesStatus = statusFilter === "all" || user.status === statusFilter
+        return matchesSearch && matchesRole && matchesStatus
+      })
+      
+      // Apply pagination to filtered results
+      const startIndex = (currentPage - 1) * itemsPerPage
+      const endIndex = startIndex + itemsPerPage
+      const paginatedUsers = filtered.slice(startIndex, endIndex)
+      
+      setUsers(paginatedUsers)
+      setTotalUsers(filtered.length)
+    } catch (error: any) {
+      console.error('Error loading users:', error)
+      toast.error('Không thể tải danh sách người dùng')
+    }
+  }
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [rolesResponse, permissionsResponse] = await Promise.all([
+        apiClient.getRoles(),
+        apiClient.getPermissions()
+      ])
+      
+      setRoles(rolesResponse.data)
+      setPermissions(permissionsResponse.data)
+      
+      // Load role permissions
+      const rolePerms = await loadRolePermissions(rolesResponse.data)
+      setRolePermissions(rolePerms)
+      
+      // Load users separately with filtering
+      await loadUsers()
+    } catch (error: any) {
+      console.error('Error loading data:', error)
+      const errorMessage = error?.message || 'Không thể tải dữ liệu'
+      
+      if (errorMessage.includes('quyền truy cập') || errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
+        toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.')
+        // Set empty data instead of showing error
+        setRoles([])
+        setPermissions([])
+        setUsers([])
+        setRolePermissions({})
+      } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        toast.error('Bạn không có quyền truy cập tính năng này. Vui lòng liên hệ quản trị viên.')
+        // Set empty data instead of showing error
+        setRoles([])
+        setPermissions([])
+        setUsers([])
+        setRolePermissions({})
+      } else {
+        toast.error(`Lỗi tải dữ liệu: ${errorMessage}`)
+        // Set empty data on error
+        setRoles([])
+        setPermissions([])
+        setUsers([])
+        setRolePermissions({})
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const totalPages = Math.ceil(totalUsers / itemsPerPage)
 
   const handleCreateUser = () => {
     setEditingUser(null)
@@ -156,22 +201,177 @@ export function RoleManagement() {
     setIsDialogOpen(true)
   }
 
-  const handleSaveUser = (userData: Partial<User>) => {
-    if (editingUser) {
-      setUsers(users.map((u) => (u.id === editingUser.id ? { ...u, ...userData } : u)))
-    } else {
-      const newUser: User = {
-        id: Date.now().toString(),
-        name: userData.name || "",
-        email: userData.email || "",
-        role: userData.role || "attendee",
-        status: "active",
-        lastLogin: "Chưa đăng nhập",
-        createdAt: new Date().toISOString().split("T")[0],
+  const handleViewUser = (user: User) => {
+    setViewingUser(user)
+    setIsUserDetailDialogOpen(true)
+  }
+
+  const handleToggleUserStatus = async (userId: string, newStatus: "active" | "inactive" | "suspended") => {
+    try {
+      // Find the user to get current data
+      const currentUser = allUsers.find(u => u.id === userId)
+      if (!currentUser) {
+        toast.error('Không tìm thấy người dùng')
+        return
       }
-      setUsers([...users, newUser])
+      
+      const updateData: UpdateUserRequest = {
+        name: currentUser.name,
+        email: currentUser.email,
+        status: newStatus,
+      }
+      
+      console.log('Updating user status:', { userId, newStatus, updateData })
+      
+      const response = await apiClient.updateUser(Number(userId), updateData)
+      
+      // Use the response data directly as it contains the updated information
+      setUsers(users.map((u) => (u.id === userId ? response.data : u)))
+      setAllUsers(allUsers.map((u) => (u.id === userId ? response.data : u)))
+      
+      const statusMessages = {
+        active: 'mở khóa',
+        inactive: 'khóa',
+        suspended: 'tạm khóa'
+      }
+      toast.success(`Đã ${statusMessages[newStatus]} tài khoản thành công`)
+    } catch (error: any) {
+      console.error('Error toggling user status:', error)
+      const errorMessage = error?.message || 'Không thể thay đổi trạng thái người dùng'
+      toast.error(`Lỗi: ${errorMessage}`)
     }
-    setIsDialogOpen(false)
+  }
+
+  const handleUnlockAllAccounts = async () => {
+    try {
+      const disabledUsers = allUsers.filter(u => u.status !== 'active')
+      
+      if (disabledUsers.length === 0) {
+        toast.info('Tất cả tài khoản đều đang hoạt động')
+        return
+      }
+
+      toast.info(`Đang mở khóa ${disabledUsers.length} tài khoản...`)
+      
+      let successCount = 0
+      let errorCount = 0
+      
+      for (const user of disabledUsers) {
+        try {
+          const updateData: UpdateUserRequest = {
+            name: user.name,
+            email: user.email,
+            status: 'active',
+          }
+          
+          const response = await apiClient.updateUser(Number(user.id), updateData)
+          
+          // Update the user in both arrays
+          setUsers(users.map((u) => (u.id === user.id ? response.data : u)))
+          setAllUsers(allUsers.map((u) => (u.id === user.id ? response.data : u)))
+          
+          successCount++
+        } catch (error) {
+          console.error(`Error unlocking user ${user.email}:`, error)
+          errorCount++
+        }
+      }
+      
+      if (successCount > 0) {
+        toast.success(`Đã mở khóa ${successCount} tài khoản thành công`)
+      }
+      
+      if (errorCount > 0) {
+        toast.error(`Không thể mở khóa ${errorCount} tài khoản`)
+      }
+      
+    } catch (error: any) {
+      console.error('Error unlocking all accounts:', error)
+      toast.error('Lỗi khi mở khóa tài khoản')
+    }
+  }
+
+  const handleEditRole = (role: Role) => {
+    console.log('Editing role:', role)
+    setEditingRole(role)
+    setIsEditRoleDialogOpen(true)
+  }
+
+  const handleSaveUser = async (userData: Partial<User>) => {
+    try {
+      if (editingUser) {
+        const updateData: UpdateUserRequest = {
+          name: userData.name,
+          email: userData.email,
+          status: userData.status,
+          role: userData.role,
+        }
+        console.log('Updating user with data:', updateData)
+        const response = await apiClient.updateUser(Number(editingUser.id), updateData)
+        console.log('User updated successfully:', response.data)
+        
+        // Use the response data directly as it contains the updated information
+        setUsers(users.map((u) => (u.id === editingUser.id ? response.data : u)))
+        setAllUsers(allUsers.map((u) => (u.id === editingUser.id ? response.data : u)))
+        toast.success('Cập nhật người dùng thành công')
+      } else {
+        const createData: CreateUserRequest = {
+          name: userData.name || "",
+          email: userData.email || "",
+          role: userData.role || "attendee",
+        }
+        
+        console.log('Creating user with data:', createData)
+        const response = await apiClient.createUser(createData)
+        setAllUsers([...allUsers, response.data])
+        // Reload users to apply current filters
+        await loadUsers()
+        toast.success('Tạo người dùng thành công')
+      }
+      setIsDialogOpen(false)
+    } catch (error: any) {
+      console.error('Error saving user:', error)
+      const errorMessage = error?.message || 'Không thể lưu người dùng'
+      toast.error(errorMessage)
+    }
+  }
+
+  const handleDeleteUser = async (userId: number) => {
+    try {
+      await apiClient.deleteUser(userId)
+      setAllUsers(allUsers.filter(u => Number(u.id) !== userId))
+      // Reload users to apply current filters
+      await loadUsers()
+      toast.success('Xóa người dùng thành công')
+    } catch (error: any) {
+      console.error('Error deleting user:', error)
+      const errorMessage = error?.message || 'Không thể xóa người dùng'
+      toast.error(errorMessage)
+    }
+  }
+
+  const handlePermissionChange = async (roleId: number, permissionId: number, checked: boolean) => {
+    try {
+      if (checked) {
+        await apiClient.assignPermissionToRole(roleId, { permissionId })
+        toast.success('Đã gán quyền thành công')
+      } else {
+        await apiClient.removePermissionFromRole(roleId, permissionId)
+        toast.success('Đã gỡ quyền thành công')
+      }
+      // Reload role permissions to reflect changes
+      const rolePerms = await loadRolePermissions(roles)
+      setRolePermissions(rolePerms)
+    } catch (error: any) {
+      console.error('Error updating permission:', error)
+      const errorMessage = error?.message || 'Không thể cập nhật quyền'
+      toast.error(errorMessage)
+      
+      // If it's an auth error, suggest login
+      if (errorMessage.includes('quyền truy cập') || errorMessage.includes('Unauthorized')) {
+        toast.error('Vui lòng đăng nhập lại để tiếp tục')
+      }
+    }
   }
 
   const getInitials = (name: string) => {
@@ -184,15 +384,48 @@ export function RoleManagement() {
 
   const getRoleStats = () => {
     return {
-      total: users.length,
-      admin: users.filter((u) => u.role === "admin").length,
-      staff: users.filter((u) => u.role === "staff").length,
-      attendee: users.filter((u) => u.role === "attendee").length,
-      active: users.filter((u) => u.status === "active").length,
+      total: allUsers.length,
+      admin: allUsers.filter((u) => u.role === "admin").length,
+      staff: allUsers.filter((u) => u.role === "staff").length,
+      attendee: allUsers.filter((u) => u.role === "attendee").length,
+      active: allUsers.filter((u) => u.status === "active").length,
     }
   }
 
   const stats = getRoleStats()
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Đang tải dữ liệu...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show message if no data and not loading (likely auth issue)
+  if (!loading && roles.length === 0 && permissions.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-serif font-bold">Quản lý vai trò</h1>
+            <p className="text-muted-foreground">Phân quyền và quản lý người dùng hệ thống</p>
+          </div>
+        </div>
+        
+        <AuthErrorHandler 
+          error="Không có quyền truy cập tính năng này"
+          onLogin={() => window.location.href = '/login'}
+          onRetry={loadData}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -202,14 +435,63 @@ export function RoleManagement() {
           <h1 className="text-3xl font-serif font-bold">Quản lý vai trò</h1>
           <p className="text-muted-foreground">Phân quyền và quản lý người dùng hệ thống</p>
         </div>
-        <Button onClick={handleCreateUser}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Thêm người dùng
-        </Button>
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={() => setIsCreateRoleDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Tạo vai trò
+          </Button>
+          <Button onClick={handleCreateUser}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Thêm người dùng
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleUnlockAllAccounts}
+            className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+          >
+            <Key className="mr-2 h-4 w-4" />
+            Mở khóa tất cả
+          </Button>
+        </div>
       </div>
+
+      {/* Warning for disabled accounts */}
+      {allUsers.filter(u => u.status !== 'active').length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center">
+            <Key className="h-5 w-5 text-yellow-600 mr-2" />
+            <div>
+              <h3 className="text-sm font-medium text-yellow-800">
+                Có {allUsers.filter(u => u.status !== 'active').length} tài khoản bị khóa
+              </h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                Những tài khoản này không thể đăng nhập. Click "Mở khóa tất cả" để khắc phục.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tổng vai trò</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{roles.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tổng quyền</CardTitle>
+            <Key className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{permissions.length}</div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tổng người dùng</CardTitle>
@@ -230,24 +512,6 @@ export function RoleManagement() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Nhân viên</CardTitle>
-            <Key className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.staff}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tham dự</CardTitle>
-            <Users className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.attendee}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Đang hoạt động</CardTitle>
             <Settings className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -257,11 +521,73 @@ export function RoleManagement() {
         </Card>
       </div>
 
-      <Tabs defaultValue="users" className="space-y-4">
+      <Tabs defaultValue="roles" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="roles">Vai trò</TabsTrigger>
           <TabsTrigger value="users">Người dùng</TabsTrigger>
           <TabsTrigger value="permissions">Phân quyền</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="roles" className="space-y-4">
+          {/* Roles List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Danh sách vai trò</CardTitle>
+              <CardDescription>
+                Hiển thị {roles.length} vai trò từ hệ thống
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {roles.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Chưa có vai trò nào trong hệ thống</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {roles.map((role) => (
+                      <Card key={role.id} className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold">{role.name}</h3>
+                            <p className="text-sm text-muted-foreground">Code: {role.code}</p>
+                            <p className="text-sm text-muted-foreground">
+                              ID: {role.id}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={roleColors[role.code as keyof typeof roleColors] || "bg-gray-100 text-gray-800"}>
+                              {role.code}
+                            </Badge>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditRole(role)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Chỉnh sửa
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <p className="text-sm text-muted-foreground">
+                            Quyền: {rolePermissions[role.code]?.length || 0} quyền
+                          </p>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="users" className="space-y-4">
           {/* Filters */}
@@ -313,7 +639,7 @@ export function RoleManagement() {
             <CardHeader>
               <CardTitle>Danh sách người dùng</CardTitle>
               <CardDescription>
-                Hiển thị {paginatedUsers.length} trong tổng số {filteredUsers.length} người dùng
+                Hiển thị {users.length} trong tổng số {totalUsers} người dùng
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -331,7 +657,7 @@ export function RoleManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedUsers.map((user) => (
+                    {users.map((user) => (
                       <TableRow key={user.id}>
                         <TableCell>
                           <div className="flex items-center space-x-3">
@@ -347,10 +673,10 @@ export function RoleManagement() {
                         </TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
-                          <Badge className={roleColors[user.role]}>{roleLabels[user.role]}</Badge>
+                          <Badge className={roleColors[user.role as keyof typeof roleColors]}>{roleLabels[user.role as keyof typeof roleLabels]}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge className={statusColors[user.status]}>{statusLabels[user.status]}</Badge>
+                          <Badge className={statusColors[user.status as keyof typeof statusColors]}>{statusLabels[user.status as keyof typeof statusLabels]}</Badge>
                         </TableCell>
                         <TableCell>{user.lastLogin}</TableCell>
                         <TableCell>{user.createdAt}</TableCell>
@@ -362,7 +688,7 @@ export function RoleManagement() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleViewUser(user)}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 Xem chi tiết
                               </DropdownMenuItem>
@@ -370,7 +696,45 @@ export function RoleManagement() {
                                 <Edit className="mr-2 h-4 w-4" />
                                 Chỉnh sửa
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  // Improved logic: always toggle to opposite of current status
+                                  let newStatus: "active" | "inactive" | "suspended"
+                                  if (user.status === 'active') {
+                                    newStatus = 'inactive'
+                                  } else if (user.status === 'inactive') {
+                                    newStatus = 'active'
+                                  } else if (user.status === 'suspended') {
+                                    newStatus = 'active'
+                                  } else {
+                                    newStatus = 'active' // Default fallback
+                                  }
+                                  handleToggleUserStatus(user.id, newStatus)
+                                }}
+                              >
+                                <Settings className="mr-2 h-4 w-4" />
+                                {user.status === 'active' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+                              </DropdownMenuItem>
+                              {user.status === 'inactive' && (
+                                <DropdownMenuItem 
+                                  onClick={() => handleToggleUserStatus(user.id, 'suspended')}
+                                >
+                                  <Settings className="mr-2 h-4 w-4" />
+                                  Tạm khóa tài khoản
+                                </DropdownMenuItem>
+                              )}
+                              {user.status === 'suspended' && (
+                                <DropdownMenuItem 
+                                  onClick={() => handleToggleUserStatus(user.id, 'active')}
+                                >
+                                  <Settings className="mr-2 h-4 w-4" />
+                                  Mở khóa tài khoản
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={() => handleDeleteUser(Number(user.id))}
+                              >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Xóa
                               </DropdownMenuItem>
@@ -414,11 +778,85 @@ export function RoleManagement() {
         </TabsContent>
 
         <TabsContent value="permissions" className="space-y-4">
-          <PermissionMatrix permissions={permissions} rolePermissions={rolePermissions} />
+          {/* Permissions List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Danh sách quyền</CardTitle>
+              <CardDescription>
+                Hiển thị {permissions.length} quyền từ hệ thống
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {permissions.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Key className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Chưa có quyền nào trong hệ thống</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {permissions.map((permission) => (
+                      <Card key={permission.id} className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold">{permission.name}</h3>
+                            <p className="text-sm text-muted-foreground">ID: {permission.id}</p>
+                            {permission.description && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {permission.description}
+                              </p>
+                            )}
+                          </div>
+                          {permission.category && (
+                            <Badge variant="outline">
+                              {permission.category}
+                            </Badge>
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Permission Matrix */}
+          <PermissionMatrix 
+            permissions={permissions} 
+            rolePermissions={rolePermissions}
+            roles={roles}
+            onPermissionChange={handlePermissionChange}
+          />
         </TabsContent>
       </Tabs>
 
       <UserRoleDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} user={editingUser} onSave={handleSaveUser} />
+      <UserDetailDialog 
+        open={isUserDetailDialogOpen} 
+        onOpenChange={setIsUserDetailDialogOpen} 
+        user={viewingUser}
+        onEdit={handleEditUser}
+        onToggleStatus={handleToggleUserStatus}
+      />
+      <CreateRoleDialog 
+        open={isCreateRoleDialogOpen} 
+        onOpenChange={setIsCreateRoleDialogOpen} 
+        onRoleCreated={loadData}
+      />
+      <EditRoleDialog 
+        open={isEditRoleDialogOpen} 
+        onOpenChange={setIsEditRoleDialogOpen} 
+        role={editingRole}
+        onRoleUpdated={() => {
+          // Reload data to get updated roles
+          loadData()
+          // Also reload role permissions
+          if (roles.length > 0) {
+            loadRolePermissions(roles).then(setRolePermissions)
+          }
+        }}
+      />
     </div>
   )
 }

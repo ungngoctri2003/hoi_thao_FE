@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Google Login</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Test Google Login</h1>
+    <button id="googleLogin">Login with Google</button>
+    <div id="result"></div>
+
+    <script>
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyCe5ebKWjE7xB7mq2-y9ZQKOg0a8lz6xKxKk",
+            authDomain: "fun-chat-9e936.firebaseapp.com",
+            databaseURL: "https://fun-chat-9e936-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "fun-chat-9e936",
+            storageBucket: "fun-chat-9e936.firebasestorage.app",
+            messagingSenderId: "888828957485",
+            appId: "1:888828957485:web:47b2a523de9c75b0d839a4",
+            measurementId: "G-4J4XC473RG"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        // Google provider
+        const googleProvider = new firebase.auth.GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+
+        // Login function
+        document.getElementById('googleLogin').addEventListener('click', async () => {
+            try {
+                console.log('Starting Google login...');
+                const result = await auth.signInWithPopup(googleProvider);
+                console.log('Login successful:', result);
+                document.getElementById('result').innerHTML = `
+                    <h3>Login Successful!</h3>
+                    <p>User: ${result.user.displayName}</p>
+                    <p>Email: ${result.user.email}</p>
+                    <p>UID: ${result.user.uid}</p>
+                    <img src="${result.user.photoURL}" alt="Avatar" style="width: 50px; height: 50px; border-radius: 50%;">
+                `;
+            } catch (error) {
+                console.error('Login failed:', error);
+                document.getElementById('result').innerHTML = `
+                    <h3>Login Failed!</h3>
+                    <p>Error: ${error.message}</p>
+                    <p>Code: ${error.code}</p>
+                `;
+            }
+        });
+
+        // Check auth state
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                console.log('User signed in:', user);
+            } else {
+                console.log('User signed out');
+            }
+        });
+    </script>
+</body>
+</html>
+

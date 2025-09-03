@@ -1,16 +1,15 @@
 "use client"
 
-import React, { useState } from "react"
+import React from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AttendeeRegistrationForm } from "@/components/attendees/attendee-registration-form"
+
 import { useAuth } from "@/hooks/use-auth"
 
 export default function RegisterPage() {
-  const [activeTab, setActiveTab] = useState("attendee")
   const { isAuthenticated, user } = useAuth()
   const router = useRouter()
 
@@ -25,11 +24,11 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-serif font-bold mb-2">Đăng ký tham dự hội nghị</h1>
-          <p className="text-muted-foreground">Chọn loại đăng ký phù hợp với bạn</p>
+          <h1 className="text-3xl font-serif font-bold mb-2">Đăng ký</h1>
+          <p className="text-muted-foreground">Chọn loại đăng ký phù hợp với nhu cầu của bạn</p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value="attendee" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="attendee">Đăng ký tham dự</TabsTrigger>
             <TabsTrigger value="account">Tạo tài khoản</TabsTrigger>
@@ -40,11 +39,29 @@ export default function RegisterPage() {
               <CardHeader>
                 <CardTitle>Đăng ký tham dự hội nghị</CardTitle>
                 <CardDescription>
-                  Điền đầy đủ thông tin để đăng ký tham dự hội nghị. Bạn có thể tạo tài khoản sau.
+                  Đăng ký tham dự các hội nghị chuyên nghiệp và kết nối với cộng đồng.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <AttendeeRegistrationForm />
+              <CardContent className="space-y-4">
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">
+                    Tham gia các hội nghị và sự kiện chuyên nghiệp
+                  </p>
+                  <Button asChild className="w-full">
+                    <Link href="/register-attendee">
+                      Đăng ký tham dự
+                    </Link>
+                  </Button>
+                </div>
+                
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Cần tạo tài khoản trước?{" "}
+                    <Link href="/register-simple" className="text-primary hover:underline">
+                      Tạo tài khoản ngay
+                    </Link>
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

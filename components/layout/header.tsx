@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { useFirebaseAuth } from "@/hooks/use-firebase-auth";
+// import { RefreshPermissionsButton } from "@/components/auth/refresh-permissions-button";
 
 interface HeaderProps {
   userName: string;
@@ -48,17 +50,25 @@ export function Header({ userName, userRole, userAvatar }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const { logout, isLoading } = useAuth();
+  const { logout: firebaseLogout } = useFirebaseAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      await logout();
-      router.push("/login");
+      // Use Firebase logout which includes redirect logic
+      await firebaseLogout();
+      // Firebase logout will handle the redirect, so we don't need router.push here
     } catch (error) {
       console.error('Logout failed:', error);
-      // Even if logout fails, redirect to login
-      router.push("/login");
+      // Fallback: if Firebase logout fails, use app logout
+      try {
+        await logout();
+      } catch (appLogoutError) {
+        console.error('App logout also failed:', appLogoutError);
+        // Final fallback: redirect manually
+        router.push("/login");
+      }
     } finally {
       setIsLoggingOut(false);
     }
@@ -76,6 +86,13 @@ export function Header({ userName, userRole, userAvatar }: HeaderProps) {
 
       {/* Actions */}
       <div className="flex items-center space-x-2">
+        {/* Refresh Permissions Button */}
+        {/* <RefreshPermissionsButton 
+          variant="outline" 
+          size="sm"
+          className="text-xs border-blue-200 hover:border-blue-300 hover:bg-blue-50 dark:border-blue-800 dark:hover:border-blue-700 dark:hover:bg-blue-950"
+        /> */}
+
         {/* Theme Toggle */}
         <Button
           variant="ghost"
@@ -155,13 +172,27 @@ export function Header({ userName, userRole, userAvatar }: HeaderProps) {
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-2 py-1.5">
               <p className="text-sm font-medium">{userName}</p>
-              <p className="text-xs text-muted-foreground">
-                {userRole === "admin"
-                  ? "Quản trị viên"
-                  : userRole === "staff"
-                  ? "Nhân viên"
-                  : "Tham dự"}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {userRole === "admin"
+                    ? "Quản trị viên"
+                    : userRole === "staff"
+                    ? "Nhân viên"
+                    : "Tham dự"}
+                </p>
+                <Badge 
+                  variant="outline" 
+                  className={`text-xs ${
+                    userRole === "admin" 
+                      ? "border-red-200 text-red-700 bg-red-50 dark:border-red-800 dark:text-red-300 dark:bg-red-950"
+                      : userRole === "staff"
+                      ? "border-blue-200 text-blue-700 bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:bg-blue-950"
+                      : "border-green-200 text-green-700 bg-green-50 dark:border-green-800 dark:text-green-300 dark:bg-green-950"
+                  }`}
+                >
+                  {userRole}
+                </Badge>
+              </div>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>

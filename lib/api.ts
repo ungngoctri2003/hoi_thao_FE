@@ -1,5 +1,5 @@
 // API configuration and utilities
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -55,6 +55,20 @@ export interface ChangePasswordResponse {
   changed: boolean;
 }
 
+export interface GoogleLoginRequest {
+  firebaseUid: string;
+  email: string;
+  name: string;
+  avatar?: string;
+}
+
+export interface GoogleRegisterRequest {
+  email: string;
+  name: string;
+  avatar?: string;
+  firebaseUid: string;
+}
+
 export interface RefreshTokenRequest {
   refreshToken: string;
 }
@@ -72,6 +86,61 @@ export interface UserInfo {
   avatar?: string;
   createdAt: string;
   updatedAt: string;
+  permissions?: string[];
+}
+
+// Roles Management Interfaces
+export interface Role {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "staff" | "attendee";
+  status: "active" | "inactive" | "suspended";
+  lastLogin: string;
+  createdAt: string;
+  avatar?: string;
+}
+
+export interface Permission {
+  id: number;
+  name: string;
+  description?: string;
+  category?: string;
+}
+
+export interface CreateRoleRequest {
+  code: string;
+  name: string;
+}
+
+export interface UpdateRoleRequest {
+  code?: string;
+  name?: string;
+}
+
+export interface AssignPermissionRequest {
+  permissionId: number;
+}
+
+export interface CreateUserRequest {
+  email: string;
+  name: string;
+  password?: string;
+  role?: string;
+}
+
+export interface UpdateUserRequest {
+  email?: string;
+  name?: string;
+  status?: string;
+  password?: string;
+  role?: string;
 }
 
 export interface UpdateProfileRequest {
@@ -93,6 +162,17 @@ export interface AttendeeInfo {
   dateOfBirth?: string;
   gender?: string;
   createdAt: string;
+  // Backend fields (uppercase)
+  ID?: number;
+  NAME?: string;
+  EMAIL?: string;
+  PHONE?: string;
+  COMPANY?: string;
+  POSITION?: string;
+  AVATAR_URL?: string;
+  CREATED_AT?: string;
+  STATUS?: string;
+  CONFERENCE_NAME?: string;
 }
 
 export interface RegistrationInfo {
@@ -167,7 +247,8 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    isRetry: boolean = false
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
     
@@ -191,10 +272,92 @@ class ApiClient {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
+      
+      // Handle responses with no content (204, 205)
+      if (response.status === 204 || response.status === 205) {
+        return { success: true, data: null } as ApiResponse<T>;
+      }
+      
+      // Try to parse JSON, but handle cases where there's no content
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        // If JSON parsing fails, create a basic response object
+        data = { message: response.statusText || 'No content' };
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        // Handle 401 Unauthorized with automatic token refresh
+        if (response.status === 401 && !isRetry && this.shouldAttemptRefresh(endpoint)) {
+          // Check if this is an account disabled error
+          if (data.error && data.error.code === 'ACCOUNT_DISABLED') {
+            console.log('Account is disabled, not attempting token refresh');
+            // Clear tokens and handle account disabled
+            this.removeTokens();
+            this.handleAccountDisabled();
+            throw new Error('Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.');
+          }
+          
+          console.log('Access token expired, attempting to refresh...');
+          try {
+            const refreshSuccess = await this.attemptTokenRefresh();
+            if (refreshSuccess) {
+              console.log('Token refresh successful, retrying request...');
+              // Retry the original request with new token
+              return this.request<T>(endpoint, options, true);
+            }
+          } catch (refreshError) {
+            console.error('Token refresh failed:', refreshError);
+          }
+        }
+
+        // Create more descriptive error messages
+        let errorMessage = data.message || `HTTP error! status: ${response.status}`;
+        
+        // Add specific error handling for common status codes
+        switch (response.status) {
+          case 400:
+            errorMessage = data.message || 'Thông tin không hợp lệ';
+            break;
+          case 401:
+            // Check if this is an account disabled error
+            if (data.error && data.error.code === 'ACCOUNT_DISABLED') {
+              errorMessage = 'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.';
+              this.removeTokens();
+              this.handleAccountDisabled();
+            }
+            // Check if this is a token-related 401
+            else if (endpoint.includes('/auth/') || endpoint.includes('/profile') || endpoint.includes('/users/me')) {
+              // For auth endpoints, clear tokens and handle session expiration
+              this.removeTokens();
+              errorMessage = data.message || 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+              // Trigger session expiration handler
+              this.handleSessionExpiration();
+            } else {
+              errorMessage = data.message || 'Không có quyền truy cập';
+            }
+            break;
+          case 403:
+            errorMessage = data.message || 'Bị cấm truy cập';
+            break;
+          case 404:
+            errorMessage = data.message || 'Không tìm thấy tài nguyên';
+            break;
+          case 409:
+            errorMessage = data.message || 'Tài khoản đã tồn tại';
+            break;
+          case 422:
+            errorMessage = data.message || 'Dữ liệu không hợp lệ';
+            break;
+          case 500:
+            errorMessage = data.message || 'Lỗi máy chủ';
+            break;
+          default:
+            errorMessage = data.message || `Lỗi ${response.status}`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       return data;
@@ -210,11 +373,55 @@ class ApiClient {
       const cookies = document.cookie.split(';');
       const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('accessToken='));
       if (tokenCookie) {
-        return tokenCookie.split('=')[1];
+        const token = tokenCookie.split('=')[1];
+        return token;
       }
-      return localStorage.getItem('accessToken');
+      const token = localStorage.getItem('accessToken');
+      return token;
     }
     return null;
+  }
+
+  private getRefreshToken(): string | null {
+    if (typeof window !== 'undefined') {
+      // Try to get from cookies first, then localStorage as fallback
+      const cookies = document.cookie.split(';');
+      const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('refreshToken='));
+      if (tokenCookie) {
+        const token = tokenCookie.split('=')[1];
+        return token;
+      }
+      const token = localStorage.getItem('refreshToken');
+      return token;
+    }
+    return null;
+  }
+
+  private shouldAttemptRefresh(endpoint: string): boolean {
+    // Don't attempt refresh for auth endpoints (login, register, refresh itself)
+    const authEndpoints = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password'];
+    return !authEndpoints.some(authEndpoint => endpoint.includes(authEndpoint));
+  }
+
+  private async attemptTokenRefresh(): Promise<boolean> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      console.log('No refresh token available');
+      return false;
+    }
+
+    try {
+      console.log('Attempting to refresh token...');
+      const response = await this.refreshToken({ refreshToken });
+      console.log('Token refresh successful');
+      return true;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      // Clear tokens if refresh fails
+      this.removeTokens();
+      this.handleSessionExpiration();
+      return false;
+    }
   }
 
   private setToken(token: string): void {
@@ -247,6 +454,32 @@ class ApiClient {
       // Remove from localStorage
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+    }
+  }
+
+  private handleSessionExpiration(): void {
+    if (typeof window !== 'undefined') {
+      // Dispatch session expiration event for components to handle
+      const event = new CustomEvent('session-expired', {
+        detail: {
+          message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+          timestamp: new Date().toISOString()
+        }
+      });
+      window.dispatchEvent(event);
+    }
+  }
+
+  private handleAccountDisabled(): void {
+    if (typeof window !== 'undefined') {
+      // Dispatch account disabled event for components to handle
+      const event = new CustomEvent('account-disabled', {
+        detail: {
+          message: 'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.',
+          timestamp: new Date().toISOString()
+        }
+      });
+      window.dispatchEvent(event);
     }
   }
 
@@ -302,17 +535,29 @@ class ApiClient {
   }
 
   async refreshToken(data: RefreshTokenRequest): Promise<RefreshTokenResponse> {
-    const response = await this.request<RefreshTokenResponse>('/auth/refresh', {
+    // Use direct fetch to avoid infinite loop with request method
+    const url = `${this.baseURL}/auth/refresh`;
+    const response = await fetch(url, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(data),
     });
 
-    if (response.data) {
-      this.setToken(response.data.accessToken);
-      this.setRefreshToken(response.data.refreshToken);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Token refresh failed' }));
+      throw new Error(errorData.message || 'Token refresh failed');
     }
 
-    return response.data;
+    const result = await response.json();
+    
+    if (result.data) {
+      this.setToken(result.data.accessToken);
+      this.setRefreshToken(result.data.refreshToken);
+    }
+
+    return result.data;
   }
 
   async logout(): Promise<void> {
@@ -320,39 +565,261 @@ class ApiClient {
     this.removeTokens();
   }
 
-  async getCurrentUser(): Promise<UserInfo> {
-    try {
-      // Get user info from profile endpoint
-      const profileResponse = await this.request<any>('/profile', {
-        method: 'GET',
-      });
+  async loginWithGoogle(googleData: GoogleLoginRequest): Promise<LoginResponse> {
+    // Sử dụng Next.js API route thay vì backend
+    const response = await fetch('/api/auth/google/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(googleData),
+    });
 
-      // Get permissions from users/me endpoint
-      const meResponse = await this.request<any>('/users/me', {
-        method: 'GET',
-      });
+    const result = await response.json();
 
-      // Extract user info from the profile response
-      const userData = profileResponse.data.user;
-      const attendeeData = profileResponse.data.attendee;
-      const permissions = meResponse.data.permissions || [];
+    if (!response.ok) {
+      // Handle specific error cases for Google login
+      let errorMessage = result.message || `HTTP error! status: ${response.status}`;
       
-      // Get role from permissions - check for admin, staff, or default to attendee
-      let role = 'attendee';
-      if (permissions.includes('roles.admin')) {
-        role = 'admin';
-      } else if (permissions.includes('conferences.create') || permissions.includes('conferences.update')) {
-        role = 'staff';
+      switch (response.status) {
+        case 409:
+          errorMessage = result.message || 'Tài khoản chưa được đăng ký';
+          break;
+        case 401:
+          errorMessage = result.message || 'Thông tin xác thực Google không hợp lệ';
+          break;
+        case 400:
+          errorMessage = result.message || 'Thông tin Google không hợp lệ';
+          break;
+        default:
+          errorMessage = result.message || `Lỗi đăng nhập Google: ${response.status}`;
       }
       
+      throw new Error(errorMessage);
+    }
+
+    if (result.data) {
+      this.setToken(result.data.accessToken);
+      this.setRefreshToken(result.data.refreshToken);
+    }
+
+    return result.data;
+  }
+
+  async registerWithGoogle(googleData: GoogleRegisterRequest): Promise<RegisterResponse> {
+    // Sử dụng Next.js API route thay vì backend
+    const response = await fetch('/api/auth/google/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(googleData),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      // Handle specific error cases for Google registration
+      let errorMessage = result.message || `HTTP error! status: ${response.status}`;
+      
+      switch (response.status) {
+        case 409:
+          errorMessage = result.message || 'Tài khoản đã tồn tại';
+          break;
+        case 400:
+          errorMessage = result.message || 'Thông tin Google không hợp lệ';
+          break;
+        case 422:
+          errorMessage = result.message || 'Dữ liệu Google không hợp lệ';
+          break;
+        default:
+          errorMessage = result.message || `Lỗi đăng ký Google: ${response.status}`;
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    return result.data;
+  }
+
+  async refreshPermissions(): Promise<UserInfo> {
+    try {
+      const response = await this.request<any>('/users/me/refresh-permissions', {
+        method: 'GET',
+      });
+      
+      const userData = response.data.user;
+      console.log('Refreshed permissions response:', userData);
+      
+      // Get role from the refreshed data
+      let role = 'attendee';
+      if (userData.role) {
+        role = userData.role;
+        console.log('Role from refreshed permissions:', role);
+      }
+      
+      // Generate permissions based on role if not provided
+      let permissions = userData.permissions || [];
+      if (role && permissions.length === 0) {
+        if (role === 'admin') {
+          permissions = [
+            'dashboard.view', 'profile.view', 'conferences.view', 'conferences.create', 'conferences.update', 'conferences.delete',
+            'attendees.view', 'attendees.read', 'attendees.write', 'attendees.manage',
+            'checkin.manage', 'roles.manage', 'audit.view', 'settings.manage', 'analytics.view',
+            'networking.view', 'venue.view', 'sessions.view', 'badges.view', 'mobile.view', 'my-events.view'
+          ];
+        } else if (role === 'staff') {
+          permissions = [
+            'dashboard.view', 'profile.view', 'conferences.view', 'conferences.create', 'conferences.update',
+            'attendees.view', 'attendees.read', 'attendees.write', 'attendees.manage',
+            'checkin.manage', 'networking.view', 'venue.view', 'sessions.view', 'badges.view', 'mobile.view'
+          ];
+        } else if (role === 'attendee') {
+          permissions = [
+            'dashboard.view', 'profile.view', 'networking.view', 'venue.view', 'sessions.view', 'badges.view', 'mobile.view', 'my-events.view'
+          ];
+        }
+      }
+
       return {
-        id: userData.ID,
-        email: userData.EMAIL,
-        name: userData.NAME,
+        id: userData.id || 0,
+        email: userData.email || 'unknown@example.com',
+        name: userData.name || 'User',
         role: role,
-        avatar: userData.AVATAR_URL || attendeeData?.AVATAR_URL || null,
-        createdAt: userData.CREATED_AT,
-        updatedAt: userData.LAST_LOGIN || userData.CREATED_AT,
+        avatar: userData.avatar || null,
+        createdAt: userData.createdAt || new Date().toISOString(),
+        updatedAt: userData.updatedAt || new Date().toISOString(),
+        permissions: permissions,
+      };
+    } catch (error) {
+      console.error('Failed to refresh permissions:', error);
+      throw error;
+    }
+  }
+
+  async getCurrentUser(): Promise<UserInfo> {
+    try {
+      // Try to get user info from profile endpoint first
+      let userData, attendeeData, permissions = [];
+      
+      try {
+        const profileResponse = await this.request<any>('/profile', {
+          method: 'GET',
+        });
+        userData = profileResponse.data.user;
+        attendeeData = profileResponse.data.attendee;
+        console.log('Profile response:', { userData, attendeeData });
+      } catch (profileError) {
+        console.warn('Profile endpoint failed, trying users/me:', profileError);
+        // Fallback to users/me endpoint
+        const meResponse = await this.request<any>('/users/me', {
+          method: 'GET',
+        });
+        userData = meResponse.data.user || meResponse.data;
+        permissions = meResponse.data.user?.permissions || meResponse.data.permissions || [];
+        console.log('Users/me response:', { userData, permissions });
+      }
+
+      // If we still don't have user data, try a simple auth check
+      if (!userData) {
+        try {
+          const authResponse = await this.request<any>('/auth/me', {
+            method: 'GET',
+          });
+          userData = authResponse.data;
+        } catch (authError) {
+          console.warn('Auth/me endpoint also failed:', authError);
+          // Last resort: create minimal user info from token
+          const token = this.getToken();
+          if (token) {
+            try {
+              const payload = JSON.parse(atob(token.split('.')[1]));
+              userData = {
+                ID: payload.userId || payload.sub || 0,
+                EMAIL: payload.email || 'unknown@example.com',
+                NAME: payload.name || payload.email?.split('@')[0] || 'User',
+                AVATAR_URL: payload.avatar || null,
+                CREATED_AT: new Date().toISOString(),
+                LAST_LOGIN: new Date().toISOString(),
+              };
+            } catch (tokenError) {
+              console.error('Failed to parse token:', tokenError);
+              throw new Error('Invalid authentication token');
+            }
+          } else {
+            throw new Error('No authentication token found');
+          }
+        }
+      }
+      
+      // Get role from permissions or user data
+      let role = 'attendee';
+      
+      // Priority 1: Check ROLE_CODE from user data (most reliable - from backend)
+      if (userData.ROLE_CODE) {
+        role = userData.ROLE_CODE;
+        console.log('Role determined from ROLE_CODE (backend):', role);
+      }
+      // Priority 2: Check role field from users/me endpoint
+      else if (userData.role) {
+        role = userData.role;
+        console.log('Role determined from user.role (backend):', role);
+      }
+      // Priority 3: Check permissions for admin role
+      else if (permissions.includes('roles.admin')) {
+        role = 'admin';
+        console.log('Role determined from permissions (admin):', role);
+      }
+      // Priority 4: Check permissions for staff role
+      else if (permissions.includes('conferences.create') || permissions.includes('conferences.update')) {
+        role = 'staff';
+        console.log('Role determined from permissions (staff):', role);
+      }
+      // Priority 5: Check email pattern for admin (fallback)
+      else if (userData.EMAIL && userData.EMAIL.toLowerCase().includes('admin')) {
+        role = 'admin';
+        console.log('Role determined from email pattern (admin):', role);
+      }
+
+      // If we have a role but no permissions, generate permissions based on role
+      if (role && permissions.length === 0) {
+        console.log('No permissions from backend, generating based on role:', role);
+        if (role === 'admin') {
+          permissions = [
+            'dashboard.view', 'profile.view', 'conferences.view', 'conferences.create', 'conferences.update', 'conferences.delete',
+            'attendees.view', 'attendees.read', 'attendees.write', 'attendees.manage',
+            'checkin.manage', 'roles.manage', 'audit.view', 'settings.manage', 'analytics.view',
+            'networking.view', 'venue.view', 'sessions.view', 'badges.view', 'mobile.view', 'my-events.view'
+          ];
+        } else if (role === 'staff') {
+          permissions = [
+            'dashboard.view', 'profile.view', 'conferences.view', 'conferences.create', 'conferences.update',
+            'attendees.view', 'attendees.read', 'attendees.write', 'attendees.manage',
+            'checkin.manage', 'networking.view', 'venue.view', 'sessions.view', 'badges.view', 'mobile.view'
+          ];
+        } else if (role === 'attendee') {
+          permissions = [
+            'dashboard.view', 'profile.view', 'networking.view', 'venue.view', 'sessions.view', 'badges.view', 'mobile.view', 'my-events.view'
+          ];
+        }
+        console.log('Generated permissions for role', role, ':', permissions);
+      }
+      
+      console.log('Final role determination:', {
+        userData: userData,
+        permissions: permissions,
+        determinedRole: role
+      });
+      
+      return {
+        id: userData.ID || userData.id || 0,
+        email: userData.EMAIL || userData.email || 'unknown@example.com',
+        name: userData.NAME || userData.name || 'User',
+        role: role,
+        avatar: userData.AVATAR_URL || userData.avatar_url || attendeeData?.AVATAR_URL || null,
+        createdAt: userData.CREATED_AT || userData.created_at || new Date().toISOString(),
+        updatedAt: userData.LAST_LOGIN || userData.last_login || userData.CREATED_AT || new Date().toISOString(),
+        permissions: permissions, // Include permissions in the response
       };
     } catch (error) {
       console.error('Failed to get current user info:', error);
@@ -363,8 +830,6 @@ class ApiClient {
 
   async updateProfile(profileData: UpdateProfileRequest): Promise<UserInfo> {
     try {
-      console.log('🔄 Updating profile via API:', profileData);
-      
       // Update profile - backend will handle role-based table updates
       let userResponse;
       try {
@@ -372,17 +837,14 @@ class ApiClient {
           method: 'PATCH',
           body: JSON.stringify(profileData),
         });
-        console.log('📤 Profile update response:', userResponse);
       } catch (patchError) {
         const errorMessage = patchError instanceof Error ? patchError.message : String(patchError);
         if (errorMessage.includes('CORS') || errorMessage.includes('PATCH')) {
-          console.warn('PATCH method blocked by CORS, trying POST...');
           // Fallback to POST method
           userResponse = await this.request<any>('/profile', {
             method: 'POST',
             body: JSON.stringify({ ...profileData, _method: 'PATCH' }), // Some backends use _method override
           });
-          console.log('📤 Profile update response (POST fallback):', userResponse);
         } else {
           throw patchError;
         }
@@ -390,7 +852,6 @@ class ApiClient {
 
       // Return updated user info
       const updatedUser = await this.getCurrentUser();
-      console.log('👤 Updated user info:', updatedUser);
       return updatedUser;
     } catch (error) {
       console.error('Failed to update profile:', error);
@@ -409,6 +870,28 @@ class ApiClient {
   }
 
   // Attendees endpoints
+  // Debug method to check permissions
+  async debugPermissions(): Promise<any> {
+    try {
+      const endpoints = ['/users/me', '/profile', '/users/me/refresh-permissions'];
+      const results = [];
+      
+      for (const endpoint of endpoints) {
+        try {
+          const response = await this.request<any>(endpoint, { method: 'GET' });
+          results.push({ endpoint, success: true, data: response.data });
+        } catch (error: any) {
+          results.push({ endpoint, success: false, error: error.message || 'Unknown error' });
+        }
+      }
+      
+      return results;
+    } catch (error) {
+      console.error('Debug permissions failed:', error);
+      throw error;
+    }
+  }
+
   async getAttendees(params?: { page?: number; limit?: number; filters?: any; search?: string }): Promise<{ data: AttendeeInfo[]; meta: any }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
@@ -421,8 +904,24 @@ class ApiClient {
     }
 
     const endpoint = `/attendees${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    // Add special header for admin users to bypass permission check
+    const headers: Record<string, string> = {};
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        if (user.role === 'admin') {
+          headers['X-Admin-Override'] = 'true';
+        }
+      }
+    } catch (error) {
+      console.warn('Could not parse user data for admin override:', error);
+    }
+    
     const response = await this.request<AttendeeInfo[]>(endpoint, {
       method: 'GET',
+      headers,
     });
 
     return {
@@ -516,12 +1015,33 @@ class ApiClient {
   }
 
   async publicRegistration(registrationData: PublicRegistrationRequest): Promise<any> {
-    const response = await this.request<any>('/registrations/public', {
+    // Use Next.js API route instead of direct backend call
+    const response = await fetch('/api/attendees/register', {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(registrationData),
     });
 
-    return response.data;
+    const result = await response.json();
+
+    if (!response.ok) {
+      // Handle specific error cases
+      let errorMessage = result.message || 'Đăng ký thất bại';
+      
+      if (response.status === 409) {
+        errorMessage = result.message || 'Email này đã được sử dụng. Vui lòng đăng nhập hoặc sử dụng email khác.';
+      } else if (response.status === 400) {
+        errorMessage = result.message || 'Thông tin không hợp lệ. Vui lòng kiểm tra lại.';
+      } else if (response.status === 422) {
+        errorMessage = result.message || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các trường thông tin.';
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    return result.data;
   }
 
   async uploadImage(imageData: string): Promise<{ url: string; publicId: string }> {
@@ -618,6 +1138,193 @@ class ApiClient {
       data: mapped,
       meta: response.meta || {}
     };
+  }
+
+  // Roles Management endpoints
+  async getRoles(): Promise<{ data: Role[] }> {
+    const response = await this.request<Role[]>('/roles', {
+      method: 'GET',
+    });
+
+    const mapped: Role[] = (response.data || []).map((row: any) => ({
+      id: row.ID ?? row.id,
+      code: row.CODE ?? row.code,
+      name: row.NAME ?? row.name,
+    }));
+
+    return { data: mapped };
+  }
+
+  async createRole(roleData: CreateRoleRequest): Promise<{ data: { id: number } }> {
+    const response = await this.request<{ id: number }>('/roles', {
+      method: 'POST',
+      body: JSON.stringify(roleData),
+    });
+
+    return { data: response.data };
+  }
+
+  async assignPermissionToRole(roleId: number, permissionData: AssignPermissionRequest): Promise<void> {
+    const response = await this.request(`/roles/${roleId}/permissions`, {
+      method: 'POST',
+      body: JSON.stringify(permissionData),
+    });
+    // Backend returns 204 No Content, so no need to parse JSON
+    return;
+  }
+
+  async removePermissionFromRole(roleId: number, permissionId: number): Promise<void> {
+    const response = await this.request(`/roles/${roleId}/permissions/${permissionId}`, {
+      method: 'DELETE',
+    });
+    // Backend returns 204 No Content, so no need to parse JSON
+    return;
+  }
+
+  // Permissions endpoints
+  async getPermissions(): Promise<{ data: Permission[] }> {
+    const response = await this.request<Permission[]>('/permissions', {
+      method: 'GET',
+    });
+
+    const mapped: Permission[] = (response.data || []).map((row: any) => ({
+      id: row.ID ?? row.id,
+      name: row.NAME ?? row.name,
+      description: row.DESCRIPTION ?? row.description,
+      category: row.CATEGORY ?? row.category,
+    }));
+
+    return { data: mapped };
+  }
+
+  // Users endpoints
+  async getUsers(page: number = 1, limit: number = 50): Promise<{ data: User[], meta: any }> {
+    const response = await this.request<{ data: any[], meta: any }>(`/users?page=${page}&limit=${limit}`, {
+      method: 'GET',
+    });
+
+    const mapped: User[] = (Array.isArray(response.data) ? response.data : []).map((row: any) => ({
+      id: String(row.ID ?? row.id),
+      name: row.NAME ?? row.name,
+      email: row.EMAIL ?? row.email,
+      role: (row.ROLE_CODE ?? row.role_code) || 'attendee',
+      status: (row.STATUS ?? row.status) || 'active',
+      lastLogin: row.LAST_LOGIN ? new Date(row.LAST_LOGIN).toLocaleString('vi-VN') : 'Chưa đăng nhập',
+      createdAt: row.CREATED_AT ? new Date(row.CREATED_AT).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+      avatar: row.AVATAR_URL ?? row.avatar_url,
+    }));
+
+    return { data: mapped, meta: response.meta };
+  }
+
+  async createUser(userData: CreateUserRequest): Promise<{ data: User }> {
+    const response = await this.request<any>('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+
+    const mapped: User = {
+      id: String(response.data.ID ?? response.data.id),
+      name: response.data.NAME ?? response.data.name,
+      email: response.data.EMAIL ?? response.data.email,
+      role: (response.data.ROLE_CODE ?? response.data.role_code) || 'attendee',
+      status: (response.data.STATUS ?? response.data.status) || 'active',
+      lastLogin: response.data.LAST_LOGIN ? new Date(response.data.LAST_LOGIN).toLocaleString('vi-VN') : 'Chưa đăng nhập',
+      createdAt: response.data.CREATED_AT ? new Date(response.data.CREATED_AT).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+      avatar: response.data.AVATAR_URL ?? response.data.avatar_url,
+    };
+
+    return { data: mapped };
+  }
+
+  async updateUser(userId: number, userData: UpdateUserRequest): Promise<{ data: User }> {
+    const response = await this.request<any>(`/users/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(userData),
+    });
+
+    const mapped: User = {
+      id: String(response.data.ID ?? response.data.id),
+      name: response.data.NAME ?? response.data.name,
+      email: response.data.EMAIL ?? response.data.email,
+      role: (response.data.ROLE_CODE ?? response.data.role_code) || 'attendee',
+      status: (response.data.STATUS ?? response.data.status) || 'active',
+      lastLogin: response.data.LAST_LOGIN ? new Date(response.data.LAST_LOGIN).toLocaleString('vi-VN') : 'Chưa đăng nhập',
+      createdAt: response.data.CREATED_AT ? new Date(response.data.CREATED_AT).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+      avatar: response.data.AVATAR_URL ?? response.data.avatar_url,
+    };
+
+    return { data: mapped };
+  }
+
+  async deleteUser(userId: number): Promise<void> {
+    await this.request(`/users/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async assignRoleToUser(userId: number, roleId: number): Promise<void> {
+    await this.request(`/users/${userId}/roles`, {
+      method: 'POST',
+      body: JSON.stringify({ roleId }),
+    });
+  }
+
+  async removeRoleFromUser(userId: number, roleId: number): Promise<void> {
+    await this.request(`/users/${userId}/roles/${roleId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getUserRoles(userId: number): Promise<{ data: Role[] }> {
+    const response = await this.request<Role[]>(`/users/${userId}/roles`, {
+      method: 'GET',
+    });
+
+    const mapped: Role[] = (response.data || []).map((row: any) => ({
+      id: row.ID ?? row.id,
+      code: row.CODE ?? row.code,
+      name: row.NAME ?? row.name,
+    }));
+
+    return { data: mapped };
+  }
+
+  // Role permissions endpoints
+  async getRolePermissions(roleId: number): Promise<{ data: Permission[] }> {
+    const response = await this.request<Permission[]>(`/roles/${roleId}/permissions`, {
+      method: 'GET',
+    });
+
+    const mapped: Permission[] = (response.data || []).map((row: any) => ({
+      id: row.ID ?? row.id,
+      name: row.NAME ?? row.name,
+      description: row.DESCRIPTION ?? row.description,
+      category: row.CATEGORY ?? row.category,
+    }));
+
+    return { data: mapped };
+  }
+
+  async updateRole(roleId: number, roleData: UpdateRoleRequest): Promise<{ data: Role }> {
+    const response = await this.request<any>(`/roles/${roleId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(roleData),
+    });
+
+    const mapped: Role = {
+      id: response.data.ID ?? response.data.id,
+      code: response.data.CODE ?? response.data.code,
+      name: response.data.NAME ?? response.data.name,
+    };
+
+    return { data: mapped };
+  }
+
+  async deleteRole(roleId: number): Promise<void> {
+    await this.request(`/roles/${roleId}`, {
+      method: 'DELETE',
+    });
   }
 }
 

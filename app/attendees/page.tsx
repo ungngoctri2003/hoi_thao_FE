@@ -5,6 +5,7 @@ import { MainLayout } from "@/components/layout/main-layout"
 import { AttendeeManagement } from "@/components/attendees/attendee-management"
 import { useAuth } from "@/hooks/use-auth"
 import { AuthStatus } from "@/components/auth/auth-status"
+import { StaffAndAdmin } from "@/components/auth/role-guard"
 
 export default function AttendeesPage() {
   const searchParams = useSearchParams()
@@ -33,8 +34,10 @@ export default function AttendeesPage() {
   }
 
   return (
-    <MainLayout userRole={role} userName={name} userAvatar={user?.avatar}>
-      <AttendeeManagement />
-    </MainLayout>
+    <StaffAndAdmin>
+      <MainLayout userRole={role} userName={name} userAvatar={user?.avatar}>
+        <AttendeeManagement />
+      </MainLayout>
+    </StaffAndAdmin>
   )
 }

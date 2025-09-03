@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -45,6 +45,8 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -55,76 +57,17 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import { apiClient, AttendeeInfo, CreateAttendeeRequest } from "@/lib/api";
+import { useNotification } from "@/hooks/use-notification";
+import { useAuth } from "@/hooks/use-auth";
+import { AuthErrorHandler } from "../auth/auth-error-handler";
 
-interface Attendee {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  company: string;
-  position: string;
-  conference: string;
-  registrationDate: string;
-  status: "registered" | "checked-in" | "cancelled" | "no-show";
-  dietary: string;
-  specialNeeds: string;
-  avatar?: string;
+// Extend AttendeeInfo to include registration status
+interface AttendeeWithRegistration extends AttendeeInfo {
+  registrationStatus?: "registered" | "checked-in" | "cancelled" | "no-show";
+  conferenceName?: string;
+  registrationDate?: string;
 }
-
-const mockAttendees: Attendee[] = [
-  {
-    id: "1",
-    name: "Nguyễn Văn An",
-    email: "nguyen.van.an@email.com",
-    phone: "0901234567",
-    company: "Tech Corp",
-    position: "Kỹ sư phần mềm",
-    conference: "Hội nghị Công nghệ 2024",
-    registrationDate: "2024-11-15",
-    status: "checked-in",
-    dietary: "Không",
-    specialNeeds: "Không",
-  },
-  {
-    id: "2",
-    name: "Trần Thị Bình",
-    email: "tran.thi.binh@email.com",
-    phone: "0912345678",
-    company: "AI Academy",
-    position: "Giảng viên",
-    conference: "Workshop AI & Machine Learning",
-    registrationDate: "2024-11-18",
-    status: "registered",
-    dietary: "Chay",
-    specialNeeds: "Xe lăn",
-  },
-  {
-    id: "3",
-    name: "Lê Văn Cường",
-    email: "le.van.cuong@email.com",
-    phone: "0923456789",
-    company: "Startup Hub",
-    position: "CEO",
-    conference: "Seminar Khởi nghiệp",
-    registrationDate: "2024-11-20",
-    status: "registered",
-    dietary: "Không",
-    specialNeeds: "Không",
-  },
-  {
-    id: "4",
-    name: "Phạm Thị Dung",
-    email: "pham.thi.dung@email.com",
-    phone: "0934567890",
-    company: "Medical Center",
-    position: "Bác sĩ",
-    conference: "Hội thảo Y tế",
-    registrationDate: "2024-10-25",
-    status: "no-show",
-    dietary: "Không",
-    specialNeeds: "Không",
-  },
-];
 
 const statusColors = {
   registered: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -142,25 +85,57 @@ const statusLabels = {
 };
 
 export function AttendeeManagement() {
-  const [attendees, setAttendees] = useState<Attendee[]>(mockAttendees);
+  const [attendees, setAttendees] = useState<AttendeeWithRegistration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [conferenceFilter, setConferenceFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const itemsPerPage = 10;
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newAttendee, setNewAttendee] = useState<Partial<Attendee>>({
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newAttendee, setNewAttendee] = useState<Partial<CreateAttendeeRequest>>({
     name: "",
     email: "",
     phone: "",
     company: "",
     position: "",
-    conference: "Hội nghị Công nghệ 2024",
-    registrationDate: new Date().toISOString().slice(0, 10),
-    status: "registered",
     dietary: "",
     specialNeeds: "",
   });
+  const { showSuccess, showError } = useNotification();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  
+  // Debug authentication state
+  console.log('AttendeeManagement - Auth state:', {
+    isAuthenticated,
+    authLoading,
+    user: user ? { id: user.id, email: user.email, role: user.role, permissions: user.permissions } : null
+  });
+  
+  // Debug permission check - use useMemo to prevent recalculation
+  const hasAttendeesPermission = useMemo(() => {
+    const hasPermission = user?.permissions?.includes('attendees.write') || 
+                         user?.permissions?.includes('attendees.read') || 
+                         user?.permissions?.includes('attendees.manage') ||
+                         user?.role === 'admin' || user?.role === 'staff';
+    
+    console.log('Permission check:', {
+      hasAttendeesPermission: hasPermission,
+      userPermissions: user?.permissions,
+      userRole: user?.role,
+      includesAttendeesWrite: user?.permissions?.includes('attendees.write'),
+      includesAttendeesRead: user?.permissions?.includes('attendees.read'),
+      includesAttendeesManage: user?.permissions?.includes('attendees.manage'),
+      isAdmin: user?.role === 'admin',
+      isStaff: user?.role === 'staff'
+    });
+    
+    return hasPermission;
+  }, [user?.permissions, user?.role]);
 
   const conferences = [
     "Tất cả",
@@ -170,25 +145,132 @@ export function AttendeeManagement() {
     "Hội thảo Y tế",
   ];
 
-  const filteredAttendees = attendees.filter((attendee) => {
-    const matchesSearch =
-      attendee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      attendee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      attendee.company.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || attendee.status === statusFilter;
-    const matchesConference =
-      conferenceFilter === "all" || attendee.conference === conferenceFilter;
-    return matchesSearch && matchesStatus && matchesConference;
+  // Fetch attendees from API
+  const fetchAttendees = async () => {
+    console.log('fetchAttendees called with:', {
+      isAuthenticated,
+      user: user ? { id: user.id, email: user.email, role: user.role } : null,
+      hasAttendeesPermission
+    });
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      if (!isAuthenticated || !user) {
+        console.log('fetchAttendees: Not authenticated or no user');
+        setError("Bạn cần đăng nhập để truy cập tính năng này. Vui lòng đăng nhập và thử lại.");
+        setLoading(false);
+        return;
+      }
+
+      // Check permissions (already calculated above)
+      if (!hasAttendeesPermission) {
+        setError("Bạn không có quyền truy cập tính năng này. Cần quyền 'attendees.read', 'attendees.write', hoặc 'attendees.manage'. Vui lòng liên hệ quản trị viên để được cấp quyền.");
+        setLoading(false);
+        return;
+      }
+      
+      const params = {
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchTerm || undefined,
+        filters: {
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          conference: conferenceFilter !== "all" ? conferenceFilter : undefined,
+        }
+      };
+      
+      console.log("Fetching attendees with params:", params);
+      const response = await apiClient.getAttendees(params);
+      console.log("Attendees response:", response);
+      
+      if (response && response.data) {
+        console.log("Setting attendees data:", response.data);
+        setAttendees(response.data);
+        setTotalCount(response.meta?.total || response.data.length);
+        setTotalPages(response.meta?.totalPages || Math.ceil(response.data.length / itemsPerPage));
+      } else {
+        console.log("No data in response, setting empty array");
+        setAttendees([]);
+        setTotalCount(0);
+        setTotalPages(0);
+      }
+    } catch (err: any) {
+      console.error('fetchAttendees error:', err);
+      const errorMessage = err.message || "Không thể tải danh sách người tham dự";
+      console.log('Error message:', errorMessage);
+      
+      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('quyền truy cập')) {
+        setError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.");
+        showError("Phiên hết hạn", "Vui lòng đăng nhập lại để tiếp tục sử dụng tính năng này.");
+      } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden') || errorMessage.includes('Insufficient permissions')) {
+        setError("Bạn không có quyền truy cập tính năng này. Vui lòng liên hệ quản trị viên để được cấp quyền 'attendees.write' hoặc kiểm tra cấu hình backend.");
+        showError("Không có quyền", "Bạn cần quyền 'attendees.write' để truy cập tính năng này. Vui lòng liên hệ quản trị viên hoặc kiểm tra cấu hình backend.");
+      } else {
+        setError(errorMessage);
+        showError("Lỗi", errorMessage);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load attendees on component mount and when filters change
+  useEffect(() => {
+    console.log('useEffect for fetchAttendees triggered:', {
+      authLoading,
+      isAuthenticated,
+      currentPage,
+      searchTerm,
+      statusFilter,
+      conferenceFilter
+    });
+    
+    if (!authLoading && isAuthenticated && hasAttendeesPermission) {
+      console.log('Calling fetchAttendees from useEffect');
+      fetchAttendees();
+    } else {
+      console.log('Not calling fetchAttendees:', { authLoading, isAuthenticated, hasAttendeesPermission });
+    }
+  }, [currentPage, searchTerm, statusFilter, conferenceFilter, authLoading, isAuthenticated, hasAttendeesPermission]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        fetchAttendees();
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const filteredAttendees = attendees;
+  const paginatedAttendees = attendees;
+  
+  // Debug attendees state
+  console.log('Attendees state:', {
+    attendeesLength: attendees.length,
+    attendees: attendees.slice(0, 2), // Show first 2 items
+    totalCount,
+    totalPages,
+    currentPage
+  });
+  
+  // Debug paginated attendees
+  console.log('Paginated attendees:', {
+    paginatedAttendeesLength: paginatedAttendees.length,
+    paginatedAttendees: paginatedAttendees.slice(0, 2), // Show first 2 items
+    willShowEmpty: paginatedAttendees.length === 0
   });
 
-  const totalPages = Math.ceil(filteredAttendees.length / itemsPerPage);
-  const paginatedAttendees = filteredAttendees.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | undefined | null) => {
+    if (!name || typeof name !== 'string') {
+      return '??';
+    }
     return name
       .split(" ")
       .map((n) => n[0])
@@ -196,30 +278,140 @@ export function AttendeeManagement() {
       .toUpperCase();
   };
 
-  const handleAddAttendee = () => {
-    setAttendees([
-      ...attendees,
-      {
-        ...newAttendee,
-        id: (attendees.length + 1).toString(),
-        status: "registered",
-        registrationDate: new Date().toISOString().slice(0, 10),
-      } as Attendee,
-    ]);
-    setIsDialogOpen(false);
-    setNewAttendee({
-      name: "",
-      email: "",
-      phone: "",
-      company: "",
-      position: "",
-      conference: "Hội nghị Công nghệ 2024",
-      registrationDate: new Date().toISOString().slice(0, 10),
-      status: "registered",
-      dietary: "",
-      specialNeeds: "",
-    });
+  const handleAddAttendee = async () => {
+    if (!newAttendee.name || !newAttendee.email) {
+      showError("Lỗi", "Vui lòng điền đầy đủ thông tin bắt buộc");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await apiClient.createAttendee(newAttendee as CreateAttendeeRequest);
+      showSuccess("Thành công", "Thêm người tham dự thành công");
+      setIsDialogOpen(false);
+      setNewAttendee({
+        name: "",
+        email: "",
+        phone: "",
+        company: "",
+        position: "",
+        dietary: "",
+        specialNeeds: "",
+      });
+      // Refresh the list
+      fetchAttendees();
+    } catch (err: any) {
+      showError("Lỗi", err.message || "Không thể thêm người tham dự");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const handleDeleteAttendee = async (id: number) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa người tham dự này?")) {
+      return;
+    }
+
+    try {
+      await apiClient.deleteAttendee(id);
+      showSuccess("Thành công", "Xóa người tham dự thành công");
+      fetchAttendees();
+    } catch (err: any) {
+      showError("Lỗi", err.message || "Không thể xóa người tham dự");
+    }
+  };
+
+  const handleUpdateAttendee = async (id: number, data: Partial<CreateAttendeeRequest>) => {
+    try {
+      await apiClient.updateAttendee(id, data);
+      showSuccess("Thành công", "Cập nhật thông tin thành công");
+      fetchAttendees();
+    } catch (err: any) {
+      showError("Lỗi", err.message || "Không thể cập nhật thông tin");
+    }
+  };
+
+  const handleExportAttendees = () => {
+    try {
+      const csvContent = [
+        ["Tên", "Email", "Số điện thoại", "Công ty", "Chức vụ", "Hội nghị", "Ngày đăng ký", "Trạng thái"],
+        ...attendees.map(attendee => [
+          attendee.name || "Không có tên",
+          attendee.email || "Không có email",
+          attendee.phone || "",
+          attendee.company || "",
+          attendee.position || "",
+          attendee.conferenceName || "Chưa đăng ký",
+          attendee.registrationDate || (attendee.createdAt ? new Date(attendee.createdAt).toLocaleDateString() : "Không có ngày"),
+          statusLabels[attendee.registrationStatus || "registered"]
+        ])
+      ].map(row => row.join(",")).join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `danh-sach-nguoi-tham-du-${new Date().toISOString().slice(0, 10)}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showSuccess("Thành công", "Xuất danh sách thành công");
+    } catch (err: any) {
+      showError("Lỗi", "Không thể xuất danh sách");
+    }
+  };
+
+  // Show loading state while auth is loading
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Đang kiểm tra quyền truy cập...</span>
+      </div>
+    );
+  }
+
+  // Show error if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-serif font-bold">Quản lý người tham dự</h1>
+            <p className="text-muted-foreground">Quản lý danh sách và thông tin người tham dự hội thảo</p>
+          </div>
+        </div>
+        
+        <AuthErrorHandler 
+          error="Bạn cần đăng nhập để truy cập tính năng này"
+          onLogin={() => window.location.href = '/login'}
+          showRetry={false}
+        />
+      </div>
+    );
+  }
+
+  // Show error if user doesn't have permission (already calculated above)
+  if (!hasAttendeesPermission) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-serif font-bold">Quản lý người tham dự</h1>
+            <p className="text-muted-foreground">Quản lý danh sách và thông tin người tham dự hội thảo</p>
+          </div>
+        </div>
+        
+        <AuthErrorHandler 
+          error="Bạn không có quyền truy cập tính năng này. Cần quyền 'attendees.read', 'attendees.write', hoặc 'attendees.manage'."
+          onLogin={() => window.location.href = '/login'}
+          showRetry={false}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -280,23 +472,7 @@ export function AttendeeManagement() {
                   setNewAttendee({ ...newAttendee, position: e.target.value })
                 }
               />
-              <Select
-                value={newAttendee.conference}
-                onValueChange={(val) =>
-                  setNewAttendee({ ...newAttendee, conference: val })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn hội nghị" />
-                </SelectTrigger>
-                <SelectContent>
-                  {conferences.slice(1).map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
               <Input
                 placeholder="Nhu cầu ăn uống (ví dụ: Chay, Không)"
                 value={newAttendee.dietary}
@@ -321,9 +497,16 @@ export function AttendeeManagement() {
               </DialogClose>
               <Button
                 onClick={handleAddAttendee}
-                disabled={!newAttendee.name || !newAttendee.email}
+                disabled={!newAttendee.name || !newAttendee.email || isSubmitting}
               >
-                Thêm mới
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Đang thêm...
+                  </>
+                ) : (
+                  "Thêm mới"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -338,7 +521,7 @@ export function AttendeeManagement() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{attendees.length}</div>
+            <div className="text-2xl font-bold">{totalCount}</div>
           </CardContent>
         </Card>
         <Card>
@@ -348,7 +531,7 @@ export function AttendeeManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {attendees.filter((a) => a.status === "checked-in").length}
+              {attendees.filter((a) => a.registrationStatus === "checked-in").length}
             </div>
           </CardContent>
         </Card>
@@ -359,7 +542,7 @@ export function AttendeeManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {attendees.filter((a) => a.status === "registered").length}
+              {attendees.filter((a) => a.registrationStatus === "registered").length}
             </div>
           </CardContent>
         </Card>
@@ -370,7 +553,7 @@ export function AttendeeManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {attendees.filter((a) => a.status === "no-show").length}
+              {attendees.filter((a) => a.registrationStatus === "no-show").length}
             </div>
           </CardContent>
         </Card>
@@ -427,7 +610,7 @@ export function AttendeeManagement() {
                 <SelectItem value="Hội thảo Y tế">Hội thảo Y tế</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleExportAttendees} disabled={loading || attendees.length === 0}>
               <Download className="mr-2 h-4 w-4" />
               Xuất danh sách
             </Button>
@@ -440,99 +623,150 @@ export function AttendeeManagement() {
         <CardHeader>
           <CardTitle>Danh sách người tham dự</CardTitle>
           <CardDescription>
-            Hiển thị {paginatedAttendees.length} trong tổng số{" "}
-            {filteredAttendees.length} người tham dự
+            {loading ? "Đang tải..." : `Hiển thị ${paginatedAttendees.length} trong tổng số ${totalCount} người tham dự`}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Người tham dự</TableHead>
-                  <TableHead>Liên hệ</TableHead>
-                  <TableHead>Công ty</TableHead>
-                  <TableHead>Hội nghị</TableHead>
-                  <TableHead>Ngày đăng ký</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedAttendees.map((attendee) => (
-                  <TableRow key={attendee.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar>
-                          <AvatarImage
-                            src={attendee.avatar || "/placeholder.svg"}
-                          />
-                          <AvatarFallback>
-                            {getInitials(attendee.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">{attendee.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {attendee.position}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{attendee.email}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {attendee.phone}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{attendee.company}</TableCell>
-                    <TableCell>
-                      <div className="max-w-48 truncate">
-                        {attendee.conference}
-                      </div>
-                    </TableCell>
-                    <TableCell>{attendee.registrationDate}</TableCell>
-                    <TableCell>
-                      <Badge className={statusColors[attendee.status]}>
-                        {statusLabels[attendee.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Xem chi tiết
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Chỉnh sửa
-                          </DropdownMenuItem>
-                          {attendee.status === "registered" && (
-                            <DropdownMenuItem>
-                              <CheckCircle className="mr-2 h-4 w-4" />
-                              Check-in thủ công
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Xóa
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+          {error && (
+            <div className="flex items-center gap-2 p-4 mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <span className="text-red-600">{error}</span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchAttendees}
+                className="ml-auto"
+              >
+                Thử lại
+              </Button>
+            </div>
+          )}
+          
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="ml-2">Đang tải danh sách...</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Người tham dự</TableHead>
+                    <TableHead>Liên hệ</TableHead>
+                    <TableHead>Công ty</TableHead>
+                    <TableHead>Hội nghị</TableHead>
+                    <TableHead>Ngày đăng ký</TableHead>
+                    <TableHead>Trạng thái</TableHead>
+                    <TableHead className="text-right">Thao tác</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    console.log('TableBody render check:', {
+                      paginatedAttendeesLength: paginatedAttendees.length,
+                      willShowEmpty: paginatedAttendees.length === 0,
+                      paginatedAttendees: paginatedAttendees.slice(0, 2)
+                    });
+                    return paginatedAttendees.length === 0;
+                  })() ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <div className="flex flex-col items-center gap-2">
+                          <Users className="h-12 w-12 text-muted-foreground" />
+                          <p className="text-muted-foreground">Không có người tham dự nào</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedAttendees.map((attendee, index) => {
+                      const attendeeData = attendee as any; // Type assertion for backend fields
+                      console.log(`Rendering attendee ${index}:`, {
+                        id: attendeeData.id || attendeeData.ID,
+                        name: attendeeData.name || attendeeData.NAME,
+                        email: attendeeData.email || attendeeData.EMAIL,
+                        fullAttendee: attendeeData
+                      });
+                      return (
+                      <TableRow key={attendeeData.id || attendeeData.ID}>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <Avatar>
+                              <AvatarImage
+                                src={attendeeData.avatarUrl || attendeeData.AVATAR_URL || "/placeholder.svg"}
+                              />
+                              <AvatarFallback>
+                                {getInitials(attendeeData.name || attendeeData.NAME)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">{attendeeData.name || attendeeData.NAME || 'Không có tên'}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {attendeeData.position || attendeeData.POSITION || 'Không có chức vụ'}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{attendeeData.email || attendeeData.EMAIL || 'Không có email'}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {attendeeData.phone || attendeeData.PHONE || 'Không có số điện thoại'}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{attendeeData.company || attendeeData.COMPANY || 'Không có công ty'}</TableCell>
+                        <TableCell>
+                          <div className="max-w-48 truncate">
+                            {attendeeData.conferenceName || attendeeData.CONFERENCE_NAME || "Chưa đăng ký hội nghị"}
+                          </div>
+                        </TableCell>
+                        <TableCell>{attendeeData.registrationDate || (attendeeData.createdAt || attendeeData.CREATED_AT ? new Date(attendeeData.createdAt || attendeeData.CREATED_AT).toLocaleDateString() : "Không có ngày")}</TableCell>
+                        <TableCell>
+                          <Badge className={statusColors[(attendeeData.registrationStatus || attendeeData.STATUS || "registered") as keyof typeof statusColors]}>
+                            {statusLabels[(attendeeData.registrationStatus || attendeeData.STATUS || "registered") as keyof typeof statusLabels]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Xem chi tiết
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Chỉnh sửa
+                              </DropdownMenuItem>
+                              {(attendeeData.registrationStatus || attendeeData.STATUS) === "registered" && (
+                                <DropdownMenuItem>
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                  Check-in thủ công
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={() => handleDeleteAttendee(attendeeData.id || attendeeData.ID)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Xóa
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
 
           {/* Pagination */}
           {totalPages > 1 && (

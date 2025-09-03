@@ -2,12 +2,14 @@
 
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
+import { useFirebaseAuth } from '@/hooks/use-firebase-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LogOut, User } from 'lucide-react';
 
 export function AuthStatus() {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { logout: firebaseLogout } = useFirebaseAuth();
 
   if (isLoading) {
     return (
@@ -65,7 +67,20 @@ export function AuthStatus() {
           <p className="text-xs text-muted-foreground">{user.email}</p>
         </div>
         <Button 
-          onClick={logout} 
+          onClick={async () => {
+            try {
+              // Use Firebase logout which includes redirect logic
+              await firebaseLogout();
+            } catch (error) {
+              console.error('Logout failed:', error);
+              // Fallback: if Firebase logout fails, use app logout
+              try {
+                await logout();
+              } catch (appLogoutError) {
+                console.error('App logout also failed:', appLogoutError);
+              }
+            }
+          }} 
           variant="outline" 
           size="sm" 
           className="w-full"

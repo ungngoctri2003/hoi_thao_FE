@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Google Auth Simple</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        .login-btn {
+            background-color: #34a853;
+        }
+        .register-btn {
+            background-color: #ea4335;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Google Auth Logic</h1>
+        
+        <div class="info">
+            <strong>Logic mới:</strong><br>
+            • <strong>Login:</strong> Chỉ cho user đã tồn tại<br>
+            • <strong>Register:</strong> Chỉ cho user mới<br><br>
+            <strong>Test:</strong> Tạo user mới → Login với user đó → Thử register lại (sẽ lỗi)
+        </div>
+
+        <div class="test-section">
+            <h3>🔐 Test Google Login</h3>
+            <p>Chỉ cho phép user đã tồn tại</p>
+            <button class="login-btn" onclick="testLogin()">Test Login</button>
+            <div id="loginResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Test Google Register</h3>
+            <p>Chỉ cho phép user mới</p>
+            <button class="register-btn" onclick="testRegister()">Test Register</button>
+            <div id="registerResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        let createdUser = null;
+
+        function showResult(elementId, message, isSuccess = true) {
+            const resultDiv = document.getElementById(elementId);
+            resultDiv.style.display = 'block';
+            resultDiv.className = `result ${isSuccess ? 'success' : 'error'}`;
+            resultDiv.innerHTML = message;
+        }
+
+        function generateTestUser() {
+            const timestamp = Date.now();
+            return {
+                firebaseUid: `test-uid-${timestamp}`,
+                email: `test.${timestamp}@example.com`,
+                name: `Test User ${timestamp}`,
+                avatar: 'https://via.placeholder.com/150'
+            };
+        }
+
+        async function testLogin() {
+            if (!createdUser) {
+                showResult('loginResult', '❌ Chưa có user để test login. Hãy tạo user mới trước!', false);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/google/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(createdUser)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showResult('loginResult', `
+                        ✅ <strong>Login thành công!</strong><br>
+                        User: ${result.data.user.name}<br>
+                        Email: ${result.data.user.email}
+                    `, true);
+                } else {
+                    showResult('loginResult', `
+                        ❌ <strong>Login thất bại:</strong><br>
+                        ${result.message}
+                    `, false);
+                }
+            } catch (error) {
+                showResult('loginResult', `❌ Lỗi: ${error.message}`, false);
+            }
+        }
+
+        async function testRegister() {
+            const testUser = generateTestUser();
+
+            try {
+                const response = await fetch('/api/auth/google/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(testUser)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    createdUser = testUser; // Lưu user để test login sau
+                    showResult('registerResult', `
+                        ✅ <strong>Register thành công!</strong><br>
+                        User: ${result.data.user.name}<br>
+                        Email: ${result.data.user.email}<br>
+                        <em>Bây giờ bạn có thể test Login!</em>
+                    `, true);
+                } else {
+                    showResult('registerResult', `
+                        ❌ <strong>Register thất bại:</strong><br>
+                        ${result.message}
+                    `, false);
+                }
+            } catch (error) {
+                showResult('registerResult', `❌ Lỗi: ${error.message}`, false);
+            }
+        }
+
+        // Test với user đã tồn tại
+        window.onload = function() {
+            // Tạo user mẫu để test
+            createdUser = {
+                firebaseUid: 'existing-user-123',
+                email: 'existing@example.com',
+                name: 'Existing User',
+                avatar: 'https://via.placeholder.com/150'
+            };
+            console.log('Test page loaded with existing user for login test');
+        };
+    </script>
+</body>
+</html>

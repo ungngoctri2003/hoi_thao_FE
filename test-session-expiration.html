@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Expiration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .danger {
+            background: #dc3545;
+        }
+        .danger:hover {
+            background: #c82333;
+        }
+        .success {
+            background: #28a745;
+        }
+        .success:hover {
+            background: #218838;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #dc3545;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Session Expiration Test</h1>
+        <p>This page tests the session expiration handling mechanism.</p>
+
+        <div class="test-section">
+            <h3>Test Controls</h3>
+            <button onclick="simulateSessionExpiration()" class="danger">
+                Simulate Session Expiration
+            </button>
+            <button onclick="clearLog()" class="success">
+                Clear Log
+            </button>
+            <button onclick="testApiCall()">
+                Test API Call (will fail with 401)
+            </button>
+        </div>
+
+        <div class="test-section">
+            <h3>Event Log</h3>
+            <div id="log" class="log">Ready to test session expiration handling...\n</div>
+        </div>
+
+        <div class="test-section">
+            <h3>Instructions</h3>
+            <ol>
+                <li>Click "Simulate Session Expiration" to trigger the session-expired event</li>
+                <li>Click "Test API Call" to simulate a 401 error from the API</li>
+                <li>Watch the console and this page for session expiration handling</li>
+                <li>Check if the user gets redirected to the login page</li>
+            </ol>
+        </div>
+    </div>
+
+    <div id="notification" class="notification">
+        Session expired! Redirecting to login...
+    </div>
+
+    <script>
+        let logElement = document.getElementById('log');
+        let notificationElement = document.getElementById('notification');
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function clearLog() {
+            logElement.textContent = 'Log cleared...\n';
+        }
+
+        function showNotification(message) {
+            notificationElement.textContent = message;
+            notificationElement.style.display = 'block';
+            setTimeout(() => {
+                notificationElement.style.display = 'none';
+            }, 5000);
+        }
+
+        function simulateSessionExpiration() {
+            log('Simulating session expiration...');
+            
+            // Create and dispatch the session-expired event
+            const event = new CustomEvent('session-expired', {
+                detail: {
+                    message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+                    timestamp: new Date().toISOString()
+                }
+            });
+            
+            window.dispatchEvent(event);
+            log('Session expiration event dispatched');
+            showNotification('Session expired! Redirecting to login...');
+        }
+
+        function testApiCall() {
+            log('Testing API call that will return 401...');
+            
+            // Simulate an API call that returns 401
+            fetch('http://localhost:4000/api/v1/users/me', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer invalid-token'
+                }
+            })
+            .then(response => {
+                log(`API Response: ${response.status} ${response.statusText}`);
+                if (response.status === 401) {
+                    log('401 Unauthorized detected - session should be expired');
+                    // Simulate the API client behavior
+                    simulateSessionExpiration();
+                }
+            })
+            .catch(error => {
+                log(`API Error: ${error.message}`);
+            });
+        }
+
+        // Listen for session expiration events
+        window.addEventListener('session-expired', (event) => {
+            log('Session expiration event received!');
+            log(`Event detail: ${JSON.stringify(event.detail)}`);
+            
+            // Simulate redirect to login page
+            setTimeout(() => {
+                log('Redirecting to login page...');
+                // In a real app, this would be: window.location.href = '/login';
+                showNotification('Would redirect to: /login?redirect=' + encodeURIComponent(window.location.pathname));
+            }, 2000);
+        });
+
+        // Initial log
+        log('Session expiration test page loaded');
+        log('Event listeners are set up');
+    </script>
+</body>
+</html>

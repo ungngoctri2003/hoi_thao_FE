@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Users, CheckCircle, Clock, QrCode } from "lucide-react"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
 import { useAuth } from "@/hooks/use-auth"
+import { RoleInfoPanel } from "@/components/layout/role-info-panel"
 
 const todayStats = [
   {
@@ -50,7 +51,7 @@ export function StaffDashboard() {
       </div>
 
       {/* Today's Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {todayStats.map((stat, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -68,6 +69,9 @@ export function StaffDashboard() {
             </CardContent>
           </Card>
         ))}
+        
+        {/* Role Info Panel */}
+        <RoleInfoPanel />
       </div>
 
       {/* Quick Actions & Activity */}

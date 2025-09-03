@@ -7,16 +7,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Shield, Key, Users, Save } from "lucide-react"
 
-interface Permission {
-  id: string
-  name: string
-  description: string
-  category: string
-}
-
 interface PermissionMatrixProps {
-  permissions: Permission[]
+  permissions: Array<{ id: number; name: string; description?: string; category?: string }>
   rolePermissions: Record<string, string[]>
+  roles: Array<{ id: number; code: string; name: string }>
+  onPermissionChange: (roleId: number, permissionId: number, checked: boolean) => void
 }
 
 const roleIcons = {
@@ -37,20 +32,27 @@ const roleColors = {
   attendee: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
 }
 
-export function PermissionMatrix({ permissions, rolePermissions }: PermissionMatrixProps) {
+export function PermissionMatrix({ permissions, rolePermissions, roles, onPermissionChange }: PermissionMatrixProps) {
   const [currentPermissions, setCurrentPermissions] = useState(rolePermissions)
   const [hasChanges, setHasChanges] = useState(false)
 
-  const categories = [...new Set(permissions.map((p) => p.category))]
-  const roles = Object.keys(rolePermissions) as Array<keyof typeof rolePermissions>
+  const categories = [...new Set(permissions.map((p) => p.category || 'Khác'))]
 
-  const handlePermissionChange = (role: string, permissionId: string, checked: boolean) => {
+  const handlePermissionToggle = (roleId: number, permissionId: number, checked: boolean) => {
+    // Call the parent's permission change handler
+    onPermissionChange(roleId, permissionId, checked)
+    
+    // Update local state for immediate UI feedback
     setCurrentPermissions((prev) => {
       const newPermissions = { ...prev }
-      if (checked) {
-        newPermissions[role] = [...(newPermissions[role] || []), permissionId]
-      } else {
-        newPermissions[role] = (newPermissions[role] || []).filter((id) => id !== permissionId)
+      const role = roles.find(r => r.id === roleId)
+      if (role) {
+        const roleKey = role.code
+        if (checked) {
+          newPermissions[roleKey] = [...(newPermissions[roleKey] || []), permissionId.toString()]
+        } else {
+          newPermissions[roleKey] = (newPermissions[roleKey] || []).filter((id) => id !== permissionId.toString())
+        }
       }
       return newPermissions
     })
@@ -92,12 +94,12 @@ export function PermissionMatrix({ permissions, rolePermissions }: PermissionMat
       {/* Role Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {roles.map((role) => {
-          const Icon = roleIcons[role as keyof typeof roleIcons]
-          const permissionCount = currentPermissions[role]?.length || 0
+          const Icon = roleIcons[role.code as keyof typeof roleIcons] || Shield
+          const permissionCount = currentPermissions[role.code]?.length || 0
           return (
-            <Card key={role}>
+            <Card key={role.id}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{roleLabels[role as keyof typeof roleLabels]}</CardTitle>
+                <CardTitle className="text-sm font-medium">{role.name}</CardTitle>
                 <Icon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -123,9 +125,9 @@ export function PermissionMatrix({ permissions, rolePermissions }: PermissionMat
                   <tr className="border-b">
                     <th className="text-left py-2 pr-4 font-medium">Quyền</th>
                     {roles.map((role) => (
-                      <th key={role} className="text-center py-2 px-4 font-medium">
-                        <Badge className={roleColors[role as keyof typeof roleColors]}>
-                          {roleLabels[role as keyof typeof roleLabels]}
+                      <th key={role.id} className="text-center py-2 px-4 font-medium">
+                        <Badge className={roleColors[role.code as keyof typeof roleColors] || "bg-gray-100 text-gray-800"}>
+                          {role.name}
                         </Badge>
                       </th>
                     ))}
@@ -143,11 +145,11 @@ export function PermissionMatrix({ permissions, rolePermissions }: PermissionMat
                           </div>
                         </td>
                         {roles.map((role) => (
-                          <td key={`${role}-${permission.id}`} className="text-center py-3 px-4">
+                          <td key={`${role.id}-${permission.id}`} className="text-center py-3 px-4">
                             <Checkbox
-                              checked={currentPermissions[role]?.includes(permission.id) || false}
+                              checked={currentPermissions[role.code]?.includes(permission.id.toString()) || false}
                               onCheckedChange={(checked) =>
-                                handlePermissionChange(role, permission.id, checked as boolean)
+                                handlePermissionToggle(role.id, permission.id, checked as boolean)
                               }
                             />
                           </td>

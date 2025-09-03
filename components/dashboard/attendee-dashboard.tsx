@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar, MapPin, Clock, Users, Star } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
+import { RoleInfoPanel } from "@/components/layout/role-info-panel"
 
 const myEvents = [
   {
@@ -59,7 +60,7 @@ export function AttendeeDashboard() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Sự kiện đã đăng ký</CardTitle>
@@ -92,6 +93,9 @@ export function AttendeeDashboard() {
             <p className="text-xs text-muted-foreground">Từ 1 đánh giá</p>
           </CardContent>
         </Card>
+
+        {/* Role Info Panel */}
+        <RoleInfoPanel />
       </div>
 
       {/* My Events */}

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test WebSocket Connection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔌 Test WebSocket Connection</h1>
+    
+    <div class="container">
+        <h2>Connection Test</h2>
+        <div id="status" class="status info">Ready to test...</div>
+        <button onclick="testConnection()">Test WebSocket Connection</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <div class="container">
+        <h2>Log</h2>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+        let socket = null;
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function testConnection() {
+            log('Starting WebSocket connection test...');
+            updateStatus('Connecting...', 'info');
+
+            if (socket) {
+                socket.disconnect();
+            }
+
+            socket = io('http://localhost:4000', {
+                path: '/ws',
+                transports: ['websocket', 'polling'],
+                timeout: 10000
+            });
+
+            socket.on('connect', () => {
+                log('✅ WebSocket connected successfully!');
+                updateStatus('✅ Connected successfully!', 'success');
+                
+                // Test joining a room
+                socket.emit('join', 'test-room');
+                log('📝 Joined test room');
+            });
+
+            socket.on('connect_error', (error) => {
+                log(`❌ Connection error: ${error.message}`);
+                updateStatus(`❌ Connection failed: ${error.message}`, 'error');
+            });
+
+            socket.on('disconnect', (reason) => {
+                log(`🔌 Disconnected: ${reason}`);
+                updateStatus('🔌 Disconnected', 'error');
+            });
+
+            socket.on('error', (error) => {
+                log(`❌ Socket error: ${error}`);
+            });
+
+            // Test receiving messages
+            socket.on('permission_change', (data) => {
+                log(`🔔 Received permission change: ${JSON.stringify(data)}`);
+            });
+
+            // Test after 5 seconds
+            setTimeout(() => {
+                if (socket && socket.connected) {
+                    log('🧪 Testing room join...');
+                    socket.emit('join', 'user:123');
+                    log('📝 Joined user:123 room');
+                } else {
+                    log('❌ Socket not connected after 5 seconds');
+                }
+            }, 5000);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Auto test on page load
+        window.addEventListener('load', () => {
+            log('Page loaded, ready to test WebSocket connection');
+        });
+    </script>
+</body>
+</html>

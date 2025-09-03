@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { apiClient, ConferenceInfo, SessionInfo, CreateAttendeeRequest, CreateRegistrationRequest } from "@/lib/api"
+import { useNotification } from "@/hooks/use-notification"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -112,6 +113,7 @@ export function AttendeeRegistrationForm() {
   const [dataError, setDataError] = useState<string>("")
   const [tempPassword, setTempPassword] = useState<string>("")
   const router = useRouter()
+  const { showSuccess, showError } = useNotification()
 
   // Load conferences from API
   useEffect(() => {
@@ -125,7 +127,9 @@ export function AttendeeRegistrationForm() {
         setConferences(conferencesResponse.data)
       } catch (error) {
         console.error('Failed to load data:', error)
-        setDataError("Không thể tải danh sách hội nghị. Vui lòng thử lại sau.")
+        const errorMessage = "Không thể tải danh sách hội nghị. Vui lòng thử lại sau."
+        setDataError(errorMessage)
+        showError("Lỗi tải dữ liệu", errorMessage)
       } finally {
         setIsLoadingData(false)
       }
@@ -249,23 +253,41 @@ export function AttendeeRegistrationForm() {
       
       setIsSubmitting(false)
       setIsComplete(true)
+      
+      // Show success toast
+      showSuccess(
+        "Đăng ký thành công!",
+        `Chào mừng ${formData.firstName} ${formData.lastName} tham dự ${formData.conference}!`
+      )
     } catch (error: any) {
       console.error('Registration failed:', error)
       setIsSubmitting(false)
       
       // Provide more specific error messages
       let errorMessage = "Đăng ký thất bại. Vui lòng thử lại sau."
+      let errorTitle = "Đăng ký thất bại"
       
       if (error.message) {
         if (error.message.includes('email') && error.message.includes('already')) {
+          errorTitle = "Email đã tồn tại"
           errorMessage = "Email này đã được sử dụng. Vui lòng sử dụng email khác hoặc đăng nhập."
         } else if (error.message.includes('UNAUTHORIZED')) {
+          errorTitle = "Lỗi xác thực"
           errorMessage = "Lỗi xác thực. Vui lòng thử lại sau."
         } else if (error.message.includes('conference')) {
+          errorTitle = "Hội nghị không hợp lệ"
           errorMessage = "Không thể tìm thấy hội nghị đã chọn. Vui lòng chọn lại."
+        } else if (error.message.includes('409')) {
+          errorTitle = "Tài khoản đã tồn tại"
+          errorMessage = "Email này đã được sử dụng. Vui lòng đăng nhập hoặc sử dụng email khác."
+        } else if (error.message.includes('400')) {
+          errorTitle = "Thông tin không hợp lệ"
+          errorMessage = "Vui lòng kiểm tra lại thông tin đã nhập."
         }
       }
       
+      // Show error toast
+      showError(errorTitle, errorMessage)
       setErrors({ submit: errorMessage })
     }
   }

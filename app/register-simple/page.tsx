@@ -7,9 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Eye, EyeOff, CheckCircle } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { useNotification } from "@/hooks/use-notification"
+import { GoogleSignInButton } from "@/components/auth/google-signin-button"
+import { AttendeeRegistrationForm } from "@/components/attendees/attendee-registration-form"
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -21,6 +24,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [activeTab, setActiveTab] = useState("attendee")
   const router = useRouter()
   const { register, isLoading, isAuthenticated, user } = useAuth()
   const { showError, showSuccess } = useNotification()
@@ -153,140 +157,178 @@ export default function RegisterPage() {
       
       {/* Content */}
       <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md backdrop-blur-sm bg-white/80 dark:bg-gray-900/80 border-white/20 shadow-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-serif font-bold">Đăng ký tài khoản</CardTitle>
-          <CardDescription>Tạo tài khoản mới để truy cập hệ thống</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="w-full max-w-4xl">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-serif font-bold mb-2">Đăng ký</h1>
+            <p className="text-muted-foreground">Chọn loại đăng ký phù hợp với nhu cầu của bạn</p>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="name">Họ và tên *</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Nhập họ và tên"
-                value={formData.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-                required
-                className="w-full"
-                disabled={isLoading}
-              />
-            </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="attendee">Đăng ký tham dự</TabsTrigger>
+              <TabsTrigger value="account">Tạo tài khoản</TabsTrigger>
+            </TabsList>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={formData.email}
-                onChange={(e) => handleInputChange("email", e.target.value)}
-                required
-                className="w-full"
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Mật khẩu *</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Nhập mật khẩu (ít nhất 6 ký tự)"
-                  value={formData.password}
-                  onChange={(e) => handleInputChange("password", e.target.value)}
-                  required
-                  className="pr-10"
-                  disabled={isLoading}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={isLoading}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Xác nhận mật khẩu *</Label>
-              <div className="relative">
-                <Input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Nhập lại mật khẩu"
-                  value={formData.confirmPassword}
-                  onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                  required
-                  className="pr-10"
-                  disabled={isLoading}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  disabled={isLoading}
-                >
-                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-
-            <Button 
-              type="submit" 
-              className="w-full transition-all duration-300 hover:scale-105 hover:shadow-lg" 
-              disabled={isLoading || !formData.name.trim() || !formData.email.trim() || !formData.password.trim() || !formData.confirmPassword.trim()}
-            >
-              {isLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Đang đăng ký...
+            <TabsContent value="attendee">
+              <div className="backdrop-blur-sm bg-white/80 dark:bg-gray-900/80 border-white/20 shadow-2xl rounded-lg">
+                <div className="p-6">
+                  <div className="text-center mb-6">
+                    <h2 className="text-2xl font-serif font-bold mb-2">Đăng ký tham dự hội nghị</h2>
+                    <p className="text-muted-foreground">Tham gia các hội nghị và sự kiện chuyên nghiệp</p>
+                  </div>
+                  <AttendeeRegistrationForm />
                 </div>
-              ) : (
-                "Đăng ký"
-              )}
-            </Button>
-          </form>
+              </div>
+            </TabsContent>
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Hoặc
-              </span>
-            </div>
-          </div>
+            <TabsContent value="account">
+              <Card className="backdrop-blur-sm bg-white/80 dark:bg-gray-900/80 border-white/20 shadow-2xl">
+                <CardHeader className="text-center">
+                  <CardTitle className="text-xl font-serif font-bold">Tạo tài khoản hệ thống</CardTitle>
+                  <CardDescription>Tạo tài khoản để truy cập đầy đủ tính năng hệ thống</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Họ và tên *</Label>
+                      <Input
+                        id="name"
+                        type="text"
+                        placeholder="Nhập họ và tên"
+                        value={formData.name}
+                        onChange={(e) => handleInputChange("name", e.target.value)}
+                        required
+                        className="w-full"
+                        disabled={isLoading}
+                      />
+                    </div>
 
-          {/* Login section */}
-          <div className="text-center space-y-4">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Đã có tài khoản?
-              </p>
-              <Link href="/login">
-                <Button 
-                  variant="outline" 
-                  className="w-full transition-all duration-300 hover:scale-105 hover:shadow-lg hover:bg-primary hover:text-primary-foreground"
-                >
-                  Đăng nhập ngay
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </CardContent>
-        </Card>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={formData.email}
+                        onChange={(e) => handleInputChange("email", e.target.value)}
+                        required
+                        className="w-full"
+                        disabled={isLoading}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Mật khẩu *</Label>
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Nhập mật khẩu (ít nhất 6 ký tự)"
+                          value={formData.password}
+                          onChange={(e) => handleInputChange("password", e.target.value)}
+                          required
+                          className="pr-10"
+                          disabled={isLoading}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                          disabled={isLoading}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Xác nhận mật khẩu *</Label>
+                      <div className="relative">
+                        <Input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="Nhập lại mật khẩu"
+                          value={formData.confirmPassword}
+                          onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
+                          required
+                          className="pr-10"
+                          disabled={isLoading}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          disabled={isLoading}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Button 
+                      type="submit" 
+                      className="w-full transition-all duration-300 hover:scale-105 hover:shadow-lg" 
+                      disabled={isLoading || !formData.name.trim() || !formData.email.trim() || !formData.password.trim() || !formData.confirmPassword.trim()}
+                    >
+                      {isLoading ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Đang đăng ký...
+                        </div>
+                      ) : (
+                        "Đăng ký"
+                      )}
+                    </Button>
+                  </form>
+
+                  {/* Divider */}
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">
+                        Hoặc
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Google Sign In */}
+                  <GoogleSignInButton 
+                    mode="register"
+                    onSuccess={() => {
+                      router.push("/dashboard")
+                    }}
+                    onError={(error) => {
+                      showError("Đăng ký Google thất bại", error)
+                    }}
+                  />
+
+                  {/* Login section */}
+                  <div className="text-center space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Đã có tài khoản?
+                      </p>
+                      <Link href="/login">
+                        <Button 
+                          variant="outline" 
+                          className="w-full transition-all duration-300 hover:scale-105 hover:shadow-lg hover:bg-primary hover:text-primary-foreground"
+                        >
+                          Đăng nhập ngay
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   )

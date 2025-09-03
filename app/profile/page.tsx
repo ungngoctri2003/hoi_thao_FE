@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
-import ProfileDetails from "@/components/Profile/Profile";
+import ProfileDetails from "@/components/profile/Profile";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthStatus } from "@/components/auth/auth-status";
 

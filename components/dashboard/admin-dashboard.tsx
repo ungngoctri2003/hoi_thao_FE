@@ -10,6 +10,7 @@ import { RealtimeChart } from "@/components/charts/realtime-chart"
 import { RegistrationChart } from "@/components/charts/registration-chart"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
 import { useAuth } from "@/hooks/use-auth"
+import { RoleInfoPanel } from "@/components/layout/role-info-panel"
 
 const statsData = [
   {
@@ -105,7 +106,7 @@ export function AdminDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {statsData.map((stat, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -120,6 +121,9 @@ export function AdminDashboard() {
             </CardContent>
           </Card>
         ))}
+        
+        {/* Role Info Panel */}
+        <RoleInfoPanel />
       </div>
 
       {/* Charts and Activity */}

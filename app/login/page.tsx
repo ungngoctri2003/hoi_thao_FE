@@ -10,6 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Eye, EyeOff } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { useNotification } from "@/hooks/use-notification"
+import { GoogleSignInButton } from "@/components/auth/google-signin-button"
+import { GoogleAuthRedirectHandler } from "@/components/auth/google-auth-redirect-handler"
+import { AccountDisabledNotice } from "@/components/auth/account-disabled-notice"
+import { AccountDisabledAlert } from "@/components/auth/account-disabled-alert"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -41,7 +45,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <>
+      <GoogleAuthRedirectHandler />
+      <div className="min-h-screen relative overflow-hidden">
       {/* Animated background */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900">
         {/* Floating orbs */}
@@ -58,6 +64,10 @@ export default function LoginPage() {
       
       {/* Content */}
       <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+        {/* Account Disabled Notice */}
+        <div className="absolute top-4 left-4 right-4 max-w-2xl mx-auto">
+          <AccountDisabledNotice email={email} />
+        </div>
         <Card className="w-full max-w-md backdrop-blur-sm bg-white/80 dark:bg-gray-900/80 border-white/20 shadow-2xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-serif font-bold">Đăng nhập</CardTitle>
@@ -140,13 +150,25 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Google Sign In */}
+          <GoogleSignInButton 
+            mode="login"
+            onSuccess={() => {
+              const redirectTo = searchParams.get('redirect') || '/dashboard'
+              router.push(redirectTo)
+            }}
+            onError={(error) => {
+              showError("Đăng nhập Google thất bại", error)
+            }}
+          />
+
           {/* Register section */}
           <div className="text-center space-y-4">
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground my-2">
                 Chưa có tài khoản?
               </p>
-              <Link href="/register">
+              <Link href="/register-simple">
                 <Button 
                   variant="outline" 
                   className="w-full transition-all duration-300 hover:scale-105 hover:shadow-lg hover:bg-primary hover:text-primary-foreground"
@@ -159,6 +181,10 @@ export default function LoginPage() {
         </CardContent>
         </Card>
       </div>
+      
+      {/* Account Disabled Alert */}
+      <AccountDisabledAlert email={email} />
     </div>
+    </>
   )
 }

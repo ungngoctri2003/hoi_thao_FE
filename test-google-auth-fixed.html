@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Google Authentication - Fixed Version</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .status.loading { background-color: #fff3cd; border: 1px solid #ffeaa7; }
+        .status.success { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .status.error { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Test Google Authentication - Fixed Version</h1>
+        <p>Trang này để test Google authentication sau khi đã sửa các lỗi.</p>
+
+        <div class="test-section info">
+            <h3>📋 Các vấn đề đã sửa:</h3>
+            <ul>
+                <li>✅ Sửa Firebase configuration và redirect URL</li>
+                <li>✅ Đồng bộ hóa token management giữa Firebase và auth service</li>
+                <li>✅ Cải thiện error handling trong API routes</li>
+                <li>✅ Sửa logic xử lý redirect callback</li>
+                <li>✅ Thêm validation cho required fields</li>
+                <li>✅ Cải thiện logging và debugging</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Current Status</h3>
+            <div id="status" class="status loading">Đang kiểm tra trạng thái...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>🚀 Test Actions</h3>
+            <button onclick="testGoogleAuth()" id="testBtn">Test Google Authentication</button>
+            <button onclick="checkAuthState()" id="checkBtn">Check Auth State</button>
+            <button onclick="clearLogs()" id="clearBtn">Clear Logs</button>
+            <button onclick="testBackendAPI()" id="backendBtn">Test Backend API</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Debug Information</h3>
+            <div id="debugInfo" class="log">Chưa có thông tin debug...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Logs</h3>
+            <div id="logs" class="log">Logs sẽ hiển thị ở đây...</div>
+        </div>
+    </div>
+
+    <script>
+        let logs = [];
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            logs.push(logEntry);
+            
+            const logsDiv = document.getElementById('logs');
+            logsDiv.textContent = logs.join('\n');
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            
+            console.log(logEntry);
+        }
+
+        function clearLogs() {
+            logs = [];
+            document.getElementById('logs').textContent = 'Logs đã được xóa...';
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function updateDebugInfo(info) {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.textContent = JSON.stringify(info, null, 2);
+        }
+
+        async function checkAuthState() {
+            log('Kiểm tra trạng thái authentication...');
+            
+            try {
+                // Check localStorage tokens
+                const accessToken = localStorage.getItem('accessToken');
+                const refreshToken = localStorage.getItem('refreshToken');
+                
+                // Check cookies
+                const cookies = document.cookie;
+                const hasAccessTokenCookie = cookies.includes('accessToken=');
+                const hasRefreshTokenCookie = cookies.includes('refreshToken=');
+                
+                // Check current URL
+                const currentUrl = window.location.href;
+                const isCallbackPage = currentUrl.includes('/auth/google/callback');
+                
+                const authState = {
+                    localStorage: {
+                        accessToken: accessToken ? 'Present' : 'Not found',
+                        refreshToken: refreshToken ? 'Present' : 'Not found'
+                    },
+                    cookies: {
+                        accessToken: hasAccessTokenCookie ? 'Present' : 'Not found',
+                        refreshToken: hasRefreshTokenCookie ? 'Present' : 'Not found'
+                    },
+                    url: {
+                        current: currentUrl,
+                        isCallbackPage: isCallbackPage
+                    },
+                    timestamp: new Date().toISOString()
+                };
+                
+                updateDebugInfo(authState);
+                
+                if (accessToken || hasAccessTokenCookie) {
+                    updateStatus('✅ User đã được authenticate', 'success');
+                    log('User đã được authenticate thành công');
+                } else {
+                    updateStatus('❌ User chưa được authenticate', 'error');
+                    log('User chưa được authenticate');
+                }
+                
+            } catch (error) {
+                log(`Lỗi khi kiểm tra auth state: ${error.message}`, 'error');
+                updateStatus('❌ Lỗi khi kiểm tra auth state', 'error');
+            }
+        }
+
+        async function testGoogleAuth() {
+            log('Bắt đầu test Google authentication...');
+            updateStatus('🔄 Đang test Google authentication...', 'loading');
+            
+            try {
+                // Redirect to login page with Google auth
+                const loginUrl = '/login';
+                log(`Chuyển hướng đến: ${loginUrl}`);
+                window.location.href = loginUrl;
+                
+            } catch (error) {
+                log(`Lỗi khi test Google auth: ${error.message}`, 'error');
+                updateStatus('❌ Lỗi khi test Google auth', 'error');
+            }
+        }
+
+        async function testBackendAPI() {
+            log('Test Backend API endpoints...');
+            updateStatus('🔄 Đang test Backend API...', 'loading');
+            
+            try {
+                // Test Google login endpoint
+                const testData = {
+                    firebaseUid: 'test_uid_' + Date.now(),
+                    email: 'test@example.com',
+                    name: 'Test User',
+                    avatar: 'https://example.com/avatar.jpg'
+                };
+                
+                log('Testing Google login endpoint...');
+                const loginResponse = await fetch('/api/auth/google/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const loginResult = await loginResponse.json();
+                log(`Login response: ${JSON.stringify(loginResult)}`);
+                
+                if (loginResponse.ok) {
+                    log('✅ Google login endpoint hoạt động', 'success');
+                } else {
+                    log(`❌ Google login endpoint lỗi: ${loginResult.message}`, 'error');
+                }
+                
+                // Test Google register endpoint
+                log('Testing Google register endpoint...');
+                const registerResponse = await fetch('/api/auth/google/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const registerResult = await registerResponse.json();
+                log(`Register response: ${JSON.stringify(registerResult)}`);
+                
+                if (registerResponse.ok) {
+                    log('✅ Google register endpoint hoạt động', 'success');
+                } else {
+                    log(`❌ Google register endpoint lỗi: ${registerResult.message}`, 'error');
+                }
+                
+                updateStatus('✅ Backend API test hoàn thành', 'success');
+                
+            } catch (error) {
+                log(`Lỗi khi test Backend API: ${error.message}`, 'error');
+                updateStatus('❌ Lỗi khi test Backend API', 'error');
+            }
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Trang test Google authentication đã được tải');
+            checkAuthState();
+            
+            // Check if we're on callback page
+            if (window.location.href.includes('/auth/google/callback')) {
+                log('Đang ở trang callback, chờ xử lý...');
+                updateStatus('🔄 Đang xử lý callback...', 'loading');
+                
+                // Check auth state after a delay
+                setTimeout(() => {
+                    checkAuthState();
+                }, 2000);
+            }
+        });
+    </script>
+</body>
+</html>

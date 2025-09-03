@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Roles API Integration</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .test-section { margin: 20px 0; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff; background: #f8f9fa; }
+        .success { border-left-color: #28a745; background: #d4edda; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .info { border-left-color: #17a2b8; background: #d1ecf1; }
+        .warning { border-left-color: #ffc107; background: #fff3cd; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin-top: 10px; padding: 10px; background: #e9ecef; border-radius: 3px; font-family: monospace; max-height: 300px; overflow-y: auto; }
+        .data-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-top: 15px; }
+        .data-card { padding: 15px; border: 1px solid #ddd; border-radius: 5px; background: white; }
+        .data-card h4 { margin: 0 0 10px 0; color: #333; }
+        .data-card p { margin: 5px 0; color: #666; font-size: 14px; }
+        .badge { display: inline-block; padding: 2px 8px; background: #007bff; color: white; border-radius: 12px; font-size: 12px; margin: 2px; }
+        .badge.admin { background: #dc3545; }
+        .badge.staff { background: #007bff; }
+        .badge.attendee { background: #28a745; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Roles API Integration</h1>
+        
+        <div class="test-section info">
+            <h3>📋 Mục tiêu test</h3>
+            <p>Kiểm tra xem frontend có hiển thị đúng dữ liệu từ API backend không:</p>
+            <ul>
+                <li>✅ Roles từ API `/roles`</li>
+                <li>✅ Permissions từ API `/permissions`</li>
+                <li>✅ Stats cards hiển thị số liệu thực</li>
+                <li>✅ Tab "Vai trò" hiển thị danh sách roles</li>
+                <li>✅ Tab "Phân quyền" hiển thị danh sách permissions</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🔗 Test API Endpoints</h3>
+            <button onclick="testRolesAPI()">Test GET /roles</button>
+            <button onclick="testPermissionsAPI()">Test GET /permissions</button>
+            <button onclick="testCreateRole()">Test POST /roles</button>
+            <div id="api-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🌐 Test Frontend Integration</h3>
+            <button onclick="openRolesPage()">Mở trang Roles</button>
+            <button onclick="checkDataDisplay()">Kiểm tra hiển thị dữ liệu</button>
+            <div id="frontend-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Dữ liệu từ API</h3>
+            <div id="data-display" class="data-grid"></div>
+        </div>
+
+        <div class="test-section success">
+            <h3>✅ Kết quả mong đợi</h3>
+            <p><strong>Trước khi sửa:</strong> Hiển thị mock data cố định</p>
+            <p><strong>Sau khi sửa:</strong> Hiển thị dữ liệu thực từ API backend</p>
+            <ul>
+                <li>Stats cards hiển thị số lượng roles/permissions thực</li>
+                <li>Tab "Vai trò" hiển thị danh sách roles từ API</li>
+                <li>Tab "Phân quyền" hiển thị danh sách permissions từ API</li>
+                <li>Permission matrix sử dụng dữ liệu thực</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000/api/v1';
+        let apiData = { roles: [], permissions: [] };
+        
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+            element.innerHTML = `<div class="test-section ${className}">${message}</div>`;
+        }
+
+        function displayData() {
+            const container = document.getElementById('data-display');
+            container.innerHTML = '';
+            
+            // Display Roles
+            const rolesCard = document.createElement('div');
+            rolesCard.className = 'data-card';
+            rolesCard.innerHTML = `
+                <h4>📋 Roles (${apiData.roles.length})</h4>
+                ${apiData.roles.map(role => `
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
+                        <p><strong>${role.name}</strong> <span class="badge ${role.code}">${role.code}</span></p>
+                        <p>ID: ${role.id}</p>
+                    </div>
+                `).join('')}
+            `;
+            container.appendChild(rolesCard);
+            
+            // Display Permissions
+            const permissionsCard = document.createElement('div');
+            permissionsCard.className = 'data-card';
+            permissionsCard.innerHTML = `
+                <h4>🔑 Permissions (${apiData.permissions.length})</h4>
+                ${apiData.permissions.map(permission => `
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
+                        <p><strong>${permission.name}</strong></p>
+                        <p>ID: ${permission.id}</p>
+                        ${permission.description ? `<p>Mô tả: ${permission.description}</p>` : ''}
+                        ${permission.category ? `<p>Danh mục: ${permission.category}</p>` : ''}
+                    </div>
+                `).join('')}
+            `;
+            container.appendChild(permissionsCard);
+        }
+
+        async function testRolesAPI() {
+            log('api-result', '🔄 Đang test GET /roles...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/roles`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    apiData.roles = data.data || [];
+                    log('api-result', `✅ GET /roles thành công! Tìm thấy ${apiData.roles.length} roles`, 'success');
+                    displayData();
+                } else {
+                    log('api-result', `❌ GET /roles thất bại: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log('api-result', `❌ GET /roles lỗi: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPermissionsAPI() {
+            log('api-result', '🔄 Đang test GET /permissions...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/permissions`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    apiData.permissions = data.data || [];
+                    log('api-result', `✅ GET /permissions thành công! Tìm thấy ${apiData.permissions.length} permissions`, 'success');
+                    displayData();
+                } else {
+                    log('api-result', `❌ GET /permissions thất bại: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log('api-result', `❌ GET /permissions lỗi: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreateRole() {
+            log('api-result', '🔄 Đang test POST /roles...', 'info');
+            try {
+                const roleData = {
+                    code: 'test_role_' + Date.now(),
+                    name: 'Test Role ' + new Date().toLocaleTimeString()
+                };
+                
+                const response = await fetch(`${API_BASE}/roles`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token'
+                    },
+                    body: JSON.stringify(roleData)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('api-result', `✅ POST /roles thành công! Role ID: ${data.data.id}`, 'success');
+                    // Refresh roles list
+                    await testRolesAPI();
+                } else {
+                    log('api-result', `❌ POST /roles thất bại: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log('api-result', `❌ POST /roles lỗi: ${error.message}`, 'error');
+            }
+        }
+
+        function openRolesPage() {
+            const url = 'http://localhost:3000/roles';
+            window.open(url, '_blank');
+            log('frontend-result', `🌐 Đã mở trang roles: <a href="${url}" target="_blank">${url}</a><br>📝 Hướng dẫn: Kiểm tra các tab "Vai trò" và "Phân quyền" để xem dữ liệu từ API`, 'info');
+        }
+
+        function checkDataDisplay() {
+            log('frontend-result', `
+                <h4>🔍 Checklist kiểm tra hiển thị dữ liệu:</h4>
+                <ol>
+                    <li><strong>Stats Cards:</strong> Số "Tổng vai trò" và "Tổng quyền" phải khớp với API</li>
+                    <li><strong>Tab "Vai trò":</strong> Hiển thị danh sách roles từ API, không phải mock data</li>
+                    <li><strong>Tab "Phân quyền":</strong> Hiển thị danh sách permissions từ API</li>
+                    <li><strong>Permission Matrix:</strong> Sử dụng dữ liệu thực từ API</li>
+                    <li><strong>Create Role:</strong> Tạo role mới và thấy xuất hiện trong danh sách</li>
+                </ol>
+                <p><strong>💡 Lưu ý:</strong> Nếu thấy dữ liệu cố định (như "admin", "staff", "attendee"), có nghĩa là vẫn đang dùng mock data</p>
+            `, 'info');
+        }
+
+        // Auto-load data on page load
+        window.onload = function() {
+            setTimeout(async () => {
+                await testRolesAPI();
+                await testPermissionsAPI();
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

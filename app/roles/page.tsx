@@ -1,12 +1,14 @@
 "use client"
 
+import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { MainLayout } from "@/components/layout/main-layout"
 import { RoleManagement } from "@/components/roles/role-management"
 import { useAuth } from "@/hooks/use-auth"
 import { AuthStatus } from "@/components/auth/auth-status"
+import { AdminOnly } from "@/components/auth/role-guard"
 
-export default function RolesPage() {
+function RolesPageContent() {
   const searchParams = useSearchParams()
   const { user, isAuthenticated, isLoading } = useAuth()
   
@@ -33,8 +35,22 @@ export default function RolesPage() {
   }
 
   return (
-    <MainLayout userRole={role} userName={name} userAvatar={user?.avatar}>
-      <RoleManagement />
-    </MainLayout>
+    <AdminOnly>
+      <MainLayout userRole={role} userName={name} userAvatar={user?.avatar}>
+        <RoleManagement />
+      </MainLayout>
+    </AdminOnly>
+  )
+}
+
+export default function RolesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    }>
+      <RolesPageContent />
+    </Suspense>
   )
 }
