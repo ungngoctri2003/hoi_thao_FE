@@ -88,3 +88,4 @@ GET /api/users/me/refresh-permissions
 2. **Auto-refresh**: Tự động refresh permissions định kỳ
 3. **Role change history**: Lịch sử thay đổi quyền
 4. **Bulk role updates**: Cập nhật quyền hàng loạt
+

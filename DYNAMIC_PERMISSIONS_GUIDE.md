@@ -202,3 +202,4 @@ function MyComponent() {
 3. **Permission Inheritance**: Permissions kế thừa
 4. **Permission Templates**: Template permissions cho roles
 5. **Real-time Notifications**: Thông báo khi permissions thay đổi
+
