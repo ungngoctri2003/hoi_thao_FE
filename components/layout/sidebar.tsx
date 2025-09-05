@@ -239,7 +239,7 @@ export function Sidebar({ userRole }: SidebarProps) {
   return (
     <div
       className={cn(
-        "flex flex-col h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300",
+        "flex flex-col h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 relative z-10",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
@@ -291,24 +291,52 @@ export function Sidebar({ userRole }: SidebarProps) {
                   <Button
                     variant="ghost"
                     className={cn(
-                      "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent p-2 h-auto",
-                      isCollapsed && "px-2"
+                      "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent p-3 h-auto min-h-[3rem] group",
+                      isCollapsed && "px-2 min-h-[2.5rem]"
                     )}
                     onClick={() => toggleConference(conference.conferenceId)}
                   >
-                    <Building className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
-                    {!isCollapsed && (
-                      <>
-                        <span className="flex-1 text-left truncate">{conference.conferenceName}</span>
-                        <Badge variant="outline" className="text-xs w-16">
-                          {categories.length} tính năng
-                        </Badge>
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 ml-2" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 ml-2" />
-                        )}
-                      </>
+                    <Building className={cn("h-4 w-4 flex-shrink-0", !isCollapsed && "mr-3")} />
+                    {isCollapsed ? (
+                      <SidebarTooltip
+                        content={conference.conferenceName}
+                        description={`${categories.length} tính năng có sẵn`}
+                        role={currentRole}
+                      >
+                        <div className="w-full h-8 flex items-center justify-center">
+                          <Building className="h-4 w-4" />
+                        </div>
+                      </SidebarTooltip>
+                    ) : (
+                      <div className="flex-1 min-w-0 flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <SidebarTooltip
+                            content={conference.conferenceName}
+                            description={`${categories.length} tính năng có sẵn`}
+                            role={currentRole}
+                          >
+                            <div className="text-sm font-medium text-left leading-tight break-words cursor-pointer line-clamp-2 group-hover:text-sidebar-accent-foreground transition-colors">
+                              {conference.conferenceName}
+                            </div>
+                          </SidebarTooltip>
+                        </div>
+                        <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "text-xs whitespace-nowrap",
+                              categories.length > 5 && "bg-primary/10 text-primary border-primary/20"
+                            )}
+                          >
+                            {categories.length}
+                          </Badge>
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </div>
+                      </div>
                     )}
                   </Button>
 
