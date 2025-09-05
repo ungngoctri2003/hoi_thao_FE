@@ -50,7 +50,7 @@ interface ConferenceSelectorProps {
 }
 
 // Permission mapping with icons and labels
-const permissionMap: Record<string, { icon: any; label: string; color: string }> = {
+const permissionMap: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; color: string }> = {
   'conferences.view': { icon: Eye, label: 'Xem hội nghị', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
   'conferences.create': { icon: Plus, label: 'Tạo hội nghị', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
   'conferences.update': { icon: Edit, label: 'Sửa hội nghị', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },

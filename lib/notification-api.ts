@@ -11,7 +11,7 @@ export interface Notification {
   category: 'system' | 'permission' | 'conference' | 'session' | 'registration' | 'general';
   is_read: boolean;
   is_archived: boolean;
-  data?: any;
+  data?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
   expires_at?: string;
@@ -40,7 +40,7 @@ export interface NotificationPreferences {
   email_notifications: boolean;
   push_notifications: boolean;
   in_app_notifications: boolean;
-  categories?: any;
+  categories?: Record<string, unknown>;
   quiet_hours_start?: string;
   quiet_hours_end?: string;
   created_at: string;
@@ -150,7 +150,7 @@ class NotificationAPI {
       message: string;
       type?: 'info' | 'success' | 'warning' | 'error';
       category?: 'system' | 'permission' | 'conference' | 'session' | 'registration' | 'general';
-      data?: any;
+      data?: Record<string, unknown>;
       expires_at?: string;
     }
   ): Promise<Notification> {
@@ -166,7 +166,7 @@ class NotificationAPI {
     data: {
       template_name: string;
       variables?: Record<string, any>;
-      data?: any;
+      data?: Record<string, unknown>;
       expires_at?: string;
     }
   ): Promise<Notification> {
@@ -182,7 +182,7 @@ class NotificationAPI {
     message: string;
     type?: 'info' | 'success' | 'warning' | 'error';
     category?: 'system' | 'permission' | 'conference' | 'session' | 'registration' | 'general';
-    data?: any;
+    data?: Record<string, unknown>;
     expires_at?: string;
   }): Promise<{ createdCount: number; totalUsers: number }> {
     return this.request('/broadcast', {
@@ -195,7 +195,7 @@ class NotificationAPI {
   async broadcastFromTemplate(data: {
     template_name: string;
     variables?: Record<string, any>;
-    data?: any;
+    data?: Record<string, unknown>;
     expires_at?: string;
   }): Promise<{ createdCount: number; totalUsers: number }> {
     return this.request('/broadcast-template', {

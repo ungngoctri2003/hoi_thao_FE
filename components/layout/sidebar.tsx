@@ -46,6 +46,13 @@ const allNavigationItems = [
     description: "Trang chủ và tổng quan hệ thống"
   },
   { 
+    href: "/conference-management", 
+    icon: Building, 
+    label: "Quản lý hội nghị", 
+    requiredPermissions: ["conferences.manage", "conferences.create", "conferences.edit", "conferences.delete"],
+    description: "Tạo, chỉnh sửa và quản lý các hội nghị"
+  },
+  { 
     href: "/roles", 
     icon: Shield, 
     label: "Phân quyền", 
@@ -89,6 +96,11 @@ const getNavigationItems = (
   userRole: string
 ) => {
   return allNavigationItems.filter(item => {
+    // Special handling for conference management - only show to admin
+    if (item.href === '/conference-management') {
+      return userRole === 'admin';
+    }
+    
     // Check if user has basic role-based permission
     const hasBasicPermission = item.requiredPermissions.every(permission => hasPermission(permission));
     
@@ -96,7 +108,7 @@ const getNavigationItems = (
     if (userRole === 'admin' || userRole === 'staff') {
       // For conference-specific features, check if user has basic permission OR conference permission
       const conferenceSpecificFeatures = [
-        '/conferences', '/attendees', '/checkin', '/networking', 
+        '/attendees', '/checkin', '/networking', 
         '/venue', '/sessions', '/badges', '/analytics', '/my-events'
       ];
       
@@ -110,7 +122,7 @@ const getNavigationItems = (
     
     // For attendees, require both basic and conference permissions for conference features
     const conferenceSpecificFeatures = [
-      '/conferences', '/attendees', '/checkin', '/networking', 
+      '/attendees', '/checkin', '/networking', 
       '/venue', '/sessions', '/badges', '/analytics', '/my-events'
     ];
     
@@ -159,7 +171,6 @@ export function Sidebar({ userRole }: SidebarProps) {
   
   // Category configuration
   const categoryConfig = {
-    conferences: { icon: Calendar, label: "Quản lý hội nghị", href: "/conferences" },
     attendees: { icon: Users, label: "Danh sách tham dự", href: "/attendees" },
     checkin: { icon: QrCode, label: "Check-in QR", href: "/checkin" },
     networking: { icon: Network, label: "Kết nối mạng", href: "/networking" },
@@ -185,15 +196,15 @@ export function Sidebar({ userRole }: SidebarProps) {
   const getConferenceCategories = (conferenceId: number) => {
     const permissions = getConferencePermissions(conferenceId);
     return Object.entries(categoryConfig).filter(([key, config]) => {
-      const permissionKey = key === 'conferences' ? 'conferences.view' : `${key}.view`;
+      const permissionKey = `${key}.view`;
       return permissions[permissionKey] === true;
-    }).map(([key, config]) => [
-      key, 
-      { 
+    }).map(([key, config]) => ({
+      key,
+      config: { 
         ...config, 
-        href: key === 'conferences' ? `/conferences/${conferenceId}` : `/${key}?conferenceId=${conferenceId}` 
+        href: `/${key}?conferenceId=${conferenceId}` 
       }
-    ]);
+    }));
   };
   
   // Group items by category for better organization
@@ -202,7 +213,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       ["/dashboard", "/profile"].includes(item.href)
     ),
     management: items.filter(item => 
-      ["/roles", "/audit", "/settings"].includes(item.href)
+      ["/conference-management", "/roles", "/audit", "/settings"].includes(item.href)
     ),
     features: items.filter(item => 
       ["/my-events"].includes(item.href)
@@ -304,7 +315,7 @@ export function Sidebar({ userRole }: SidebarProps) {
                   {/* Conference Categories */}
                   {!isCollapsed && isExpanded && categories.length > 0 && (
                     <div className="ml-6 space-y-1">
-                      {categories.map(([categoryKey, config]) => {
+                      {categories.map(({ key: categoryKey, config }) => {
                         const isActive = pathname === config.href;
                         const IconComponent = config.icon;
                         

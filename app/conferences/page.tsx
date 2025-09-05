@@ -2,10 +2,9 @@
 
 import { useSearchParams } from "next/navigation"
 import { MainLayout } from "@/components/layout/main-layout"
-import { ConferenceManagement } from "@/components/conferences/conference-management"
+import { ConferenceList } from "@/components/conferences/conference-list"
 import { useAuth } from "@/hooks/use-auth"
 import { AuthStatus } from "@/components/auth/auth-status"
-import { StaffAndAdmin } from "@/components/auth/role-guard"
 import { ConferenceViewGuard } from "@/components/auth/conference-permission-guard"
 
 export default function ConferencesPage() {
@@ -35,12 +34,10 @@ export default function ConferencesPage() {
   }
 
   return (
-    <StaffAndAdmin>
-      <ConferenceViewGuard>
-        <MainLayout userRole={role} userName={name} userAvatar={user?.avatar}>
-          <ConferenceManagement />
-        </MainLayout>
-      </ConferenceViewGuard>
-    </StaffAndAdmin>
+    <ConferenceViewGuard>
+      <MainLayout userRole={role} userName={name} userAvatar={user?.avatar}>
+        <ConferenceList />
+      </MainLayout>
+    </ConferenceViewGuard>
   )
 }

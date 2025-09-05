@@ -680,13 +680,7 @@ export function AttendeeManagement() {
                     </TableRow>
                   ) : (
                     paginatedAttendees.map((attendee, index) => {
-                      const attendeeData = attendee as any; // Type assertion for backend fields
-                      console.log(`Rendering attendee ${index}:`, {
-                        id: attendeeData.id || attendeeData.ID,
-                        name: attendeeData.name || attendeeData.NAME,
-                        email: attendeeData.email || attendeeData.EMAIL,
-                        fullAttendee: attendeeData
-                      });
+                      const attendeeData = attendee as Record<string, unknown>; // Type assertion for backend fields
                       return (
                       <TableRow key={attendeeData.id || attendeeData.ID}>
                         <TableCell>

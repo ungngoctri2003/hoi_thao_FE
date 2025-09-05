@@ -98,6 +98,19 @@ export function RoleManagement() {
     loadData()
   }, [])
 
+  // Listen for conference updates
+  useEffect(() => {
+    const handleConferenceUpdate = () => {
+      loadData()
+    }
+
+    window.addEventListener('conferences-updated', handleConferenceUpdate)
+    
+    return () => {
+      window.removeEventListener('conferences-updated', handleConferenceUpdate)
+    }
+  }, [])
+
   // Debounce search term
   useEffect(() => {
     const timer = setTimeout(() => {

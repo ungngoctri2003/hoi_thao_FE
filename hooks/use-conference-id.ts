@@ -15,23 +15,19 @@ export function useConferenceId() {
         // Get conferenceId from URL search params
         const urlParams = new URLSearchParams(window.location.search);
         const conferenceIdParam = urlParams.get('conferenceId');
-        console.log('🔍 [DEBUG] useConferenceId - conferenceIdParam:', conferenceIdParam);
         
         if (conferenceIdParam) {
           const id = parseInt(conferenceIdParam);
           if (!isNaN(id)) {
-            console.log('🔍 [DEBUG] useConferenceId - setting conferenceId:', id);
             setConferenceId(id);
           } else {
-            console.log('🔍 [DEBUG] useConferenceId - invalid conferenceId:', conferenceIdParam);
             setConferenceId(null);
           }
         } else {
-          console.log('🔍 [DEBUG] useConferenceId - no conferenceId in URL');
           setConferenceId(null);
         }
       } catch (error) {
-        console.error('🔍 [DEBUG] useConferenceId - error:', error);
+        console.error('Error parsing conferenceId:', error);
         setConferenceId(null);
       } finally {
         setIsLoading(false);
@@ -41,6 +37,5 @@ export function useConferenceId() {
     updateConferenceId();
   }, [pathname]); // Only depend on pathname changes
 
-  console.log('🔍 [DEBUG] useConferenceId - returning:', conferenceId, 'isLoading:', isLoading);
   return { conferenceId, isLoading };
 }

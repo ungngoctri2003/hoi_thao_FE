@@ -1,11 +1,11 @@
 // API configuration and utilities
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data: T;
   message?: string;
-  meta?: any;
+  meta?: Record<string, unknown>;
 }
 
 export interface LoginRequest {
@@ -224,6 +224,9 @@ export interface ConferenceInfo {
   location?: string;
   status: string;
   createdAt: string;
+  capacity?: number;
+  category?: string;
+  organizer?: string;
 }
 
 export interface UserConferenceAssignment {
@@ -293,7 +296,32 @@ class ApiClient {
     const token = this.getToken();
     console.log('API request token:', token ? 'exists' : 'missing');
     if (token) {
-      defaultHeaders['Authorization'] = `Bearer ${token}`;
+      // Check if token is expired before sending request
+      if (this.isTokenExpired(token)) {
+        console.log('Token is expired, attempting refresh before request...');
+        try {
+          const refreshSuccess = await this.attemptTokenRefresh();
+          if (refreshSuccess) {
+            // Get the new token
+            const newToken = this.getToken();
+            if (newToken) {
+              defaultHeaders['Authorization'] = `Bearer ${newToken}`;
+            }
+          } else {
+            // If refresh fails, clear tokens and handle session expiration
+            this.removeTokens();
+            this.handleSessionExpiration();
+            throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+          }
+        } catch (refreshError) {
+          console.error('Token refresh failed before request:', refreshError);
+          this.removeTokens();
+          this.handleSessionExpiration();
+          throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        }
+      } else {
+        defaultHeaders['Authorization'] = `Bearer ${token}`;
+      }
     }
 
     const config: RequestInit = {
@@ -340,9 +368,17 @@ class ApiClient {
               console.log('Token refresh successful, retrying request...');
               // Retry the original request with new token
               return this.request<T>(endpoint, options, true);
+            } else {
+              console.log('Token refresh failed, clearing tokens and redirecting to login');
+              this.removeTokens();
+              this.handleSessionExpiration();
+              throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
             }
           } catch (refreshError) {
             console.error('Token refresh failed:', refreshError);
+            this.removeTokens();
+            this.handleSessionExpiration();
+            throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
           }
         }
 
@@ -369,7 +405,10 @@ class ApiClient {
               // Trigger session expiration handler
               this.handleSessionExpiration();
             } else {
-              errorMessage = data.message || 'Không có quyền truy cập';
+              // For other endpoints, also clear tokens and handle session expiration
+              this.removeTokens();
+              errorMessage = data.message || 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+              this.handleSessionExpiration();
             }
             break;
           case 403:
@@ -414,6 +453,17 @@ class ApiClient {
       return token;
     }
     return null;
+  }
+
+  private isTokenExpired(token: string): boolean {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const now = Math.floor(Date.now() / 1000);
+      return now >= payload.exp;
+    } catch (error) {
+      console.error('Error parsing token:', error);
+      return true; // Consider invalid token as expired
+    }
   }
 
   private getRefreshToken(): string | null {
@@ -926,7 +976,7 @@ class ApiClient {
     }
   }
 
-  async getAttendees(params?: { page?: number; limit?: number; filters?: any; search?: string }): Promise<{ data: AttendeeInfo[]; meta: any }> {
+  async getAttendees(params?: { page?: number; limit?: number; filters?: Record<string, unknown>; search?: string }): Promise<{ data: AttendeeInfo[]; meta: Record<string, unknown> }> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
@@ -1120,6 +1170,9 @@ class ApiClient {
       location: row.LOCATION ?? row.location,
       status: row.STATUS ?? row.status,
       createdAt: row.CREATED_AT ?? row.createdAt,
+      capacity: row.CAPACITY ?? row.capacity,
+      category: row.CATEGORY ?? row.category,
+      organizer: row.ORGANIZER ?? row.organizer,
     }));
 
     return {
@@ -1133,21 +1186,116 @@ class ApiClient {
       method: 'GET',
     });
 
-    const row: any = response.data;
+    const row = response.data as Record<string, unknown>;
     return {
-      id: row.ID ?? row.id,
-      name: row.NAME ?? row.name,
-      description: row.DESCRIPTION ?? row.description,
-      startDate: row.START_DATE ?? row.startDate,
-      endDate: row.END_DATE ?? row.endDate,
-      location: row.LOCATION ?? row.location,
-      status: row.STATUS ?? row.status,
-      createdAt: row.CREATED_AT ?? row.createdAt,
+      id: Number(row.ID ?? row.id),
+      name: String(row.NAME ?? row.name),
+      description: String(row.DESCRIPTION ?? row.description),
+      startDate: String(row.START_DATE ?? row.startDate),
+      endDate: String(row.END_DATE ?? row.endDate),
+      location: String(row.LOCATION ?? row.location),
+      status: String(row.STATUS ?? row.status),
+      createdAt: String(row.CREATED_AT ?? row.createdAt),
+      capacity: row.CAPACITY ? Number(row.CAPACITY) : undefined,
+      category: row.CATEGORY ? String(row.CATEGORY) : undefined,
+      organizer: row.ORGANIZER ? String(row.ORGANIZER) : undefined,
+    };
+  }
+
+  async createConference(data: {
+    NAME: string;
+    DESCRIPTION?: string;
+    START_DATE?: string;
+    END_DATE?: string;
+    LOCATION?: string;
+    CAPACITY?: number;
+    CATEGORY?: string;
+    ORGANIZER?: string;
+    STATUS?: string;
+  }): Promise<ConferenceInfo> {
+    const response = await this.request<any>('/conferences', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+
+    const row = response.data as Record<string, unknown>;
+    return {
+      id: Number(row.ID ?? row.id),
+      name: String(row.NAME ?? row.name),
+      description: String(row.DESCRIPTION ?? row.description),
+      startDate: String(row.START_DATE ?? row.startDate),
+      endDate: String(row.END_DATE ?? row.endDate),
+      location: String(row.LOCATION ?? row.location),
+      status: String(row.STATUS ?? row.status),
+      createdAt: String(row.CREATED_AT ?? row.createdAt),
+      capacity: row.CAPACITY ? Number(row.CAPACITY) : undefined,
+      category: row.CATEGORY ? String(row.CATEGORY) : undefined,
+      organizer: row.ORGANIZER ? String(row.ORGANIZER) : undefined,
+    };
+  }
+
+  async updateConference(id: number, data: {
+    NAME?: string;
+    DESCRIPTION?: string;
+    START_DATE?: string;
+    END_DATE?: string;
+    LOCATION?: string;
+    CAPACITY?: number;
+    CATEGORY?: string;
+    ORGANIZER?: string;
+    STATUS?: string;
+  }): Promise<ConferenceInfo> {
+    const response = await this.request<any>(`/conferences/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+
+    const row = response.data as Record<string, unknown>;
+    return {
+      id: Number(row.ID ?? row.id),
+      name: String(row.NAME ?? row.name),
+      description: String(row.DESCRIPTION ?? row.description),
+      startDate: String(row.START_DATE ?? row.startDate),
+      endDate: String(row.END_DATE ?? row.endDate),
+      location: String(row.LOCATION ?? row.location),
+      status: String(row.STATUS ?? row.status),
+      createdAt: String(row.CREATED_AT ?? row.createdAt),
+      capacity: row.CAPACITY ? Number(row.CAPACITY) : undefined,
+      category: row.CATEGORY ? String(row.CATEGORY) : undefined,
+      organizer: row.ORGANIZER ? String(row.ORGANIZER) : undefined,
+    };
+  }
+
+  async deleteConference(id: number): Promise<void> {
+    await this.request(`/conferences/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateConferenceStatus(id: number, status: string): Promise<ConferenceInfo> {
+    const response = await this.request<any>(`/conferences/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+
+    const row = response.data as Record<string, unknown>;
+    return {
+      id: Number(row.ID ?? row.id),
+      name: String(row.NAME ?? row.name),
+      description: String(row.DESCRIPTION ?? row.description),
+      startDate: String(row.START_DATE ?? row.startDate),
+      endDate: String(row.END_DATE ?? row.endDate),
+      location: String(row.LOCATION ?? row.location),
+      status: String(row.STATUS ?? row.status),
+      createdAt: String(row.CREATED_AT ?? row.createdAt),
+      capacity: row.CAPACITY ? Number(row.CAPACITY) : undefined,
+      category: row.CATEGORY ? String(row.CATEGORY) : undefined,
+      organizer: row.ORGANIZER ? String(row.ORGANIZER) : undefined,
     };
   }
 
   // Sessions endpoints (if available)
-  async getSessions(conferenceId?: number): Promise<{ data: SessionInfo[]; meta: any }> {
+  async getSessions(conferenceId?: number): Promise<{ data: SessionInfo[]; meta: Record<string, unknown> }> {
     const queryParams = new URLSearchParams();
     if (conferenceId) queryParams.append('conferenceId', conferenceId.toString());
 

@@ -6,6 +6,8 @@ import { ConferencePermissionGuard } from "@/components/auth/conference-permissi
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MainLayout } from "@/components/layout/main-layout";
+import { useAuth } from "@/hooks/use-auth";
 import { 
   Smartphone, 
   Download, 
@@ -23,6 +25,7 @@ import {
 } from "lucide-react";
 
 export default function MobilePage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { currentConferenceId, hasConferencePermission } = useConferencePermissions();
   const [isLoading, setIsLoading] = useState(true);
 
@@ -32,29 +35,64 @@ export default function MobilePage() {
     }, 1000);
   }, [currentConferenceId]);
 
-  const canView = hasConferencePermission("mobile.view");
-
-  if (!canView) {
+  
+  // Show loading state while auth is loading
+  if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-red-600">Không có quyền truy cập</CardTitle>
-            <CardDescription className="text-center">
-              Bạn không có quyền xem ứng dụng di động
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary">        </div>
       </div>
     );
   }
 
+  // Show not authenticated state
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-center text-red-600">Chưa đăng nhập</CardTitle>
+              <CardDescription className="text-center">
+                Vui lòng đăng nhập để truy cập trang này
+              </CardDescription>
+            </CardHeader>
+          </Card>
+                </div>
+      </div>
+    );
+  }
+
+  // Get user info for MainLayout
+  const userRole = (user.role as "admin" | "staff" | "attendee") || "attendee";
+  const userName = user.name || "Người dùng";
+  const userAvatar = user.avatar;
+  const canView = hasConferencePermission("mobile.view");
+
+  if (!canView) {
+    return (
+      <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
+        <div className="flex items-center justify-center min-h-screen">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center text-red-600">Không có quyền truy cập</CardTitle>
+              <CardDescription className="text-center">
+                Bạn không có quyền xem ứng dụng di động
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
-    <ConferencePermissionGuard 
-      requiredPermissions={["mobile.view"]} 
-      conferenceId={currentConferenceId ?? undefined}
-    >
-      <div className="container mx-auto p-6 space-y-6">
+    <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
+      <ConferencePermissionGuard 
+        requiredPermissions={["mobile.view"]} 
+        conferenceId={currentConferenceId ?? undefined}
+      >
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -162,6 +200,7 @@ export default function MobilePage() {
           </CardContent>
         </Card>
       </div>
-    </ConferencePermissionGuard>
+          </ConferencePermissionGuard>
+    </MainLayout>
   );
 }

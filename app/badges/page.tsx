@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MainLayout } from "@/components/layout/main-layout";
+import { useAuth } from "@/hooks/use-auth";
 import { 
   Award, 
   Search, 
@@ -51,6 +53,7 @@ interface UserBadge {
 }
 
 export default function BadgesPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { currentConferenceId, hasConferencePermission } = useConferencePermissions();
   const [badges, setBadges] = useState<DigitalBadge[]>([]);
   const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
@@ -193,29 +196,64 @@ export default function BadgesPage() {
     return categoryMap[category] || category;
   };
 
-  const canView = hasConferencePermission("badges.view");
-
-  if (!canView) {
+  
+  // Show loading state while auth is loading
+  if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-red-600">Không có quyền truy cập</CardTitle>
-            <CardDescription className="text-center">
-              Bạn không có quyền xem huy hiệu số
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary">        </div>
       </div>
     );
   }
 
+  // Show not authenticated state
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-center text-red-600">Chưa đăng nhập</CardTitle>
+              <CardDescription className="text-center">
+                Vui lòng đăng nhập để truy cập trang này
+              </CardDescription>
+            </CardHeader>
+          </Card>
+                </div>
+      </div>
+    );
+  }
+
+  // Get user info for MainLayout
+  const userRole = (user.role as "admin" | "staff" | "attendee") || "attendee";
+  const userName = user.name || "Người dùng";
+  const userAvatar = user.avatar;
+  const canView = hasConferencePermission("badges.view");
+
+  if (!canView) {
+    return (
+      <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
+        <div className="flex items-center justify-center min-h-screen">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center text-red-600">Không có quyền truy cập</CardTitle>
+              <CardDescription className="text-center">
+                Bạn không có quyền xem huy hiệu số
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
-    <ConferencePermissionGuard 
-      requiredPermissions={["badges.view"]} 
-      conferenceId={currentConferenceId ?? undefined}
-    >
-      <div className="container mx-auto p-6 space-y-6">
+    <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
+      <ConferencePermissionGuard 
+        requiredPermissions={["badges.view"]} 
+        conferenceId={currentConferenceId ?? undefined}
+      >
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -432,6 +470,7 @@ export default function BadgesPage() {
           </CardContent>
         </Card>
       </div>
-    </ConferencePermissionGuard>
+          </ConferencePermissionGuard>
+    </MainLayout>
   );
 }

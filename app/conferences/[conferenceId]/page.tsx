@@ -24,18 +24,6 @@ import Link from "next/link";
 
 // Category configuration with icons and descriptions
 const categoryConfig = {
-  conferences: {
-    icon: Calendar,
-    title: "Quản lý hội nghị",
-    description: "Quản lý thông tin và cài đặt hội nghị",
-    color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-    features: [
-      { name: "Xem danh sách hội nghị", permission: "conferences.view" },
-      { name: "Tạo hội nghị mới", permission: "conferences.create" },
-      { name: "Chỉnh sửa hội nghị", permission: "conferences.update" },
-      { name: "Xóa hội nghị", permission: "conferences.delete" }
-    ]
-  },
   attendees: {
     icon: Users,
     title: "Danh sách tham dự",
@@ -174,7 +162,7 @@ export default function ConferencePage() {
             <div>
               <h1 className="text-3xl font-bold">{conferenceName}</h1>
               <p className="text-muted-foreground">
-                Quản lý và điều khiển các tính năng của hội nghị
+                Xem và sử dụng các tính năng của hội nghị
               </p>
             </div>
           </div>

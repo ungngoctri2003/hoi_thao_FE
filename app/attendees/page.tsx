@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useConferencePermissions } from "@/hooks/use-conference-permissions";
 import { ConferencePermissionGuard } from "@/components/auth/conference-permission-guard";
+import { MainLayout } from "@/components/layout/main-layout";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -101,6 +103,7 @@ interface Attendee {
 }
 
 export default function AttendeesPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { currentConferenceId, hasConferencePermission } = useConferencePermissions();
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -536,27 +539,62 @@ export default function AttendeesPage() {
   const canManage = hasConferencePermission("attendees.manage");
   const canView = hasConferencePermission("attendees.view");
 
-  if (!canView) {
+  // Show loading state while auth is loading
+  if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-red-600">Không có quyền truy cập</CardTitle>
-            <CardDescription className="text-center">
-              Bạn không có quyền xem danh sách tham dự
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary">        </div>
       </div>
     );
   }
 
+  // Show not authenticated state
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-center text-red-600">Chưa đăng nhập</CardTitle>
+              <CardDescription className="text-center">
+                Vui lòng đăng nhập để truy cập trang này
+              </CardDescription>
+            </CardHeader>
+          </Card>
+                </div>
+      </div>
+    );
+  }
+
+  // Get user info for MainLayout
+  const userRole = (user.role as "admin" | "staff" | "attendee") || "attendee";
+  const userName = user.name || "Người dùng";
+  const userAvatar = user.avatar;
+
+  if (!canView) {
+    return (
+      <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
+        <div className="flex items-center justify-center min-h-screen">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center text-red-600">Không có quyền truy cập</CardTitle>
+              <CardDescription className="text-center">
+                Bạn không có quyền xem danh sách tham dự
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
-    <ConferencePermissionGuard 
-      requiredPermissions={["attendees.view"]} 
-      conferenceId={currentConferenceId ?? undefined}
-    >
-      <div className="container mx-auto p-6 space-y-6">
+    <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
+      <ConferencePermissionGuard 
+        requiredPermissions={["attendees.view"]} 
+        conferenceId={currentConferenceId ?? undefined}
+      >
+        <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -1166,6 +1204,7 @@ export default function AttendeesPage() {
           </div>
         )}
       </div>
-    </ConferencePermissionGuard>
+          </ConferencePermissionGuard>
+    </MainLayout>
   );
 }
