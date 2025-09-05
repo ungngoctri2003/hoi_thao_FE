@@ -166,7 +166,7 @@ export function Sidebar({ userRole }: SidebarProps) {
   // Get navigation items based on user permissions and conference permissions
   const items = getNavigationItems(hasPermission, hasConferencePermission, currentRole);
   
-  // Get available conferences
+  // Get available conferences - admin sees all conferences, staff/attendees see only assigned ones
   const availableConferences = getAvailableConferences();
   
   // Category configuration

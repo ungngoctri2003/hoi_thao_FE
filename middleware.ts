@@ -7,6 +7,7 @@ const protectedRoutes = [
   '/profile',
   '/settings',
   '/conferences',
+  '/conference-management',
   '/attendees',
   '/sessions',
   '/badges',

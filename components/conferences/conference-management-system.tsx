@@ -142,6 +142,7 @@ export function ConferenceManagementSystem() {
   const isAdmin = user?.role === "admin";
   
   // Check permissions using the permission system
+  // Admin has all permissions, staff/attendees need specific permissions
   const canCreate = isAdmin || hasPermission('conferences.create');
   const canEdit = isAdmin || hasPermission('conferences.update') || hasPermission('conferences.edit');
   const canDelete = isAdmin || hasPermission('conferences.delete');
@@ -166,12 +167,13 @@ export function ConferenceManagementSystem() {
           convertedConferences.map(async (conference) => {
             try {
               const assignmentsResponse = await apiClient.getConferenceAssignments(Number(conference.id));
-              const assignedUsers = assignmentsResponse.data.map(assignment => ({
-                userId: assignment.userId.toString(),
-                userName: assignment.userName || 'Unknown User',
-                userRole: 'staff', // Default role, could be enhanced
-                permissions: Object.keys(assignment.permissions).filter(key => assignment.permissions[key])
-              }));
+              const assignedUsers = assignmentsResponse.data
+                .map(assignment => ({
+                  userId: assignment.userId.toString(),
+                  userName: assignment.userName || 'Unknown User',
+                  userRole: 'staff', // Default role for assignments
+                  permissions: Object.keys(assignment.permissions).filter(key => assignment.permissions[key])
+                }));
               
               return {
                 ...conference,
@@ -189,9 +191,10 @@ export function ConferenceManagementSystem() {
         
         setConferences(conferencesWithAssignments);
         
-        // Load users
+        // Load users (exclude admin and attendee, only show staff for permission assignment)
         const usersResponse = await apiClient.getUsers(1, 1000);
-        setUsers(usersResponse.data);
+        const filteredUsers = usersResponse.data.filter(user => user.role === 'staff');
+        setUsers(filteredUsers);
         
       } catch (error) {
         console.error('Failed to load data:', error);
@@ -222,12 +225,13 @@ export function ConferenceManagementSystem() {
         convertedConferences.map(async (conference) => {
           try {
             const assignmentsResponse = await apiClient.getConferenceAssignments(Number(conference.id));
-            const assignedUsers = assignmentsResponse.data.map(assignment => ({
-              userId: assignment.userId.toString(),
-              userName: assignment.userName || 'Unknown User',
-              userRole: 'staff', // Default role, could be enhanced
-              permissions: Object.keys(assignment.permissions).filter(key => assignment.permissions[key])
-            }));
+            const assignedUsers = assignmentsResponse.data
+              .map(assignment => ({
+                userId: assignment.userId.toString(),
+                userName: assignment.userName || 'Unknown User',
+                userRole: 'staff', // Default role for assignments
+                permissions: Object.keys(assignment.permissions).filter(key => assignment.permissions[key])
+              }));
             
             return {
               ...conference,
@@ -308,18 +312,18 @@ export function ConferenceManagementSystem() {
       const userPerms: Record<string, string[]> = {};
       
       assignments.data.forEach(assignment => {
-        const userId = String(assignment.userId);
-        selectedUserIds.push(userId);
-        
-        // Convert permission object to array
-        const permissions: string[] = [];
-        Object.entries(assignment.permissions).forEach(([key, value]) => {
-          if (value) {
-            permissions.push(key);
-          }
+          const userId = String(assignment.userId);
+          selectedUserIds.push(userId);
+          
+          // Convert permission object to array
+          const permissions: string[] = [];
+          Object.entries(assignment.permissions).forEach(([key, value]) => {
+            if (value) {
+              permissions.push(key);
+            }
+          });
+          userPerms[userId] = permissions;
         });
-        userPerms[userId] = permissions;
-      });
       
       setSelectedUsers(selectedUserIds);
       setUserPermissions(userPerms);
@@ -378,18 +382,18 @@ export function ConferenceManagementSystem() {
       const userPerms: Record<string, string[]> = {};
       
       assignments.data.forEach(assignment => {
-        const userId = String(assignment.userId);
-        selectedUserIds.push(userId);
-        
-        // Convert permission object to array
-        const permissions: string[] = [];
-        Object.entries(assignment.permissions).forEach(([key, value]) => {
-          if (value) {
-            permissions.push(key);
-          }
+          const userId = String(assignment.userId);
+          selectedUserIds.push(userId);
+          
+          // Convert permission object to array
+          const permissions: string[] = [];
+          Object.entries(assignment.permissions).forEach(([key, value]) => {
+            if (value) {
+              permissions.push(key);
+            }
+          });
+          userPerms[userId] = permissions;
         });
-        userPerms[userId] = permissions;
-      });
       
       setSelectedUsers(selectedUserIds);
       setUserPermissions(userPerms);
@@ -436,7 +440,7 @@ export function ConferenceManagementSystem() {
       // Save user permissions if any users are selected
       if (selectedUsers.length > 0 && conferenceId) {
         try {
-          // Remove existing assignments for this conference (for edit case)
+          // Remove existing assignments for this conference (for edit case, exclude admin)
           if (editingConference) {
             const currentAssignments = await apiClient.getConferenceAssignments(conferenceId);
             for (const assignment of currentAssignments.data) {
@@ -833,11 +837,18 @@ export function ConferenceManagementSystem() {
                       <div className="flex items-center space-x-1">
                         <Users className="h-4 w-4 text-muted-foreground" />
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium">{conference.assignedUsers?.length || 0} người</span>
+                          <span className="text-sm font-medium">
+                            {conference.assignedUsers?.length || 0} nhân viên
+                            <span className="text-xs text-muted-foreground ml-1">(+ admin có tất cả quyền)</span>
+                          </span>
                           {conference.assignedUsers && conference.assignedUsers.length > 0 && (
                             <div className="text-xs text-muted-foreground">
-                              {conference.assignedUsers.slice(0, 2).map(user => user.userName).join(', ')}
-                              {conference.assignedUsers.length > 2 && ` +${conference.assignedUsers.length - 2} khác`}
+                              {conference.assignedUsers
+                                .slice(0, 2)
+                                .map(user => user.userName)
+                                .join(', ')}
+                              {conference.assignedUsers.length > 2 && 
+                                ` +${conference.assignedUsers.length - 2} khác`}
                             </div>
                           )}
                         </div>
@@ -1049,27 +1060,34 @@ export function ConferenceManagementSystem() {
               </div>
               
               <div className="space-y-3 max-h-60 overflow-y-auto border rounded-lg p-3">
-                {users.map((user) => (
-                  <div key={user.id} className="flex items-start space-x-3 p-2 hover:bg-muted/50 rounded-md">
-                    <Checkbox
-                      id={`user-${user.id}`}
-                      checked={selectedUsers.includes(user.id)}
-                      onCheckedChange={(checked) => handleUserSelection(user.id, checked as boolean)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <Label htmlFor={`user-${user.id}`} className="cursor-pointer">
-                        <div className="space-y-1">
-                          <div className="font-medium text-sm">{user.name}</div>
-                          <div className="text-xs text-muted-foreground">{user.email}</div>
-                          <Badge variant="outline" className="text-xs">
-                            {user.role}
-                          </Badge>
-                        </div>
-                      </Label>
+                {users.length > 0 ? (
+                  users.map((user) => (
+                    <div key={user.id} className="flex items-start space-x-3 p-2 hover:bg-muted/50 rounded-md">
+                      <Checkbox
+                        id={`user-${user.id}`}
+                        checked={selectedUsers.includes(user.id)}
+                        onCheckedChange={(checked) => handleUserSelection(user.id, checked as boolean)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <Label htmlFor={`user-${user.id}`} className="cursor-pointer">
+                          <div className="space-y-1">
+                            <div className="font-medium text-sm">{user.name}</div>
+                            <div className="text-xs text-muted-foreground">{user.email}</div>
+                            <Badge variant="outline" className="text-xs">
+                              {user.role}
+                            </Badge>
+                          </div>
+                        </Label>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <p>Không có nhân viên nào để phân quyền</p>
+                    <p className="text-xs mt-1">(Admin đã có tất cả quyền mặc định, chỉ staff mới cần phân quyền)</p>
                   </div>
-                ))}
+                )}
               </div>
               
               {/* Permission Settings for Selected Users */}
@@ -1145,27 +1163,35 @@ export function ConferenceManagementSystem() {
             <div className="space-y-4">
               <h4 className="font-medium">Chọn người dùng</h4>
               <div className="space-y-3 max-h-80 overflow-y-auto border rounded-lg p-3">
-                {users.map((user) => (
-                  <div key={user.id} className="flex items-start space-x-3 p-2 hover:bg-muted/50 rounded-md">
-                    <Checkbox
-                      id={`perm-user-${user.id}`}
-                      checked={selectedUsers.includes(user.id)}
-                      onCheckedChange={(checked) => handleUserSelection(user.id, checked as boolean)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <Label htmlFor={`perm-user-${user.id}`} className="cursor-pointer">
-                        <div className="space-y-1">
-                          <div className="font-medium text-sm">{user.name}</div>
-                          <div className="text-xs text-muted-foreground">{user.email}</div>
-                          <Badge variant="outline" className="text-xs">
-                            {user.role}
-                          </Badge>
-                        </div>
-                      </Label>
+                {users.length > 0 ? (
+                  users.map((user) => (
+                    <div key={user.id} className="flex items-start space-x-3 p-2 hover:bg-muted/50 rounded-md">
+                      <Checkbox
+                        id={`perm-user-${user.id}`}
+                        checked={selectedUsers.includes(user.id)}
+                        onCheckedChange={(checked) => handleUserSelection(user.id, checked as boolean)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <Label htmlFor={`perm-user-${user.id}`} className="cursor-pointer">
+                          <div className="space-y-1">
+                            <div className="font-medium text-sm">{user.name}</div>
+                            <div className="text-xs text-muted-foreground">{user.email}</div>
+                            <Badge variant="outline" className="text-xs">
+                              {user.role}
+                            </Badge>
+                          </div>
+                        </Label>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <UserPlus className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Không có nhân viên nào để phân quyền</p>
+                    <p className="text-sm mt-2">(Admin đã có tất cả quyền mặc định, chỉ staff mới cần phân quyền)</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
             
@@ -1399,7 +1425,7 @@ export function ConferenceManagementSystem() {
                     <Shield className="h-5 w-5 mr-2 text-primary" />
                     Người dùng được phân quyền
                     <Badge variant="outline" className="ml-2">
-                      {viewingConference.assignedUsers?.length || 0}
+                      {viewingConference.assignedUsers?.length || 0} nhân viên
                     </Badge>
                   </CardTitle>
                 </CardHeader>
@@ -1428,8 +1454,8 @@ export function ConferenceManagementSystem() {
                   ) : (
                     <div className="text-center py-12 text-muted-foreground">
                       <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg">Chưa có người dùng nào được phân quyền</p>
-                      <p className="text-sm mt-2">Sử dụng nút "Phân quyền" để thêm người dùng</p>
+                      <p className="text-lg">Chưa có nhân viên nào được phân quyền</p>
+                      <p className="text-sm mt-2">Admin đã có tất cả quyền mặc định. Sử dụng nút "Phân quyền" để thêm staff</p>
                     </div>
                   )}
                 </CardContent>

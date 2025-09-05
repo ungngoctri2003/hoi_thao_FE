@@ -35,42 +35,77 @@ export function useConferencePermissions() {
 
       try {
         setIsLoading(true);
-        // Get user's conference assignments
-        const response = await apiClient.getMyAssignments();
         
-        // Transform assignments to conference permissions
-        const permissions: ConferencePermission[] = response.data.map((assignment: UserConferenceAssignment) => ({
-          conferenceId: assignment.conferenceId,
-          conferenceName: assignment.conferenceName || `Hội nghị #${assignment.conferenceId}`,
-          permissions: typeof assignment.permissions === 'string' 
-            ? JSON.parse(assignment.permissions) 
-            : assignment.permissions || {},
-          isActive: assignment.isActive === 1
-        }));
-        
-        // Use only data from API, no fallback hardcoded data
-        setConferencePermissions(permissions);
-        
-        // Set current conference ID
-        if (urlConferenceId && permissions.some(p => p.conferenceId === urlConferenceId && p.isActive)) {
-          // Use conference ID from URL if user has access to it
-          setCurrentConferenceId(urlConferenceId);
-        } else if (permissions.length > 0) {
-          // Set first active conference as current if none selected
-          const activeConference = permissions.find(p => p.isActive);
-          if (activeConference) {
-            setCurrentConferenceId(activeConference.conferenceId);
+        // For admin users, get all conferences and give them all permissions
+        if (user.role === 'admin') {
+          const conferencesResponse = await apiClient.getConferences({ page: 1, limit: 1000 });
+          
+          // Transform all conferences to conference permissions with full admin permissions
+          const permissions: ConferencePermission[] = conferencesResponse.data.map((conference) => ({
+            conferenceId: conference.id,
+            conferenceName: conference.name,
+            permissions: {
+              'conferences.view': true,
+              'conferences.create': true,
+              'conferences.update': true,
+              'conferences.delete': true,
+              'conferences.manage': true,
+              'attendees.view': true,
+              'attendees.manage': true,
+              'checkin.manage': true,
+              'sessions.view': true,
+              'sessions.manage': true,
+              'analytics.view': true,
+              'networking.view': true,
+              'venue.view': true,
+              'badges.view': true,
+              'mobile.view': true
+            },
+            isActive: true
+          }));
+          
+          setConferencePermissions(permissions);
+          
+          // Set current conference ID
+          if (urlConferenceId && permissions.some(p => p.conferenceId === urlConferenceId)) {
+            setCurrentConferenceId(urlConferenceId);
           } else if (permissions.length > 0) {
-            // If no active conference found, use the first one
             setCurrentConferenceId(permissions[0].conferenceId);
+          } else {
+            setCurrentConferenceId(null);
           }
         } else {
-          // No permissions available, clear current conference
-          setCurrentConferenceId(null);
+          // For staff and attendees, get their conference assignments
+          const response = await apiClient.getMyAssignments();
+          
+          // Transform assignments to conference permissions
+          const permissions: ConferencePermission[] = response.data.map((assignment: UserConferenceAssignment) => ({
+            conferenceId: assignment.conferenceId,
+            conferenceName: assignment.conferenceName || `Hội nghị #${assignment.conferenceId}`,
+            permissions: typeof assignment.permissions === 'string' 
+              ? JSON.parse(assignment.permissions) 
+              : assignment.permissions || {},
+            isActive: assignment.isActive === 1
+          }));
+          
+          setConferencePermissions(permissions);
+          
+          // Set current conference ID
+          if (urlConferenceId && permissions.some(p => p.conferenceId === urlConferenceId && p.isActive)) {
+            setCurrentConferenceId(urlConferenceId);
+          } else if (permissions.length > 0) {
+            const activeConference = permissions.find(p => p.isActive);
+            if (activeConference) {
+              setCurrentConferenceId(activeConference.conferenceId);
+            } else if (permissions.length > 0) {
+              setCurrentConferenceId(permissions[0].conferenceId);
+            }
+          } else {
+            setCurrentConferenceId(null);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch conference permissions:', error);
-        // No fallback data - show empty state when API fails
         setConferencePermissions([]);
         setCurrentConferenceId(null);
       } finally {
@@ -200,18 +235,49 @@ export function useConferencePermissions() {
     if (!user) return;
     
     try {
-      const response = await apiClient.getMyAssignments();
-      
-      const permissions: ConferencePermission[] = response.data.map((assignment: UserConferenceAssignment) => ({
-        conferenceId: assignment.conferenceId,
-        conferenceName: assignment.conferenceName || `Hội nghị #${assignment.conferenceId}`,
-        permissions: typeof assignment.permissions === 'string' 
-          ? JSON.parse(assignment.permissions) 
-          : assignment.permissions || {},
-        isActive: assignment.isActive === 1
-      }));
+      // For admin users, get all conferences and give them all permissions
+      if (user.role === 'admin') {
+        const conferencesResponse = await apiClient.getConferences({ page: 1, limit: 1000 });
+        
+        const permissions: ConferencePermission[] = conferencesResponse.data.map((conference) => ({
+          conferenceId: conference.id,
+          conferenceName: conference.name,
+          permissions: {
+            'conferences.view': true,
+            'conferences.create': true,
+            'conferences.update': true,
+            'conferences.delete': true,
+            'conferences.manage': true,
+            'attendees.view': true,
+            'attendees.manage': true,
+            'checkin.manage': true,
+            'sessions.view': true,
+            'sessions.manage': true,
+            'analytics.view': true,
+            'networking.view': true,
+            'venue.view': true,
+            'badges.view': true,
+            'mobile.view': true
+          },
+          isActive: true
+        }));
+        
+        setConferencePermissions(permissions);
+      } else {
+        // For staff and attendees, get their conference assignments
+        const response = await apiClient.getMyAssignments();
+        
+        const permissions: ConferencePermission[] = response.data.map((assignment: UserConferenceAssignment) => ({
+          conferenceId: assignment.conferenceId,
+          conferenceName: assignment.conferenceName || `Hội nghị #${assignment.conferenceId}`,
+          permissions: typeof assignment.permissions === 'string' 
+            ? JSON.parse(assignment.permissions) 
+            : assignment.permissions || {},
+          isActive: assignment.isActive === 1
+        }));
 
-      setConferencePermissions(permissions);
+        setConferencePermissions(permissions);
+      }
     } catch (error) {
       console.error('Failed to refresh conference permissions:', error);
     }
