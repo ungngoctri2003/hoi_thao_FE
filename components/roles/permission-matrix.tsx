@@ -38,25 +38,31 @@ export function PermissionMatrix({ permissions, rolePermissions, roles, onPermis
 
   const categories = [...new Set(permissions.map((p) => p.category || 'Khác'))]
 
-  const handlePermissionToggle = (roleId: number, permissionId: number, checked: boolean) => {
-    // Call the parent's permission change handler
-    onPermissionChange(roleId, permissionId, checked)
-    
-    // Update local state for immediate UI feedback
-    setCurrentPermissions((prev) => {
-      const newPermissions = { ...prev }
-      const role = roles.find(r => r.id === roleId)
-      if (role) {
-        const roleKey = role.code
-        if (checked) {
-          newPermissions[roleKey] = [...(newPermissions[roleKey] || []), permissionId.toString()]
-        } else {
-          newPermissions[roleKey] = (newPermissions[roleKey] || []).filter((id) => id !== permissionId.toString())
+  const handlePermissionToggle = async (roleId: number, permissionId: number, checked: boolean) => {
+    try {
+      // Call the parent's permission change handler (this will call the API)
+      await onPermissionChange(roleId, permissionId, checked)
+      
+      // Update local state for immediate UI feedback
+      setCurrentPermissions((prev) => {
+        const newPermissions = { ...prev }
+        const role = roles.find(r => r.id === roleId)
+        if (role) {
+          const roleKey = role.code
+          if (checked) {
+            newPermissions[roleKey] = [...(newPermissions[roleKey] || []), permissionId.toString()]
+          } else {
+            newPermissions[roleKey] = (newPermissions[roleKey] || []).filter((id) => id !== permissionId.toString())
+          }
         }
-      }
-      return newPermissions
-    })
-    setHasChanges(true)
+        return newPermissions
+      })
+      setHasChanges(false) // No changes pending since we saved to backend
+    } catch (error) {
+      console.error('Failed to update permission:', error)
+      // Revert the UI change on error
+      setCurrentPermissions(rolePermissions)
+    }
   }
 
   const handleSave = () => {

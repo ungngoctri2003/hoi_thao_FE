@@ -77,12 +77,12 @@ export function PasswordStrength({ password, className }: PasswordStrengthProps)
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Độ mạnh mật khẩu</span>
           <span className={cn("font-medium", strength.level === "strong" ? "text-green-600" : "text-muted-foreground")}>
-            {strengthLabels[strength.level]}
+            {strengthLabels[strength.level as keyof typeof strengthLabels]}
           </span>
         </div>
         <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div
-            className={cn("h-full transition-all duration-300", strengthColors[strength.level])}
+            className={cn("h-full transition-all duration-300", strengthColors[strength.level as keyof typeof strengthColors])}
             style={{ width: `${strength.percentage}%` }}
           />
         </div>

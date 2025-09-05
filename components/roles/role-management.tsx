@@ -10,12 +10,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, MoreHorizontal, Edit, Trash2, Shield, Users, Key, Settings, Eye, UserPlus, Plus } from "lucide-react"
+import { Search, MoreHorizontal, Edit, Trash2, Shield, Users, Key, Settings, Eye, UserPlus, Plus, Calendar } from "lucide-react"
 import { UserRoleDialog } from "./user-role-dialog"
 import { UserDetailDialog } from "./user-detail-dialog"
 import { PermissionMatrix } from "./permission-matrix"
 import { CreateRoleDialog } from "./create-role-dialog"
 import { EditRoleDialog } from "./edit-role-dialog"
+import { ConferenceAssignmentDialog } from "./conference-assignment-dialog"
+import { ConferenceAssignmentsList } from "./conference-assignments-list"
+import { UserConferenceList } from "./user-conference-list"
 import { AuthErrorHandler } from "../auth/auth-error-handler"
 import { apiClient, Role, Permission as ApiPermission, User, CreateUserRequest, UpdateUserRequest } from "@/lib/api"
 import { toast } from "sonner"
@@ -79,9 +82,12 @@ export function RoleManagement() {
   const [isUserDetailDialogOpen, setIsUserDetailDialogOpen] = useState(false)
   const [isCreateRoleDialogOpen, setIsCreateRoleDialogOpen] = useState(false)
   const [isEditRoleDialogOpen, setIsEditRoleDialogOpen] = useState(false)
+  const [isConferenceAssignmentDialogOpen, setIsConferenceAssignmentDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [viewingUser, setViewingUser] = useState<User | null>(null)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [assigningUser, setAssigningUser] = useState<User | null>(null)
+  const [viewingUserConferences, setViewingUserConferences] = useState<User | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalUsers, setTotalUsers] = useState(0)
   const [allUsers, setAllUsers] = useState<User[]>([]) // Store all users for client-side filtering
@@ -204,6 +210,15 @@ export function RoleManagement() {
   const handleViewUser = (user: User) => {
     setViewingUser(user)
     setIsUserDetailDialogOpen(true)
+  }
+
+  const handleAssignConferences = (user: User) => {
+    setAssigningUser(user)
+    setIsConferenceAssignmentDialogOpen(true)
+  }
+
+  const handleViewUserConferences = (user: User) => {
+    setViewingUserConferences(user)
   }
 
   const handleToggleUserStatus = async (userId: string, newStatus: "active" | "inactive" | "suspended") => {
@@ -359,9 +374,19 @@ export function RoleManagement() {
         await apiClient.removePermissionFromRole(roleId, permissionId)
         toast.success('Đã gỡ quyền thành công')
       }
+      
       // Reload role permissions to reflect changes
       const rolePerms = await loadRolePermissions(roles)
       setRolePermissions(rolePerms)
+      
+      // Also refresh user permissions if this affects current user
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
+      if (currentUser.role) {
+        // Trigger permission refresh for current user
+        window.dispatchEvent(new CustomEvent('permissions-changed', {
+          detail: { roleId, permissionId, checked }
+        }))
+      }
     } catch (error: any) {
       console.error('Error updating permission:', error)
       const errorMessage = error?.message || 'Không thể cập nhật quyền'
@@ -371,6 +396,9 @@ export function RoleManagement() {
       if (errorMessage.includes('quyền truy cập') || errorMessage.includes('Unauthorized')) {
         toast.error('Vui lòng đăng nhập lại để tiếp tục')
       }
+      
+      // Re-throw error so permission matrix can handle it
+      throw error
     }
   }
 
@@ -526,6 +554,7 @@ export function RoleManagement() {
           <TabsTrigger value="roles">Vai trò</TabsTrigger>
           <TabsTrigger value="users">Người dùng</TabsTrigger>
           <TabsTrigger value="permissions">Phân quyền</TabsTrigger>
+          <TabsTrigger value="conference-assignments">Giao hội nghị</TabsTrigger>
         </TabsList>
 
         <TabsContent value="roles" className="space-y-4">
@@ -696,6 +725,18 @@ export function RoleManagement() {
                                 <Edit className="mr-2 h-4 w-4" />
                                 Chỉnh sửa
                               </DropdownMenuItem>
+                              {user.role === 'staff' && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleViewUserConferences(user)}>
+                                    <Calendar className="mr-2 h-4 w-4" />
+                                    Xem hội nghị
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleAssignConferences(user)}>
+                                    <Calendar className="mr-2 h-4 w-4" />
+                                    Giao hội nghị
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                               <DropdownMenuItem 
                                 onClick={() => {
                                   // Improved logic: always toggle to opposite of current status
@@ -829,6 +870,21 @@ export function RoleManagement() {
             onPermissionChange={handlePermissionChange}
           />
         </TabsContent>
+
+        <TabsContent value="conference-assignments" className="space-y-4">
+          {/* Conference Assignments Management */}
+          <ConferenceAssignmentsList 
+            onEdit={(assignment) => {
+              // Edit assignment is handled internally by ConferenceAssignmentsList
+              console.log('Edit assignment:', assignment)
+            }}
+            onDelete={(assignmentId) => {
+              // Delete assignment is handled internally by ConferenceAssignmentsList
+              console.log('Delete assignment:', assignmentId)
+            }}
+            // Remove onCreateNew prop to use internal handling
+          />
+        </TabsContent>
       </Tabs>
 
       <UserRoleDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} user={editingUser} onSave={handleSaveUser} />
@@ -857,6 +913,45 @@ export function RoleManagement() {
           }
         }}
       />
+      <ConferenceAssignmentDialog 
+        open={isConferenceAssignmentDialogOpen} 
+        onOpenChange={setIsConferenceAssignmentDialogOpen} 
+        user={assigningUser}
+        onAssignmentCreated={() => {
+          // Reload data to refresh assignments
+          loadData()
+        }}
+      />
+      
+      {/* User Conference List Modal */}
+      {viewingUserConferences && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-2xl font-bold">Hội nghị của {viewingUserConferences.name}</h2>
+              <Button 
+                variant="outline" 
+                onClick={() => setViewingUserConferences(null)}
+              >
+                Đóng
+              </Button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <UserConferenceList
+                userId={Number(viewingUserConferences.id)}
+                userName={viewingUserConferences.name}
+                userEmail={viewingUserConferences.email}
+                onEdit={(assignment) => {
+                  console.log('Edit assignment:', assignment)
+                }}
+                onDelete={(assignmentId) => {
+                  console.log('Delete assignment:', assignmentId)
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

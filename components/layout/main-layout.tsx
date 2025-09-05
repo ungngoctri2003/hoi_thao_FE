@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { Sidebar } from "./sidebar"
+import { SidebarWrapper } from "./sidebar-wrapper"
 import { Header } from "./header"
 import { SessionExpirationHandler } from "@/components/auth/session-expiration-handler"
 import { AccountDisabledAlert } from "@/components/auth/account-disabled-alert"
@@ -21,7 +21,7 @@ export function MainLayout({ children, userRole, userName, userAvatar }: MainLay
       <SessionExpirationHandler />
       <AccountDisabledAlert />
       <RoleChangeNotification />
-      <Sidebar userRole={userRole} />
+      <SidebarWrapper userRole={userRole} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header userName={userName} userRole={userRole} userAvatar={userAvatar} />
         <main className="flex-1 overflow-auto p-6">

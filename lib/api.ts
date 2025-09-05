@@ -1,5 +1,5 @@
 // API configuration and utilities
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -226,6 +226,39 @@ export interface ConferenceInfo {
   createdAt: string;
 }
 
+export interface UserConferenceAssignment {
+  id: number;
+  userId: number;
+  conferenceId: number;
+  permissions: Record<string, boolean>;
+  assignedBy: number;
+  assignedAt: string;
+  isActive: number;
+  createdAt: string;
+  updatedAt: string;
+  conferenceName?: string;
+  conferenceStatus?: string;
+  userName?: string;
+  userEmail?: string;
+}
+
+export interface CreateUserConferenceAssignmentRequest {
+  userId: number;
+  conferenceId: number;
+  permissions: Record<string, boolean>;
+}
+
+export interface UpdateUserConferenceAssignmentRequest {
+  permissions?: Record<string, boolean>;
+  isActive?: number;
+}
+
+export interface BulkAssignConferencesRequest {
+  userId: number;
+  conferenceIds: number[];
+  permissions: Record<string, boolean>;
+}
+
 export interface SessionInfo {
   id: number;
   conferenceId: number;
@@ -258,6 +291,7 @@ class ApiClient {
 
     // Add authorization header if token exists
     const token = this.getToken();
+    console.log('API request token:', token ? 'exists' : 'missing');
     if (token) {
       defaultHeaders['Authorization'] = `Bearer ${token}`;
     }
@@ -1325,6 +1359,113 @@ class ApiClient {
     await this.request(`/roles/${roleId}`, {
       method: 'DELETE',
     });
+  }
+
+  // User Conference Assignments endpoints
+  async getUserConferenceAssignments(params?: {
+    page?: number;
+    limit?: number;
+    userId?: number;
+    conferenceId?: number;
+    isActive?: number;
+  }): Promise<{ data: UserConferenceAssignment[]; meta: any }> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.userId) queryParams.append('userId', params.userId.toString());
+    if (params?.conferenceId) queryParams.append('conferenceId', params.conferenceId.toString());
+    if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+
+    const endpoint = `/user-conference-assignments${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const response = await this.request<any>(endpoint, {
+      method: 'GET',
+    });
+
+    console.log('getUserConferenceAssignments response:', response);
+
+    return {
+      data: response.data || [],
+      meta: response.meta || {}
+    };
+  }
+
+  async getUserAssignments(userId: number): Promise<{ data: UserConferenceAssignment[] }> {
+    const response = await this.request<UserConferenceAssignment[]>(`/user-conference-assignments/user/${userId}`, {
+      method: 'GET',
+    });
+
+    return { data: response.data || [] };
+  }
+
+  async getMyAssignments(): Promise<{ data: UserConferenceAssignment[] }> {
+    const response = await this.request<UserConferenceAssignment[]>(`/user-conference-assignments/my-assignments`, {
+      method: 'GET',
+    });
+
+    console.log('getMyAssignments response:', response);
+
+    return { data: response.data || [] };
+  }
+
+  async getConferenceAssignments(conferenceId: number): Promise<{ data: UserConferenceAssignment[] }> {
+    const response = await this.request<UserConferenceAssignment[]>(`/user-conference-assignments/conference/${conferenceId}`, {
+      method: 'GET',
+    });
+
+    return { data: response.data };
+  }
+
+  async createUserConferenceAssignment(data: CreateUserConferenceAssignmentRequest): Promise<{ data: { id: number } }> {
+    const response = await this.request<{ id: number }>('/user-conference-assignments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+
+    return { data: response.data };
+  }
+
+  async bulkAssignConferences(data: BulkAssignConferencesRequest): Promise<{ data: { successful: any[]; errors: string[] } }> {
+    const response = await this.request<{ successful: any[]; errors: string[] }>('/user-conference-assignments/bulk-assign', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+
+    return { data: response.data };
+  }
+
+  async updateUserConferenceAssignment(id: number, data: UpdateUserConferenceAssignmentRequest): Promise<void> {
+    await this.request(`/user-conference-assignments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deactivateUserConferenceAssignment(id: number): Promise<void> {
+    await this.request(`/user-conference-assignments/${id}/deactivate`, {
+      method: 'PATCH',
+    });
+  }
+
+  async deleteUserConferenceAssignment(id: number): Promise<void> {
+    await this.request(`/user-conference-assignments/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async checkUserConferencePermission(userId: number, conferenceId: number, permission: string): Promise<{ data: { hasPermission: boolean } }> {
+    const response = await this.request<{ hasPermission: boolean }>(`/user-conference-assignments/check/${userId}/${conferenceId}/${permission}`, {
+      method: 'GET',
+    });
+
+    return { data: response.data };
+  }
+
+  async getUserConferencePermissions(userId: number): Promise<{ data: Record<number, Record<string, boolean>> }> {
+    const response = await this.request<Record<number, Record<string, boolean>>>(`/user-conference-assignments/permissions/${userId}`, {
+      method: 'GET',
+    });
+
+    return { data: response.data };
   }
 }
 

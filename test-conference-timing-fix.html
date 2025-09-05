@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Conference Timing Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        .warning { color: orange; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 3px; }
+        button:hover { background: #0056b3; }
+        .test-link { display: block; margin: 10px 0; padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 3px; text-decoration: none; color: #007bff; }
+        .test-link:hover { background: #e9ecef; }
+        .fix-summary { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .timing-issue { background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Test Conference Timing Fix</h1>
+    
+    <div class="timing-issue">
+        <h2>🚨 Vấn đề đã phát hiện:</h2>
+        <p><strong>Timing Issue:</strong> <code>useConferencePermissions</code> được gọi với <code>{isAuthenticated: false, user: null}</code> mặc dù user đã được authenticate.</p>
+        <p><strong>Nguyên nhân:</strong> Hook được gọi trước khi <code>useAuth</code> hoàn thành việc load user data.</p>
+        <p><strong>Kết quả:</strong> <code>conferencePermissions</code> bị set về <code>[]</code> và không có quyền truy cập.</p>
+    </div>
+    
+    <div class="fix-summary">
+        <h2>✅ Các thay đổi đã thực hiện:</h2>
+        <ul>
+            <li><strong>Thêm authLoading check:</strong> Kiểm tra <code>authLoading</code> trước khi gọi API</li>
+            <li><strong>Wait for auth:</strong> Chờ auth hoàn thành loading trước khi fetch permissions</li>
+            <li><strong>Prevent premature redirects:</strong> Return false trong permission checks khi đang loading</li>
+            <li><strong>Update isLoading:</strong> Bao gồm <code>authLoading</code> trong <code>isLoading</code> state</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Test Cases</h2>
+        <p>Click vào các link sau để test xem có còn bị redirect về /dashboard không:</p>
+        
+        <h3>Test 1: Conference Pages với conferenceId trong URL</h3>
+        <a href="/attendees?conferenceId=1" class="test-link" target="_blank">
+            📋 /attendees?conferenceId=1
+        </a>
+        <a href="/checkin?conferenceId=1" class="test-link" target="_blank">
+            📱 /checkin?conferenceId=1
+        </a>
+        <a href="/networking?conferenceId=1" class="test-link" target="_blank">
+            🌐 /networking?conferenceId=1
+        </a>
+        <a href="/venue?conferenceId=1" class="test-link" target="_blank">
+            📍 /venue?conferenceId=1
+        </a>
+        <a href="/sessions?conferenceId=1" class="test-link" target="_blank">
+            🎥 /sessions?conferenceId=1
+        </a>
+        <a href="/badges?conferenceId=1" class="test-link" target="_blank">
+            🏆 /badges?conferenceId=1
+        </a>
+        <a href="/analytics?conferenceId=1" class="test-link" target="_blank">
+            📊 /analytics?conferenceId=1
+        </a>
+
+        <h3>Test 2: Conference Pages với conferenceId khác</h3>
+        <a href="/attendees?conferenceId=3" class="test-link" target="_blank">
+            📋 /attendees?conferenceId=3
+        </a>
+        <a href="/checkin?conferenceId=3" class="test-link" target="_blank">
+            📱 /checkin?conferenceId=3
+        </a>
+
+        <h3>Test 3: Conference Pages không có conferenceId</h3>
+        <a href="/attendees" class="test-link" target="_blank">
+            📋 /attendees (no conferenceId)
+        </a>
+        <a href="/checkin" class="test-link" target="_blank">
+            📱 /checkin (no conferenceId)
+        </a>
+
+        <h3>Test 4: Conference Detail Page</h3>
+        <a href="/conferences/1" class="test-link" target="_blank">
+            🏢 /conferences/1
+        </a>
+        <a href="/conferences/3" class="test-link" target="_blank">
+            🏢 /conferences/3
+        </a>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Debug Information</h2>
+        <button onclick="checkCurrentState()">Check Current State</button>
+        <div id="debug-info"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 Expected Console Logs</h2>
+        <p><strong>Trước khi sửa (❌ Lỗi):</strong></p>
+        <pre class="error">useConferencePermissions - fetchConferencePermissions called {isAuthenticated: false, user: null}
+useConferencePermissions - not authenticated or no user, setting empty permissions</pre>
+        
+        <p><strong>Sau khi sửa (✅ Đúng):</strong></p>
+        <pre class="success">useConferencePermissions - fetchConferencePermissions called {isAuthenticated: true, user: {...}, authLoading: false}
+useConferencePermissions - starting API call for user: 1
+useConferencePermissions - permissions: (2) [{…}, {…}]
+useConferencePermissions - using first active conference: 3</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 Expected Behavior</h2>
+        <ul>
+            <li class="success">✅ Không còn thấy <code>isAuthenticated: false, user: null</code> trong logs</li>
+            <li class="success">✅ Thấy <code>authLoading: false</code> trước khi gọi API</li>
+            <li class="success">✅ Các trang conference sẽ load bình thường</li>
+            <li class="success">✅ Không còn bị redirect về <code>/dashboard</code> không mong muốn</li>
+            <li class="success">✅ Sidebar links sẽ hoạt động đúng</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Technical Details</h2>
+        <p><strong>Vấn đề đã sửa:</strong></p>
+        <ul>
+            <li>Timing issue giữa <code>useAuth</code> và <code>useConferencePermissions</code></li>
+            <li>Gọi API trước khi auth hoàn thành loading</li>
+            <li>Permission checks trả về false khi đang loading</li>
+        </ul>
+        
+        <p><strong>Giải pháp:</strong></p>
+        <ul>
+            <li>Thêm <code>authLoading</code> check trong <code>useEffect</code></li>
+            <li>Chờ auth hoàn thành trước khi fetch permissions</li>
+            <li>Return false trong permission checks khi đang loading</li>
+            <li>Bao gồm <code>authLoading</code> trong <code>isLoading</code> state</li>
+        </ul>
+    </div>
+
+    <script>
+        function checkCurrentState() {
+            const debugDiv = document.getElementById('debug-info');
+            debugDiv.innerHTML = '<p class="info">Checking current state...</p>';
+
+            // Check URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const conferenceId = urlParams.get('conferenceId');
+            
+            // Check cookies
+            const token = getCookie('accessToken');
+            
+            let debugInfo = `
+                <h3>Current State:</h3>
+                <pre>URL: ${window.location.href}
+Pathname: ${window.location.pathname}
+ConferenceId from URL: ${conferenceId || 'None'}
+Access Token: ${token ? 'Found' : 'Not found'}</pre>
+                
+                <h3>Expected Console Logs (After Fix):</h3>
+                <ul>
+                    <li class="success">✅ useConferencePermissions - fetchConferencePermissions called {isAuthenticated: true, user: {...}, authLoading: false}</li>
+                    <li class="success">✅ useConferencePermissions - starting API call for user: 1</li>
+                    <li class="success">✅ useConferencePermissions - permissions: (2) [{…}, {…}]</li>
+                    <li class="success">✅ using first active conference: 3 hoặc using URL conferenceId: X</li>
+                    <li class="error">❌ KHÔNG thấy isAuthenticated: false, user: null</li>
+                </ul>
+            `;
+
+            debugDiv.innerHTML = debugInfo;
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        // Auto-check on load
+        window.onload = function() {
+            checkCurrentState();
+        };
+    </script>
+</body>
+</html>

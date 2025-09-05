@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Auth Token</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔐 Debug Authentication Token</h1>
+    
+    <div class="debug-section">
+        <h3>1. Check Local Storage</h3>
+        <button onclick="checkLocalStorage()">Check Local Storage</button>
+        <div id="localStorageResult"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>2. Check Cookies</h3>
+        <button onclick="checkCookies()">Check Cookies</button>
+        <div id="cookiesResult"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>3. Test API with Token</h3>
+        <button onclick="testAPIWithToken()">Test Profile API</button>
+        <div id="apiResult"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>4. Test Roles API</h3>
+        <button onclick="testRolesAPI()">Test Roles API</button>
+        <div id="rolesResult"></div>
+    </div>
+
+    <script>
+        function checkLocalStorage() {
+            const result = document.getElementById('localStorageResult');
+            const data = {};
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                data[key] = localStorage.getItem(key);
+            }
+            
+            result.innerHTML = `
+                <h4>Local Storage Contents:</h4>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+        }
+
+        function checkCookies() {
+            const result = document.getElementById('cookiesResult');
+            const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+                const [key, value] = cookie.trim().split('=');
+                acc[key] = value;
+                return acc;
+            }, {});
+            
+            result.innerHTML = `
+                <h4>Cookies:</h4>
+                <pre>${JSON.stringify(cookies, null, 2)}</pre>
+            `;
+        }
+
+        async function testAPIWithToken() {
+            const result = document.getElementById('apiResult');
+            result.innerHTML = 'Testing...';
+            
+            try {
+                // Get token from localStorage or cookies
+                let token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+                
+                if (!token) {
+                    // Try to get from cookies
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [key, value] = cookie.trim().split('=');
+                        if (key === 'accessToken' || key === 'token') {
+                            token = value;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!token) {
+                    result.innerHTML = '<div class="error">❌ No token found in localStorage or cookies</div>';
+                    return;
+                }
+                
+                console.log('Using token:', token.substring(0, 20) + '...');
+                
+                const response = await fetch('http://localhost:4000/api/v1/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="success">✅ Profile API Success</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    result.innerHTML = `
+                        <div class="error">❌ Profile API Failed (${response.status})</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="error">❌ Error: ${error.message}</div>
+                `;
+            }
+        }
+
+        async function testRolesAPI() {
+            const result = document.getElementById('rolesResult');
+            result.innerHTML = 'Testing...';
+            
+            try {
+                // Get token from localStorage or cookies
+                let token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+                
+                if (!token) {
+                    // Try to get from cookies
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [key, value] = cookie.trim().split('=');
+                        if (key === 'accessToken' || key === 'token') {
+                            token = value;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!token) {
+                    result.innerHTML = '<div class="error">❌ No token found</div>';
+                    return;
+                }
+                
+                console.log('Testing roles API with token:', token.substring(0, 20) + '...');
+                
+                const response = await fetch('http://localhost:4000/api/v1/roles', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="success">✅ Roles API Success</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    result.innerHTML = `
+                        <div class="error">❌ Roles API Failed (${response.status})</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="error">❌ Error: ${error.message}</div>
+                `;
+            }
+        }
+
+        // Auto-run on load
+        window.onload = function() {
+            checkLocalStorage();
+            checkCookies();
+        };
+    </script>
+</body>
+</html>

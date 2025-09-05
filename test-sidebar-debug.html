@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Sidebar Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; background-color: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .conference { margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .conference h4 { margin: 0 0 10px 0; color: #333; }
+        .permissions { font-size: 12px; color: #666; }
+        .test-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+        .test-link { padding: 10px; border: 1px solid #ddd; border-radius: 5px; text-align: center; }
+        .test-link a { text-decoration: none; color: #007bff; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Test Sidebar Debug</h1>
+    
+    <div class="section">
+        <h3>1. Login</h3>
+        <button onclick="login()">Login as Admin</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="section">
+        <h3>2. Test Conference Links</h3>
+        <div class="test-links">
+            <div class="test-link">
+                <a href="http://localhost:3000/attendees?conferenceId=1" target="_blank">
+                    Attendees (Conference 1)
+                </a>
+            </div>
+            <div class="test-link">
+                <a href="http://localhost:3000/conferences/1" target="_blank">
+                    Conference Page (Conference 1)
+                </a>
+            </div>
+            <div class="test-link">
+                <a href="http://localhost:3000/attendees?conferenceId=3" target="_blank">
+                    Attendees (Conference 3)
+                </a>
+            </div>
+            <div class="test-link">
+                <a href="http://localhost:3000/conferences/3" target="_blank">
+                    Conference Page (Conference 3)
+                </a>
+            </div>
+            <div class="test-link">
+                <a href="http://localhost:3000/debug-sidebar-links" target="_blank">
+                    Debug Sidebar Links
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>3. Test API</h3>
+        <button onclick="testAPI()">Test My Assignments API</button>
+        <div id="api-result"></div>
+    </div>
+
+    <div class="section">
+        <h3>4. Instructions</h3>
+        <div class="info">
+            <h4>Để test sidebar:</h4>
+            <ol>
+                <li>Click "Login as Admin" để login</li>
+                <li>Mở <a href="http://localhost:3000" target="_blank">http://localhost:3000</a> trong tab mới</li>
+                <li>Login với admin account</li>
+                <li>Kiểm tra sidebar bên trái - bạn sẽ thấy phần "Hội nghị"</li>
+                <li>Click vào một hội nghị để expand</li>
+                <li>Click vào một tính năng (ví dụ: "Danh sách tham dự")</li>
+                <li>Kiểm tra xem trang có mở được không</li>
+            </ol>
+            
+            <h4>Để debug:</h4>
+            <ol>
+                <li>Mở Developer Tools (F12)</li>
+                <li>Vào tab Console</li>
+                <li>Xem các log debug bắt đầu với "🔍 [DEBUG]"</li>
+                <li>Kiểm tra xem có lỗi gì không</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        async function login() {
+            try {
+                const response = await fetch('http://localhost:4000/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@conference.vn',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.data && data.data.accessToken) {
+                    localStorage.setItem('token', data.data.accessToken);
+                    document.getElementById('login-result').innerHTML = `
+                        <div class="success">
+                            <strong>✅ Login successful!</strong><br>
+                            Token saved to localStorage
+                        </div>
+                    `;
+                } else {
+                    throw new Error('No access token in response');
+                }
+            } catch (error) {
+                document.getElementById('login-result').innerHTML = `
+                    <div class="error">
+                        <strong>❌ Login failed:</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function testAPI() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                document.getElementById('api-result').innerHTML = `
+                    <div class="error">Please login first</div>
+                `;
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:4000/api/v1/user-conference-assignments/my-assignments', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                document.getElementById('api-result').innerHTML = `
+                    <div class="success">
+                        <strong>✅ API Test successful!</strong><br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('api-result').innerHTML = `
+                    <div class="error">
+                        <strong>❌ API Test failed:</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

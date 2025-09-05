@@ -6,6 +6,7 @@ import { ConferenceManagement } from "@/components/conferences/conference-manage
 import { useAuth } from "@/hooks/use-auth"
 import { AuthStatus } from "@/components/auth/auth-status"
 import { StaffAndAdmin } from "@/components/auth/role-guard"
+import { ConferenceViewGuard } from "@/components/auth/conference-permission-guard"
 
 export default function ConferencesPage() {
   const searchParams = useSearchParams()
@@ -35,9 +36,11 @@ export default function ConferencesPage() {
 
   return (
     <StaffAndAdmin>
-      <MainLayout userRole={role} userName={name} userAvatar={user?.avatar}>
-        <ConferenceManagement />
-      </MainLayout>
+      <ConferenceViewGuard>
+        <MainLayout userRole={role} userName={name} userAvatar={user?.avatar}>
+          <ConferenceManagement />
+        </MainLayout>
+      </ConferenceViewGuard>
     </StaffAndAdmin>
   )
 }

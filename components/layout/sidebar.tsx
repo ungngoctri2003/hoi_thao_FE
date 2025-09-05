@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useConferencePermissions } from "@/hooks/use-conference-permissions";
 import { SidebarTooltip } from "./sidebar-tooltip";
 import {
   LayoutDashboard,
@@ -27,6 +28,8 @@ import {
   Smartphone,
   UserCheck,
   Building,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -41,69 +44,6 @@ const allNavigationItems = [
     label: "Tổng quan", 
     requiredPermissions: ["dashboard.view"],
     description: "Trang chủ và tổng quan hệ thống"
-  },
-  { 
-    href: "/conferences", 
-    icon: Calendar, 
-    label: "Quản lý hội nghị", 
-    requiredPermissions: ["conferences.view"],
-    description: "Quản lý các hội nghị và sự kiện"
-  },
-  { 
-    href: "/attendees", 
-    icon: Users, 
-    label: "Danh sách tham dự", 
-    requiredPermissions: ["attendees.view"],
-    description: "Quản lý danh sách người tham dự"
-  },
-  { 
-    href: "/checkin", 
-    icon: QrCode, 
-    label: "Check-in QR", 
-    requiredPermissions: ["checkin.manage"],
-    description: "Quét QR code để check-in"
-  },
-  { 
-    href: "/networking", 
-    icon: Network, 
-    label: "Kết nối mạng", 
-    requiredPermissions: ["networking.view"],
-    description: "Kết nối và giao lưu với người tham dự"
-  },
-  { 
-    href: "/venue", 
-    icon: MapPin, 
-    label: "Bản đồ địa điểm", 
-    requiredPermissions: ["venue.view"],
-    description: "Xem bản đồ và thông tin địa điểm"
-  },
-  { 
-    href: "/sessions", 
-    icon: Video, 
-    label: "Phiên trực tiếp", 
-    requiredPermissions: ["sessions.view"],
-    description: "Xem các phiên họp trực tiếp"
-  },
-  { 
-    href: "/badges", 
-    icon: Award, 
-    label: "Huy hiệu số", 
-    requiredPermissions: ["badges.view"],
-    description: "Quản lý và xem huy hiệu"
-  },
-  { 
-    href: "/analytics", 
-    icon: BarChart3, 
-    label: "Phân tích AI", 
-    requiredPermissions: ["analytics.view"],
-    description: "Phân tích dữ liệu với AI"
-  },
-  { 
-    href: "/mobile", 
-    icon: Smartphone, 
-    label: "Ứng dụng di động", 
-    requiredPermissions: ["mobile.view"],
-    description: "Tải ứng dụng di động"
   },
   { 
     href: "/roles", 
@@ -142,11 +82,44 @@ const allNavigationItems = [
   },
 ];
 
-// Function to get navigation items based on user permissions
-const getNavigationItems = (hasPermission: (code: string) => boolean) => {
-  return allNavigationItems.filter(item => 
-    item.requiredPermissions.every(permission => hasPermission(permission))
-  );
+// Function to get navigation items based on user permissions and conference permissions
+const getNavigationItems = (
+  hasPermission: (code: string) => boolean, 
+  hasConferencePermission: (code: string) => boolean,
+  userRole: string
+) => {
+  return allNavigationItems.filter(item => {
+    // Check if user has basic role-based permission
+    const hasBasicPermission = item.requiredPermissions.every(permission => hasPermission(permission));
+    
+    // For admin and staff, show all basic permissions even without conference assignments
+    if (userRole === 'admin' || userRole === 'staff') {
+      // For conference-specific features, check if user has basic permission OR conference permission
+      const conferenceSpecificFeatures = [
+        '/conferences', '/attendees', '/checkin', '/networking', 
+        '/venue', '/sessions', '/badges', '/analytics', '/my-events'
+      ];
+      
+      if (conferenceSpecificFeatures.includes(item.href)) {
+        // Admin/staff can access if they have basic permission OR conference permission
+        return hasBasicPermission || item.requiredPermissions.some(permission => hasConferencePermission(permission));
+      }
+      
+      return hasBasicPermission;
+    }
+    
+    // For attendees, require both basic and conference permissions for conference features
+    const conferenceSpecificFeatures = [
+      '/conferences', '/attendees', '/checkin', '/networking', 
+      '/venue', '/sessions', '/badges', '/analytics', '/my-events'
+    ];
+    
+    if (conferenceSpecificFeatures.includes(item.href)) {
+      return hasBasicPermission && item.requiredPermissions.some(permission => hasConferencePermission(permission));
+    }
+    
+    return hasBasicPermission;
+  });
 };
 
 const roleLabels = {
@@ -163,15 +136,65 @@ const roleColors = {
 
 export function Sidebar({ userRole }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [expandedConferences, setExpandedConferences] = useState<Set<number>>(new Set());
   const pathname = usePathname();
   const { user } = useAuth();
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const { 
+    hasConferencePermission, 
+    isLoading: conferencePermissionsLoading,
+    getAvailableConferences,
+    getConferencePermissions,
+    getConferenceName
+  } = useConferencePermissions();
   
   // Use role from auth state if available, fallback to prop
   const currentRole = (user?.role as "admin" | "staff" | "attendee") || userRole || "attendee";
   
-  // Get navigation items based on user permissions
-  const items = getNavigationItems(hasPermission);
+  // Get navigation items based on user permissions and conference permissions
+  const items = getNavigationItems(hasPermission, hasConferencePermission, currentRole);
+  
+  // Get available conferences
+  const availableConferences = getAvailableConferences();
+  
+  // Category configuration
+  const categoryConfig = {
+    conferences: { icon: Calendar, label: "Quản lý hội nghị", href: "/conferences" },
+    attendees: { icon: Users, label: "Danh sách tham dự", href: "/attendees" },
+    checkin: { icon: QrCode, label: "Check-in QR", href: "/checkin" },
+    networking: { icon: Network, label: "Kết nối mạng", href: "/networking" },
+    venue: { icon: MapPin, label: "Bản đồ địa điểm", href: "/venue" },
+    sessions: { icon: Video, label: "Phiên trực tiếp", href: "/sessions" },
+    badges: { icon: Award, label: "Huy hiệu số", href: "/badges" },
+    analytics: { icon: BarChart3, label: "Phân tích AI", href: "/analytics" },
+    mobile: { icon: Smartphone, label: "Ứng dụng di động", href: "/mobile" },
+  };
+
+  // Toggle conference expansion
+  const toggleConference = (conferenceId: number) => {
+    const newExpanded = new Set(expandedConferences);
+    if (newExpanded.has(conferenceId)) {
+      newExpanded.delete(conferenceId);
+    } else {
+      newExpanded.add(conferenceId);
+    }
+    setExpandedConferences(newExpanded);
+  };
+
+  // Get conference categories based on permissions
+  const getConferenceCategories = (conferenceId: number) => {
+    const permissions = getConferencePermissions(conferenceId);
+    return Object.entries(categoryConfig).filter(([key, config]) => {
+      const permissionKey = key === 'conferences' ? 'conferences.view' : `${key}.view`;
+      return permissions[permissionKey] === true;
+    }).map(([key, config]) => [
+      key, 
+      { 
+        ...config, 
+        href: key === 'conferences' ? `/conferences/${conferenceId}` : `/${key}?conferenceId=${conferenceId}` 
+      }
+    ]);
+  };
   
   // Group items by category for better organization
   const groupedItems = {
@@ -179,15 +202,15 @@ export function Sidebar({ userRole }: SidebarProps) {
       ["/dashboard", "/profile"].includes(item.href)
     ),
     management: items.filter(item => 
-      ["/conferences", "/attendees", "/checkin", "/roles", "/audit", "/settings"].includes(item.href)
+      ["/roles", "/audit", "/settings"].includes(item.href)
     ),
     features: items.filter(item => 
-      ["/networking", "/venue", "/sessions", "/badges", "/analytics", "/mobile", "/my-events"].includes(item.href)
+      ["/my-events"].includes(item.href)
     ),
   };
 
   // Show loading state while permissions are being fetched
-  if (permissionsLoading) {
+  if (permissionsLoading || conferencePermissionsLoading) {
     return (
       <div
         className={cn(
@@ -237,6 +260,80 @@ export function Sidebar({ userRole }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+        {/* Conferences Section */}
+        {availableConferences.length > 0 && (
+          <>
+            {!isCollapsed && (
+              <div className="px-2 py-1">
+                <p className="text-xs font-medium text-sidebar-foreground/60 uppercase tracking-wider">
+                  Hội nghị
+                </p>
+              </div>
+            )}
+            {availableConferences.map((conference) => {
+              const isExpanded = expandedConferences.has(conference.conferenceId);
+              const categories = getConferenceCategories(conference.conferenceId);
+              
+              return (
+                <div key={conference.conferenceId} className="space-y-1">
+                  {/* Conference Header */}
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent p-2 h-auto",
+                      isCollapsed && "px-2"
+                    )}
+                    onClick={() => toggleConference(conference.conferenceId)}
+                  >
+                    <Building className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 text-left truncate">{conference.conferenceName}</span>
+                        <Badge variant="outline" className="text-xs w-16">
+                          {categories.length} tính năng
+                        </Badge>
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 ml-2" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 ml-2" />
+                        )}
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Conference Categories */}
+                  {!isCollapsed && isExpanded && categories.length > 0 && (
+                    <div className="ml-6 space-y-1">
+                      {categories.map(([categoryKey, config]) => {
+                        const isActive = pathname === config.href;
+                        const IconComponent = config.icon;
+                        
+                        return (
+                          <Link key={categoryKey} href={config.href}>
+                            <Button
+                              variant={isActive ? "secondary" : "ghost"}
+                              className={cn(
+                                "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent p-2 h-auto",
+                                isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
+                              )}
+                            >
+                              <IconComponent className="h-4 w-4 mr-3" />
+                              <span className="flex-1 text-left">{config.label}</span>
+                            </Button>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {!isCollapsed && (groupedItems.main.length > 0 || groupedItems.management.length > 0 || groupedItems.features.length > 0) && (
+              <div className="border-t border-sidebar-border my-2"></div>
+            )}
+          </>
+        )}
+
         {/* Main Items */}
         {groupedItems.main.length > 0 && (
           <>
@@ -376,7 +473,7 @@ export function Sidebar({ userRole }: SidebarProps) {
             </Badge>
           </div>
           <p className="text-xs text-sidebar-foreground/40">
-            {items.length} tính năng có sẵn
+            {availableConferences.length} hội nghị • {items.length} tính năng
           </p>
         </div>
       )}

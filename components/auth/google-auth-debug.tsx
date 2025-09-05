@@ -35,7 +35,7 @@ export function GoogleAuthDebug() {
         });
       } catch (error) {
         setDebugInfo({
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           currentUser: user ? {
             uid: user.uid,
             email: user.email,

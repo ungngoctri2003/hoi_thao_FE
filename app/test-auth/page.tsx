@@ -9,11 +9,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { User, Mail, Lock, LogIn, UserPlus, LogOut } from 'lucide-react';
 
-export default function TestAuthPage() {
+function TestAuthContent() {
   const { user, isAuthenticated, isLoading, login, register, logout, clearAuthState } = useAuth();
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({ email: '', name: '', password: '' });
@@ -293,4 +293,22 @@ export default function TestAuthPage() {
       </div>
     </div>
   );
+}
+
+export default function TestAuthPage() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return <TestAuthContent />;
 }

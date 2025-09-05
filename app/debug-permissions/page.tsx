@@ -1,11 +1,12 @@
 "use client";
 
+import { Suspense } from "react";
 import { PermissionsDebug } from "@/components/debug/permissions-debug";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useSearchParams } from "next/navigation";
 
-export default function DebugPermissionsPage() {
+function DebugPermissionsContent() {
   const searchParams = useSearchParams();
   const { user, isAuthenticated, isLoading } = useAuth();
   
@@ -44,5 +45,17 @@ export default function DebugPermissionsPage() {
     <MainLayout userRole={role} userName={name} userAvatar={user?.avatar}>
       <PermissionsDebug />
     </MainLayout>
+  );
+}
+
+export default function DebugPermissionsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    }>
+      <DebugPermissionsContent />
+    </Suspense>
   );
 }

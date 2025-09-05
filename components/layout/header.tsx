@@ -17,6 +17,7 @@ import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useFirebaseAuth } from "@/hooks/use-firebase-auth";
+import { ConferenceSelectorCompact } from "@/components/layout/conference-selector";
 // import { RefreshPermissionsButton } from "@/components/auth/refresh-permissions-button";
 
 interface HeaderProps {
@@ -76,16 +77,19 @@ export function Header({ userName, userRole, userAvatar }: HeaderProps) {
 
   return (
     <header className="flex items-center justify-between p-4 bg-background border-b border-border">
-      {/* Search */}
-      <div className="flex items-center space-x-4 flex-1 max-w-md">
-        <div className="relative">
+      {/* Search and Conference Selector */}
+      <div className="flex items-center space-x-2 flex-1 min-w-0 max-w-2xl">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Tìm kiếm..." className="pl-10 w-80" />
+          <Input placeholder="Tìm kiếm..." className="pl-10 w-full max-w-xs" />
+        </div>
+        <div className="flex-shrink-0 min-w-0">
+          {/* <ConferenceSelectorCompact /> */}
         </div>
       </div>
 
       {/* Actions */}
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2 flex-shrink-0">
         {/* Refresh Permissions Button */}
         {/* <RefreshPermissionsButton 
           variant="outline" 
