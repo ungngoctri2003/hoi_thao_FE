@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test QR Scanner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .video-container {
+            position: relative;
+            max-width: 500px;
+            margin: 20px auto;
+        }
+        video {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            border-radius: 5px;
+            display: none;
+        }
+        .error {
+            background: #ffebee;
+            border-color: #f44336;
+            color: #c62828;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .status.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .status.info {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test QR Scanner</h1>
+        <p>Test chức năng quét QR code với thư viện qr-scanner</p>
+        
+        <div class="video-container">
+            <video id="video" autoplay muted playsinline></video>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">Bắt đầu quét</button>
+            <button id="stopBtn" disabled>Dừng quét</button>
+        </div>
+        
+        <div id="status" class="status info">
+            Nhấn "Bắt đầu quét" để bắt đầu
+        </div>
+        
+        <div id="result" class="result">
+            <h3>Kết quả quét QR:</h3>
+            <p id="resultText"></p>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <h3>Hướng dẫn test:</h3>
+            <ol>
+                <li>Nhấn "Bắt đầu quét" để khởi động camera</li>
+                <li>Cho phép truy cập camera khi được hỏi</li>
+                <li>Đưa mã QR vào khung hình camera</li>
+                <li>QR code sẽ được quét tự động</li>
+                <li>Kết quả sẽ hiển thị bên dưới</li>
+            </ol>
+            
+            <h4>Test với QR codes:</h4>
+            <p>Bạn có thể tạo QR code test tại: <a href="https://www.qr-code-generator.com/" target="_blank">QR Code Generator</a></p>
+            <p>Hoặc sử dụng QR code có sẵn từ Google Authenticator, WhatsApp, v.v.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import QrScanner from 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner.min.js';
+        
+        const video = document.getElementById('video');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const result = document.getElementById('result');
+        const resultText = document.getElementById('resultText');
+        
+        let qrScanner = null;
+        
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        function showResult(text, isError = false) {
+            resultText.textContent = text;
+            result.className = `result ${isError ? 'error' : ''}`;
+            result.style.display = 'block';
+        }
+        
+        function hideResult() {
+            result.style.display = 'none';
+        }
+        
+        startBtn.addEventListener('click', async () => {
+            try {
+                updateStatus('Đang khởi tạo camera...', 'info');
+                hideResult();
+                
+                // Check if camera is available
+                if (!QrScanner.hasCamera()) {
+                    throw new Error('Không tìm thấy camera trên thiết bị này');
+                }
+                
+                // Wait for video element to be ready
+                let attempts = 0;
+                const maxAttempts = 10;
+                
+                while (!video && attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                if (!video) {
+                    throw new Error('Video element không khả dụng. Vui lòng thử lại.');
+                }
+                
+                // Create QR Scanner
+                qrScanner = new QrScanner(
+                    video,
+                    (result) => {
+                        console.log('QR Code detected:', result.data);
+                        updateStatus('QR Code đã được quét thành công!', 'success');
+                        showResult(result.data);
+                        stopScanning();
+                    },
+                    {
+                        onDecodeError: (error) => {
+                            // This is normal, QR codes are not detected on every frame
+                            const errorMessage = typeof error === 'string' ? error : error.message;
+                            if (!errorMessage.includes('No QR code found')) {
+                                console.warn('QR decode error:', error);
+                            }
+                        },
+                        highlightScanRegion: true,
+                        highlightCodeOutline: true,
+                        preferredCamera: 'environment',
+                    }
+                );
+                
+                // Start scanning
+                await qrScanner.start();
+                
+                updateStatus('Đang quét QR code... Di chuyển camera để tìm mã QR', 'success');
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                
+            } catch (error) {
+                console.error('Error starting QR scanner:', error);
+                updateStatus(`Lỗi: ${error.message}`, 'error');
+                showResult(error.message, true);
+            }
+        });
+        
+        stopBtn.addEventListener('click', stopScanning);
+        
+        function stopScanning() {
+            if (qrScanner) {
+                qrScanner.stop();
+                qrScanner.destroy();
+                qrScanner = null;
+            }
+            
+            updateStatus('Đã dừng quét QR code', 'info');
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        }
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopScanning();
+        });
+    </script>
+</body>
+</html>

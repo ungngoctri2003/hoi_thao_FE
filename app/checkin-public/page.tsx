@@ -1,23 +1,29 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PublicHeader } from "@/components/layout/public-header";
+import { QRScanner } from "./components/qr-scanner";
+import { ManualCheckInForm } from "./components/manual-checkin-form";
+import { StatsCards } from "./components/stats-cards";
+import { CheckInRecordsList } from "./components/checkin-records-list";
+// import { APIStatus } from "./components/api-status";
+import { ConferenceInfo } from "./components/conference-info";
+import { UsageGuide } from "./components/usage-guide";
+import { ToastNotification } from "./components/toast-notification";
+import { checkInAPI, type CheckInResponse, type Attendee, type Conference } from "./lib/checkin-api";
 import { 
   QrCode, 
-  Search, 
   Download, 
-  UserCheck, 
-  Clock, 
   CheckCircle,
   XCircle,
-  Smartphone,
-  Camera,
-  RefreshCw,
-  ArrowLeft
+  ArrowLeft,
+  Users,
+  Calendar
 } from "lucide-react";
 import Link from "next/link";
 
@@ -33,89 +39,163 @@ interface CheckInRecord {
 
 export default function PublicCheckInPage() {
   const [checkInRecords, setCheckInRecords] = useState<CheckInRecord[]>([]);
+  const [conferences, setConferences] = useState<Conference[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
   const [isScanning, setIsScanning] = useState(false);
+  const [selectedConference, setSelectedConference] = useState<string>("");
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [toast, setToast] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    isVisible: boolean;
+  }>({
+    message: '',
+    type: 'info',
+    isVisible: false
+  });
 
-  // Mock data - replace with actual API call
-  React.useEffect(() => {
-    const mockRecords: CheckInRecord[] = [
-      {
-        id: 1,
-        attendeeName: "Nguyễn Văn A",
-        attendeeEmail: "nguyenvana@email.com",
-        checkInTime: "2024-01-20 09:15:30",
-        status: "success",
-        qrCode: "QR001",
-        conferenceId: 1
-      },
-      {
-        id: 2,
-        attendeeName: "Trần Thị B",
-        attendeeEmail: "tranthib@email.com",
-        checkInTime: "2024-01-20 09:22:15",
-        status: "success",
-        qrCode: "QR002",
-        conferenceId: 1
-      },
-      {
-        id: 3,
-        attendeeName: "Lê Văn C",
-        attendeeEmail: "levanc@email.com",
-        checkInTime: "2024-01-20 09:30:45",
-        status: "duplicate",
-        qrCode: "QR001",
-        conferenceId: 1
-      }
-    ];
-
-    setTimeout(() => {
-      setCheckInRecords(mockRecords);
-      setIsLoading(false);
-    }, 1000);
+  // Load initial data
+  useEffect(() => {
+    loadInitialData();
   }, []);
 
-  const filteredRecords = checkInRecords.filter(record =>
-    record.attendeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.attendeeEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.qrCode.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      success: { label: "Thành công", color: "bg-green-100 text-green-800", icon: CheckCircle },
-      failed: { label: "Thất bại", color: "bg-red-100 text-red-800", icon: XCircle },
-      duplicate: { label: "Trùng lặp", color: "bg-yellow-100 text-yellow-800", icon: Clock }
-    };
-    
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.success;
-    const IconComponent = config.icon;
-    
-    return (
-      <Badge className={config.color}>
-        <IconComponent className="h-3 w-3 mr-1" />
-        {config.label}
-      </Badge>
-    );
+  const loadInitialData = async () => {
+    try {
+      setIsLoading(true);
+      const [conferencesData, recordsData] = await Promise.all([
+        checkInAPI.getConferences(),
+        checkInAPI.getCheckInRecords()
+      ]);
+      
+      setConferences(conferencesData);
+      setCheckInRecords(recordsData);
+    } catch (err) {
+      console.error('Error loading initial data:', err);
+      setError("Lỗi khi tải dữ liệu");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const startScanning = () => {
-    setIsScanning(true);
-    // Simulate QR scanning
-    setTimeout(() => {
+
+  const handleQRScanSuccess = async (qrData: string) => {
+    if (!selectedConference) {
+      setError("Vui lòng chọn hội nghị trước khi quét QR");
+      return;
+    }
+
+    try {
       setIsScanning(false);
-      // Add new check-in record
-      const newRecord: CheckInRecord = {
-        id: Date.now(),
-        attendeeName: "Người dùng mới",
-        attendeeEmail: "newuser@email.com",
-        checkInTime: new Date().toLocaleString(),
-        status: "success",
-        qrCode: `QR${Date.now()}`,
-        conferenceId: 1
-      };
-      setCheckInRecords(prev => [newRecord, ...prev]);
-    }, 2000);
+      setError("");
+      
+      // Validate QR code first
+      const validation = await checkInAPI.validateQRCode(qrData, parseInt(selectedConference));
+      
+      if (!validation.valid || !validation.attendee) {
+        setError("Mã QR không hợp lệ hoặc không thuộc hội nghị này");
+        return;
+      }
+
+      // Perform check-in
+      const response = await checkInAPI.checkInAttendee({
+        attendeeId: validation.attendee.id,
+        qrCode: qrData,
+        conferenceId: parseInt(selectedConference),
+        checkInMethod: 'qr'
+      });
+
+      if (response.success && response.data) {
+        setCheckInRecords(prev => [response.data!, ...prev]);
+        setToast({
+          message: `Check-in thành công cho ${response.data.attendeeName}`,
+          type: 'success',
+          isVisible: true
+        });
+      } else {
+        setToast({
+          message: response.message || "Lỗi khi check-in",
+          type: 'error',
+          isVisible: true
+        });
+      }
+    } catch (err) {
+      console.error('QR scan error:', err);
+      setToast({
+        message: "Lỗi khi xử lý mã QR",
+        type: 'error',
+        isVisible: true
+      });
+    }
+  };
+
+  const handleQRScanError = (error: string) => {
+    setError(error);
+    setIsScanning(false);
+  };
+
+  const handleManualCheckInSuccess = async (attendee: Attendee) => {
+    try {
+      setError("");
+      
+      const response = await checkInAPI.checkInAttendee({
+        attendeeId: attendee.id,
+        qrCode: attendee.qrCode,
+        conferenceId: attendee.conferenceId,
+        checkInMethod: 'manual',
+        attendeeInfo: {
+          name: attendee.name,
+          email: attendee.email,
+          phone: attendee.phone
+        }
+      });
+
+      if (response.success && response.data) {
+        setCheckInRecords(prev => [response.data!, ...prev]);
+        setToast({
+          message: `Check-in thành công cho ${response.data.attendeeName}`,
+          type: 'success',
+          isVisible: true
+        });
+      } else {
+        setToast({
+          message: response.message || "Lỗi khi check-in",
+          type: 'error',
+          isVisible: true
+        });
+      }
+    } catch (err) {
+      console.error('Manual check-in error:', err);
+      setToast({
+        message: "Lỗi khi check-in thủ công",
+        type: 'error',
+        isVisible: true
+      });
+    }
+  };
+
+  const handleManualCheckInError = (error: string) => {
+    setError(error);
+  };
+
+  const handleExportRecords = async () => {
+    try {
+      const conferenceId = selectedConference ? parseInt(selectedConference) : undefined;
+      const blob = await checkInAPI.exportCheckInRecords(conferenceId, 'excel');
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `checkin-records-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export error:', err);
+      setError("Lỗi khi xuất báo cáo");
+    }
   };
 
   return (
@@ -134,190 +214,137 @@ export default function PublicCheckInPage() {
         </div>
 
         <div className="space-y-6">
+          {/* API Status */}
+          {/* <APIStatus onRetry={loadInitialData} /> */}
+          
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <QrCode className="h-8 w-8 text-primary" />
               <div>
-                <h1 className="text-3xl font-bold">Check-in QR</h1>
+                <h1 className="text-3xl font-bold">Hệ thống Check-in</h1>
                 <p className="text-muted-foreground">
-                  Quét QR code để check-in tham dự viên
+                  Quét QR code hoặc check-in thủ công cho tham dự viên
                 </p>
               </div>
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline">
+              <Button variant="outline" onClick={handleExportRecords}>
                 <Download className="h-4 w-4 mr-2" />
                 Xuất báo cáo
-              </Button>
-              <Button onClick={startScanning} disabled={isScanning}>
-                {isScanning ? (
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Camera className="h-4 w-4 mr-2" />
-                )}
-                {isScanning ? "Đang quét..." : "Quét QR Code"}
               </Button>
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <UserCheck className="h-4 w-4 text-green-600" />
-                  <div>
-                    <p className="text-sm font-medium">Check-in thành công</p>
-                    <p className="text-2xl font-bold">
-                      {checkInRecords.filter(r => r.status === "success").length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <XCircle className="h-4 w-4 text-red-600" />
-                  <div>
-                    <p className="text-sm font-medium">Check-in thất bại</p>
-                    <p className="text-2xl font-bold">
-                      {checkInRecords.filter(r => r.status === "failed").length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Clock className="h-4 w-4 text-yellow-600" />
-                  <div>
-                    <p className="text-sm font-medium">Trùng lặp</p>
-                    <p className="text-2xl font-bold">
-                      {checkInRecords.filter(r => r.status === "duplicate").length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <QrCode className="h-4 w-4 text-blue-600" />
-                  <div>
-                    <p className="text-sm font-medium">Tổng quét</p>
-                    <p className="text-2xl font-bold">{checkInRecords.length}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* QR Scanner Interface */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Máy quét QR Code</CardTitle>
-              <CardDescription>
-                Sử dụng camera để quét mã QR của tham dự viên
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center space-y-4">
-                <div className="w-full max-w-md h-64 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
-                  {isScanning ? (
-                    <div className="text-center">
-                      <RefreshCw className="h-12 w-12 animate-spin mx-auto mb-2 text-primary" />
-                      <p className="text-sm text-muted-foreground">Đang quét QR code...</p>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <Camera className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">Nhấn "Quét QR Code" để bắt đầu</p>
-                    </div>
-                  )}
-                </div>
-                <div className="flex space-x-2">
-                  <Button onClick={startScanning} disabled={isScanning}>
-                    <Camera className="h-4 w-4 mr-2" />
-                    {isScanning ? "Đang quét..." : "Bắt đầu quét"}
-                  </Button>
-                  <Button variant="outline">
-                    <Smartphone className="h-4 w-4 mr-2" />
-                    Mở ứng dụng di động
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Search and Filter */}
+          {/* Conference Selection */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex items-center space-x-4">
+                <Calendar className="h-5 w-5 text-primary" />
                 <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Tìm kiếm theo tên, email, QR code..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Xuất Excel
-                  </Button>
+                  <label className="text-sm font-medium">Chọn hội nghị:</label>
+                  <select
+                    value={selectedConference}
+                    onChange={(e) => setSelectedConference(e.target.value)}
+                    className="ml-2 px-3 py-1 border rounded-md"
+                  >
+                    <option value="">-- Chọn hội nghị --</option>
+                    {conferences
+                      .filter(conference => conference.id !== undefined && conference.id !== null)
+                      .map((conference) => (
+                        <option 
+                          key={conference.id} 
+                          value={conference.id.toString()}
+                        >
+                          {conference.name || 'Unknown Conference'} - {conference.date || 'N/A'}
+                        </option>
+                      ))}
+                  </select>
                 </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Conference Info */}
+          <ConferenceInfo 
+            conference={conferences.find(c => c.id === parseInt(selectedConference)) || null}
+            totalAttendees={conferences.length * 10} // Mock data
+            checkedInCount={checkInRecords.filter(r => r.status === 'success').length}
+          />
+
+          {/* Success/Error Messages */}
+          {successMessage && (
+            <div className="flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <p className="text-sm text-green-600">{successMessage}</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <XCircle className="h-4 w-4 text-red-600" />
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          {/* Stats Cards */}
+          <StatsCards 
+            records={checkInRecords}
+            conferences={conferences}
+            selectedConference={selectedConference}
+          />
+
+          {/* Check-in Methods Tabs */}
+          <Tabs defaultValue="qr" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="qr" className="flex items-center space-x-2">
+                <QrCode className="h-4 w-4" />
+                <span>Quét QR Code</span>
+              </TabsTrigger>
+              <TabsTrigger value="manual" className="flex items-center space-x-2">
+                <Users className="h-4 w-4" />
+                <span>Check-in Thủ công</span>
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="qr" className="mt-6">
+              <QRScanner
+                onScanSuccess={handleQRScanSuccess}
+                onScanError={handleQRScanError}
+                isScanning={isScanning}
+                onStartScan={() => setIsScanning(true)}
+                onStopScan={() => setIsScanning(false)}
+              />
+            </TabsContent>
+            
+            <TabsContent value="manual" className="mt-6">
+              <ManualCheckInForm
+                onCheckInSuccess={handleManualCheckInSuccess}
+                onCheckInError={handleManualCheckInError}
+                conferences={conferences}
+              />
+            </TabsContent>
+          </Tabs>
+
+          {/* Usage Guide */}
+          <UsageGuide />
+
           {/* Check-in Records */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Lịch sử Check-in ({filteredRecords.length})</CardTitle>
-              <CardDescription>
-                Danh sách tất cả các lần check-in đã thực hiện
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {filteredRecords.map((record) => (
-                    <div key={record.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                          <QrCode className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{record.attendeeName}</p>
-                          <p className="text-sm text-muted-foreground">{record.attendeeEmail}</p>
-                          <p className="text-xs text-muted-foreground">QR: {record.qrCode}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <div className="text-right">
-                          <p className="text-sm font-medium">{record.checkInTime}</p>
-                          {getStatusBadge(record.status)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <CheckInRecordsList
+            records={checkInRecords}
+            isLoading={isLoading}
+            onExport={handleExportRecords}
+          />
         </div>
       </div>
+
+      {/* Toast Notification */}
+      <ToastNotification
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
+      />
     </div>
   );
 }

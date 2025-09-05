@@ -1,0 +1,138 @@
+"use client";
+
+import React from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Search, Download, QrCode, CheckCircle, XCircle, Clock } from "lucide-react";
+
+interface CheckInRecord {
+  id: number;
+  attendeeName: string;
+  attendeeEmail: string;
+  checkInTime: string;
+  status: 'success' | 'failed' | 'duplicate';
+  qrCode: string;
+  conferenceId: number;
+}
+
+interface CheckInRecordsListProps {
+  records: CheckInRecord[];
+  isLoading: boolean;
+  onExport: () => void;
+}
+
+export function CheckInRecordsList({ records, isLoading, onExport }: CheckInRecordsListProps) {
+  const [searchTerm, setSearchTerm] = React.useState("");
+
+  const filteredRecords = records.filter(record =>
+    record.attendeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    record.attendeeEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    record.qrCode.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      success: { label: "Thành công", color: "bg-green-100 text-green-800", icon: CheckCircle },
+      failed: { label: "Thất bại", color: "bg-red-100 text-red-800", icon: XCircle },
+      duplicate: { label: "Trùng lặp", color: "bg-yellow-100 text-yellow-800", icon: Clock }
+    };
+    
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.success;
+    const IconComponent = config.icon;
+    
+    return (
+      <Badge className={config.color}>
+        <IconComponent className="h-3 w-3 mr-1" />
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const formatDateTime = (dateTime: string) => {
+    try {
+      const date = new Date(dateTime);
+      return date.toLocaleString('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch {
+      return dateTime;
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Lịch sử Check-in ({filteredRecords.length})</CardTitle>
+            <CardDescription>
+              Danh sách tất cả các lần check-in đã thực hiện
+            </CardDescription>
+          </div>
+          <Button variant="outline" onClick={onExport}>
+            <Download className="h-4 w-4 mr-2" />
+            Xuất Excel
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {/* Search */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Tìm kiếm theo tên, email, QR code..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        {/* Records List */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : filteredRecords.length === 0 ? (
+          <div className="text-center py-8">
+            <QrCode className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">
+              {searchTerm ? "Không tìm thấy kết quả phù hợp" : "Chưa có lịch sử check-in nào"}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredRecords.map((record) => (
+              <div key={record.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <QrCode className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{record.attendeeName}</p>
+                    <p className="text-sm text-muted-foreground">{record.attendeeEmail}</p>
+                    <p className="text-xs text-muted-foreground">QR: {record.qrCode}</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <div className="text-right">
+                    <p className="text-sm font-medium">{formatDateTime(record.checkInTime)}</p>
+                    {getStatusBadge(record.status)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

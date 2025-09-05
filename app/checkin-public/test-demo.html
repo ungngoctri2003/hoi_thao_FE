@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Check-in System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .demo-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .demo-button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .demo-button:hover {
+            background: #0056b3;
+        }
+        .qr-demo {
+            border: 2px dashed #ccc;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>Demo Hệ thống Check-in</h1>
+    
+    <div class="demo-section">
+        <h2>1. Demo QR Code Scanner</h2>
+        <p>Click để mô phỏng quét QR code:</p>
+        <button class="demo-button" onclick="simulateQRScan()">Quét QR Code</button>
+        <button class="demo-button" onclick="simulateQRError()">Lỗi QR Code</button>
+        <div id="qr-result" class="qr-demo">
+            <p>Nhấn nút để mô phỏng quét QR code</p>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>2. Demo Check-in Thủ công</h2>
+        <p>Mô phỏng tìm kiếm và check-in tham dự viên:</p>
+        <input type="text" id="search-input" placeholder="Nhập tên hoặc email..." style="padding: 8px; width: 300px;">
+        <button class="demo-button" onclick="simulateSearch()">Tìm kiếm</button>
+        <button class="demo-button" onclick="simulateManualCheckin()">Check-in Thủ công</button>
+        <div id="search-results"></div>
+    </div>
+
+    <div class="demo-section">
+        <h2>3. Demo Thống kê</h2>
+        <p>Mô phỏng dữ liệu thống kê:</p>
+        <button class="demo-button" onclick="simulateStats()">Tải Thống kê</button>
+        <div id="stats-display"></div>
+    </div>
+
+    <div class="demo-section">
+        <h2>4. Demo Lịch sử Check-in</h2>
+        <p>Mô phỏng danh sách lịch sử check-in:</p>
+        <button class="demo-button" onclick="simulateHistory()">Tải Lịch sử</button>
+        <button class="demo-button" onclick="simulateExport()">Xuất Excel</button>
+        <div id="history-display"></div>
+    </div>
+
+    <div class="demo-section">
+        <h2>5. Demo Thông báo</h2>
+        <p>Mô phỏng các loại thông báo:</p>
+        <button class="demo-button" onclick="showNotification('success', 'Check-in thành công!')">Thành công</button>
+        <button class="demo-button" onclick="showNotification('error', 'Lỗi khi check-in!')">Lỗi</button>
+        <button class="demo-button" onclick="showNotification('warning', 'Cảnh báo!')">Cảnh báo</button>
+        <button class="demo-button" onclick="showNotification('info', 'Thông tin!')">Thông tin</button>
+        <div id="notification-area"></div>
+    </div>
+
+    <script>
+        // Mock data
+        const mockAttendees = [
+            { id: 1, name: "Nguyễn Văn A", email: "nguyenvana@email.com", phone: "0123456789", qrCode: "QR001" },
+            { id: 2, name: "Trần Thị B", email: "tranthib@email.com", phone: "0987654321", qrCode: "QR002" },
+            { id: 3, name: "Lê Văn C", email: "levanc@email.com", phone: "0369258147", qrCode: "QR003" }
+        ];
+
+        const mockConferences = [
+            { id: 1, name: "Hội nghị Công nghệ 2024", date: "2024-01-20" },
+            { id: 2, name: "Hội nghị Khoa học 2024", date: "2024-01-25" }
+        ];
+
+        // QR Code Simulation
+        function simulateQRScan() {
+            const qrResult = document.getElementById('qr-result');
+            qrResult.innerHTML = '<p>🔍 Đang quét QR code...</p>';
+            
+            setTimeout(() => {
+                const randomQR = 'QR' + Math.floor(Math.random() * 1000);
+                qrResult.innerHTML = `
+                    <p>✅ Quét thành công!</p>
+                    <p><strong>Mã QR:</strong> ${randomQR}</p>
+                    <p><strong>Tham dự viên:</strong> Nguyễn Văn A</p>
+                    <p><strong>Email:</strong> nguyenvana@email.com</p>
+                `;
+                showNotification('success', 'Check-in thành công cho Nguyễn Văn A!');
+            }, 2000);
+        }
+
+        function simulateQRError() {
+            const qrResult = document.getElementById('qr-result');
+            qrResult.innerHTML = '<p>🔍 Đang quét QR code...</p>';
+            
+            setTimeout(() => {
+                qrResult.innerHTML = '<p>❌ Không thể đọc mã QR. Vui lòng thử lại.</p>';
+                showNotification('error', 'Mã QR không hợp lệ!');
+            }, 2000);
+        }
+
+        // Search Simulation
+        function simulateSearch() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const results = mockAttendees.filter(attendee => 
+                attendee.name.toLowerCase().includes(searchTerm) ||
+                attendee.email.toLowerCase().includes(searchTerm)
+            );
+            
+            const resultsDiv = document.getElementById('search-results');
+            if (results.length > 0) {
+                resultsDiv.innerHTML = results.map(attendee => `
+                    <div style="border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 4px;">
+                        <strong>${attendee.name}</strong><br>
+                        Email: ${attendee.email}<br>
+                        Phone: ${attendee.phone}<br>
+                        QR: ${attendee.qrCode}
+                    </div>
+                `).join('');
+            } else {
+                resultsDiv.innerHTML = '<p>Không tìm thấy tham dự viên nào.</p>';
+            }
+        }
+
+        function simulateManualCheckin() {
+            showNotification('success', 'Check-in thủ công thành công!');
+        }
+
+        // Stats Simulation
+        function simulateStats() {
+            const statsDiv = document.getElementById('stats-display');
+            const stats = {
+                success: Math.floor(Math.random() * 50) + 20,
+                failed: Math.floor(Math.random() * 10),
+                duplicate: Math.floor(Math.random() * 5),
+                total: Math.floor(Math.random() * 60) + 30
+            };
+            
+            statsDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0;">
+                    <div style="text-align: center; padding: 15px; background: #d4edda; border-radius: 4px;">
+                        <h3>${stats.success}</h3>
+                        <p>Thành công</p>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: #f8d7da; border-radius: 4px;">
+                        <h3>${stats.failed}</h3>
+                        <p>Thất bại</p>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: #fff3cd; border-radius: 4px;">
+                        <h3>${stats.duplicate}</h3>
+                        <p>Trùng lặp</p>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: #d1ecf1; border-radius: 4px;">
+                        <h3>${stats.total}</h3>
+                        <p>Tổng cộng</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // History Simulation
+        function simulateHistory() {
+            const historyDiv = document.getElementById('history-display');
+            const records = [
+                { name: "Nguyễn Văn A", email: "nguyenvana@email.com", time: "09:15:30", status: "success" },
+                { name: "Trần Thị B", email: "tranthib@email.com", time: "09:22:15", status: "success" },
+                { name: "Lê Văn C", email: "levanc@email.com", time: "09:30:45", status: "duplicate" }
+            ];
+            
+            historyDiv.innerHTML = records.map(record => `
+                <div style="border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 4px; display: flex; justify-content: space-between;">
+                    <div>
+                        <strong>${record.name}</strong><br>
+                        ${record.email}
+                    </div>
+                    <div style="text-align: right;">
+                        ${record.time}<br>
+                        <span class="status ${record.status}">${record.status === 'success' ? 'Thành công' : 'Trùng lặp'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function simulateExport() {
+            showNotification('success', 'Đang tải file Excel...');
+            setTimeout(() => {
+                showNotification('success', 'Xuất Excel thành công!');
+            }, 2000);
+        }
+
+        // Notification System
+        function showNotification(type, message) {
+            const notificationArea = document.getElementById('notification-area');
+            const notification = document.createElement('div');
+            notification.className = `status ${type}`;
+            notification.textContent = message;
+            notification.style.margin = '10px 0';
+            notification.style.padding = '10px';
+            notification.style.borderRadius = '4px';
+            notification.style.animation = 'fadeIn 0.3s ease-in';
+            
+            notificationArea.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(-10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
