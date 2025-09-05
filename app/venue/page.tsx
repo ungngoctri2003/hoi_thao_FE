@@ -1,439 +1,292 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import { useConferencePermissions } from "@/hooks/use-conference-permissions";
-import { ConferencePermissionGuard } from "@/components/auth/conference-permission-guard";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { MainLayout } from "@/components/layout/main-layout";
-import { useAuth } from "@/hooks/use-auth";
+import { Badge } from "@/components/ui/badge";
+import { PublicHeader } from "@/components/layout/public-header";
 import { 
   MapPin, 
-  Search, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Building,
-  Map,
-  Navigation,
-  Clock,
-  Users,
+  Navigation, 
+  Clock, 
+  Phone, 
+  Mail, 
   Wifi,
   Car,
+  Bus,
+  Train,
+  Plane,
   Coffee,
-  Building2
+  Utensils,
+  Car as Parking,
+  Accessibility
 } from "lucide-react";
 
-interface VenueFloor {
-  id: number;
-  name: string;
-  description: string;
-  floorNumber: number;
-  conferenceId: number;
-}
-
-interface VenueRoom {
-  id: number;
-  name: string;
-  capacity: number;
-  floorId: number;
-  amenities: string[];
-  isAvailable: boolean;
-}
-
 export default function VenuePage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { currentConferenceId, hasConferencePermission } = useConferencePermissions();
-  const [floors, setFloors] = useState<VenueFloor[]>([]);
-  const [rooms, setRooms] = useState<VenueRoom[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
+  const [selectedFloor, setSelectedFloor] = useState(1);
 
-  // Mock data - replace with actual API call
-  useEffect(() => {
-    const mockFloors: VenueFloor[] = [
-      {
-        id: 1,
-        name: "Tầng 1 - Sảnh chính",
-        description: "Sảnh đăng ký và khu vực chung",
-        floorNumber: 1,
-        conferenceId: currentConferenceId || 1
-      },
-      {
-        id: 2,
-        name: "Tầng 2 - Phòng họp",
-        description: "Các phòng họp và thuyết trình",
-        floorNumber: 2,
-        conferenceId: currentConferenceId || 1
-      },
-      {
-        id: 3,
-        name: "Tầng 3 - Khu vực VIP",
-        description: "Khu vực dành cho khách VIP",
-        floorNumber: 3,
-        conferenceId: currentConferenceId || 1
-      }
-    ];
-
-    const mockRooms: VenueRoom[] = [
-      {
-        id: 1,
-        name: "Phòng A101",
-        capacity: 50,
-        floorId: 1,
-        amenities: ["Máy chiếu", "Wifi", "Điều hòa"],
-        isAvailable: true
-      },
-      {
-        id: 2,
-        name: "Phòng A102",
-        capacity: 30,
-        floorId: 1,
-        amenities: ["Máy chiếu", "Wifi", "Bảng trắng"],
-        isAvailable: false
-      },
-      {
-        id: 3,
-        name: "Phòng B201",
-        capacity: 100,
-        floorId: 2,
-        amenities: ["Máy chiếu", "Wifi", "Hệ thống âm thanh", "Sân khấu"],
-        isAvailable: true
-      },
-      {
-        id: 4,
-        name: "Phòng VIP301",
-        capacity: 20,
-        floorId: 3,
-        amenities: ["Máy chiếu 4K", "Wifi", "Điều hòa", "Ghế VIP", "Coffee"],
-        isAvailable: true
-      }
-    ];
-
-    setTimeout(() => {
-      setFloors(mockFloors);
-      setRooms(mockRooms);
-      setIsLoading(false);
-    }, 1000);
-  }, [currentConferenceId]);
-
-  const filteredRooms = rooms.filter(room => {
-    const matchesSearch = room.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFloor = selectedFloor === null || room.floorId === selectedFloor;
-    return matchesSearch && matchesFloor;
-  });
-
-  const getAmenityIcon = (amenity: string) => {
-    const iconMap: Record<string, any> = {
-      "Máy chiếu": Building,
-      "Wifi": Wifi,
-      "Điều hòa": Clock,
-      "Bảng trắng": Edit,
-      "Hệ thống âm thanh": Users,
-      "Sân khấu": Map,
-      "Ghế VIP": Coffee,
-      "Coffee": Coffee,
-      "Parking": Car,
-      "WC": Building2
-    };
-    return iconMap[amenity] || Building;
+  const venueInfo = {
+    name: "Trung tâm Hội nghị Quốc gia",
+    address: "Số 1 Thăng Long, Nam Từ Liêm, Hà Nội",
+    phone: "+84 24 3825 1234",
+    email: "info@ncc.gov.vn",
+    website: "www.ncc.gov.vn",
+    capacity: "1000 người",
+    parking: "500 chỗ đỗ xe",
+    wifi: "Miễn phí",
+    accessibility: "Có hỗ trợ người khuyết tật"
   };
 
-  
-  // Show loading state while auth is loading
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary">        </div>
-      </div>
-    );
-  }
+  const floors = [
+    {
+      id: 1,
+      name: "Tầng 1 - Sảnh chính",
+      rooms: [
+        { name: "Sảnh đăng ký", capacity: "200", features: ["Check-in", "Thông tin", "Quầy lễ tân"] },
+        { name: "Hội trường A", capacity: "500", features: ["Sân khấu chính", "Âm thanh", "Ánh sáng"] },
+        { name: "Phòng VIP", capacity: "50", features: ["Khách mời", "Nghỉ ngơi", "Coffee"] }
+      ]
+    },
+    {
+      id: 2,
+      name: "Tầng 2 - Phòng họp",
+      rooms: [
+        { name: "Phòng họp 201", capacity: "100", features: ["Họp nhóm", "Thuyết trình", "Video call"] },
+        { name: "Phòng họp 202", capacity: "80", features: ["Workshop", "Thảo luận", "Bảng trắng"] },
+        { name: "Phòng họp 203", capacity: "60", features: ["Họp kín", "Tư vấn", "Máy chiếu"] }
+      ]
+    },
+    {
+      id: 3,
+      name: "Tầng 3 - Khu vực networking",
+      rooms: [
+        { name: "Khu networking", capacity: "200", features: ["Giao lưu", "Kết nối", "Coffee break"] },
+        { name: "Khu triển lãm", capacity: "300", features: ["Gian hàng", "Sản phẩm", "Demo"] },
+        { name: "Khu ăn uống", capacity: "150", features: ["Buffet", "Đồ uống", "Nghỉ ngơi"] }
+      ]
+    }
+  ];
 
-  // Show not authenticated state
-  if (!isAuthenticated || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md w-full">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center text-red-600">Chưa đăng nhập</CardTitle>
-              <CardDescription className="text-center">
-                Vui lòng đăng nhập để truy cập trang này
-              </CardDescription>
-            </CardHeader>
-          </Card>
-                </div>
-      </div>
-    );
-  }
+  const facilities = [
+    { icon: Wifi, name: "WiFi miễn phí", description: "Kết nối internet tốc độ cao" },
+    { icon: Parking, name: "Bãi đỗ xe", description: "500 chỗ đỗ xe miễn phí" },
+    { icon: Coffee, name: "Khu cà phê", description: "Cà phê và đồ uống đa dạng" },
+    { icon: Utensils, name: "Nhà hàng", description: "Buffet và món ăn địa phương" },
+    { icon: Accessibility, name: "Thân thiện", description: "Hỗ trợ người khuyết tật" },
+    { icon: Phone, name: "Hỗ trợ 24/7", description: "Đội ngũ hỗ trợ chuyên nghiệp" }
+  ];
 
-  // Get user info for MainLayout
-  const userRole = (user.role as "admin" | "staff" | "attendee") || "attendee";
-  const userName = user.name || "Người dùng";
-  const userAvatar = user.avatar;
-  const canView = hasConferencePermission("venue.view");
-
-  if (!canView) {
-    return (
-      <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
-        <div className="flex items-center justify-center min-h-screen">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle className="text-center text-red-600">Không có quyền truy cập</CardTitle>
-              <CardDescription className="text-center">
-                Bạn không có quyền xem thông tin địa điểm
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-      </MainLayout>
-    );
-  }
+  const transportation = [
+    { icon: Car, name: "Xe ô tô", description: "Bãi đỗ xe rộng rãi, miễn phí" },
+    { icon: Bus, name: "Xe buýt", description: "Tuyến 01, 02, 03 - Dừng ngay trước cửa" },
+    { icon: Train, name: "Tàu điện", description: "Ga Cát Linh - 5 phút đi bộ" },
+    { icon: Plane, name: "Sân bay", description: "Nội Bài - 45 phút bằng taxi" }
+  ];
 
   return (
-    <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
-      <ConferencePermissionGuard 
-      requiredPermissions={["venue.view"]} 
-      conferenceId={currentConferenceId ?? undefined}
-    >
-      <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <PublicHeader />
+      
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <MapPin className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold">Bản đồ địa điểm</h1>
-              <p className="text-muted-foreground">
-                Quản lý và xem thông tin địa điểm hội nghị
-              </p>
-            </div>
-          </div>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Thêm tầng
-          </Button>
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-serif font-bold text-slate-800 mb-4">
+            Bản đồ địa điểm hội nghị
+          </h1>
+          <p className="text-xl text-slate-600 max-w-3xl mx-auto">
+            Khám phá không gian hội nghị với bản đồ tương tác và thông tin chi tiết
+          </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Building className="h-4 w-4 text-blue-600" />
+        {/* Venue Info */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <MapPin className="h-6 w-6 text-blue-600" />
+              <span>Thông tin địa điểm</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium">Tổng tầng</p>
-                  <p className="text-2xl font-bold">{floors.length}</p>
+                  <h3 className="font-semibold text-lg text-slate-800">{venueInfo.name}</h3>
+                  <p className="text-slate-600 flex items-center space-x-2">
+                    <MapPin className="h-4 w-4" />
+                    <span>{venueInfo.address}</span>
+                  </p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Map className="h-4 w-4 text-green-600" />
-                <div>
-                  <p className="text-sm font-medium">Tổng phòng</p>
-                  <p className="text-2xl font-bold">{rooms.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-4 w-4 text-orange-600" />
-                <div>
-                  <p className="text-sm font-medium">Phòng trống</p>
-                  <p className="text-2xl font-bold">
-                    {rooms.filter(r => r.isAvailable).length}
+                <div className="space-y-2">
+                  <p className="flex items-center space-x-2">
+                    <Phone className="h-4 w-4 text-slate-500" />
+                    <span>{venueInfo.phone}</span>
+                  </p>
+                  <p className="flex items-center space-x-2">
+                    <Mail className="h-4 w-4 text-slate-500" />
+                    <span>{venueInfo.email}</span>
                   </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Users className="h-4 w-4 text-purple-600" />
-                <div>
-                  <p className="text-sm font-medium">Sức chứa</p>
-                  <p className="text-2xl font-bold">
-                    {rooms.reduce((sum, room) => sum + room.capacity, 0)}
-                  </p>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <p className="text-2xl font-bold text-blue-600">{venueInfo.capacity}</p>
+                    <p className="text-sm text-slate-600">Sức chứa</p>
+                  </div>
+                  <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <p className="text-2xl font-bold text-green-600">{venueInfo.parking}</p>
+                    <p className="text-sm text-slate-600">Chỗ đỗ xe</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Search and Filter */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Tìm kiếm phòng..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary">WiFi miễn phí</Badge>
+                  <Badge variant="secondary">Thân thiện người khuyết tật</Badge>
+                  <Badge variant="secondary">Hỗ trợ 24/7</Badge>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <select
-                  value={selectedFloor || ""}
-                  onChange={(e) => setSelectedFloor(e.target.value ? Number(e.target.value) : null)}
-                  className="px-3 py-2 border rounded-md"
-                >
-                  <option value="">Tất cả tầng</option>
-                  {floors.map(floor => (
-                    <option key={floor.id} value={floor.id}>
-                      {floor.name}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Floors and Rooms */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Floors List */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Danh sách tầng</CardTitle>
-              <CardDescription>
-                {floors.length} tầng trong tòa nhà
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {floors.map(floor => (
-                  <div 
-                    key={floor.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedFloor === floor.id 
-                        ? 'bg-primary/10 border-primary' 
-                        : 'hover:bg-gray-50'
-                    }`}
-                    onClick={() => setSelectedFloor(selectedFloor === floor.id ? null : floor.id)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium">{floor.name}</h4>
-                        <p className="text-sm text-muted-foreground">{floor.description}</p>
-                      </div>
-                      <Badge variant="outline">
-                        {rooms.filter(r => r.floorId === floor.id).length} phòng
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Rooms List */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Danh sách phòng</CardTitle>
-              <CardDescription>
-                {filteredRooms.length} phòng được tìm thấy
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Floor Plan */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Sơ đồ tầng</CardTitle>
+                <CardDescription>
+                  Chọn tầng để xem chi tiết các phòng và khu vực
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Floor Tabs */}
+                <div className="flex space-x-2 mb-6">
+                  {floors.map((floor) => (
+                    <Button
+                      key={floor.id}
+                      variant={selectedFloor === floor.id ? "default" : "outline"}
+                      onClick={() => setSelectedFloor(floor.id)}
+                      className="flex-1"
+                    >
+                      {floor.name}
+                    </Button>
+                  ))}
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredRooms.map(room => {
-                    const floor = floors.find(f => f.id === room.floorId);
-                    return (
-                      <Card key={room.id} className="hover:shadow-lg transition-shadow">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">{room.name}</CardTitle>
-                            <Badge 
-                              variant={room.isAvailable ? "default" : "secondary"}
-                              className={room.isAvailable ? "bg-green-100 text-green-800" : ""}
-                            >
-                              {room.isAvailable ? "Trống" : "Đã sử dụng"}
-                            </Badge>
-                          </div>
-                          <CardDescription>
-                            {floor?.name} • Sức chứa: {room.capacity} người
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-3">
-                            {/* Amenities */}
-                            <div>
-                              <p className="text-sm font-medium mb-2">Tiện ích:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {room.amenities.map((amenity, index) => {
-                                  const IconComponent = getAmenityIcon(amenity);
-                                  return (
-                                    <Badge key={index} variant="outline" className="text-xs flex items-center space-x-1">
-                                      <IconComponent className="h-3 w-3" />
-                                      <span>{amenity}</span>
-                                    </Badge>
-                                  );
-                                })}
-                              </div>
-                            </div>
 
-                            {/* Actions */}
-                            <div className="flex space-x-2 pt-2">
-                              <Button size="sm" variant="outline" className="flex-1">
-                                <Edit className="h-4 w-4 mr-1" />
-                                Chỉnh sửa
-                              </Button>
-                              <Button size="sm" variant="outline" className="flex-1">
-                                <Map className="h-4 w-4 mr-1" />
-                                Xem vị trí
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                {/* Floor Content */}
+                <div className="space-y-4">
+                  {floors
+                    .filter(floor => floor.id === selectedFloor)
+                    .map((floor) => (
+                      <div key={floor.id}>
+                        <h3 className="text-lg font-semibold mb-4">{floor.name}</h3>
+                        <div className="grid gap-4">
+                          {floor.rooms.map((room, index) => (
+                            <Card key={index} className="p-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="font-medium text-slate-800">{room.name}</h4>
+                                  <p className="text-sm text-slate-600">Sức chứa: {room.capacity}</p>
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    {room.features.map((feature, idx) => (
+                                      <Badge key={idx} variant="outline" className="text-xs">
+                                        {feature}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                                <Button variant="outline" size="sm">
+                                  <Navigation className="h-4 w-4 mr-1" />
+                                  Chỉ đường
+                                </Button>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Facilities */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Tiện ích</CardTitle>
+                <CardDescription>Các dịch vụ và tiện ích có sẵn</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {facilities.map((facility, index) => {
+                    const Icon = facility.icon;
+                    return (
+                      <div key={index} className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <Icon className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{facility.name}</p>
+                          <p className="text-xs text-slate-600">{facility.description}</p>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
 
-        {/* Interactive Map */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Bản đồ tương tác</CardTitle>
-            <CardDescription>
-              Xem vị trí các phòng và tầng trong tòa nhà
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="w-full h-96 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
-              <div className="text-center">
-                <Map className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-muted-foreground">Bản đồ tương tác sẽ được hiển thị ở đây</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Tích hợp với Google Maps hoặc bản đồ tùy chỉnh
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Transportation */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Phương tiện di chuyển</CardTitle>
+                <CardDescription>Cách đến địa điểm hội nghị</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {transportation.map((transport, index) => {
+                    const Icon = transport.icon;
+                    return (
+                      <div key={index} className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                          <Icon className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{transport.name}</p>
+                          <p className="text-xs text-slate-600">{transport.description}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Hành động nhanh</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button className="w-full" variant="outline">
+                  <Navigation className="h-4 w-4 mr-2" />
+                  Chỉ đường Google Maps
+                </Button>
+                <Button className="w-full" variant="outline">
+                  <Phone className="h-4 w-4 mr-2" />
+                  Gọi điện đặt chỗ
+                </Button>
+                <Button className="w-full" variant="outline">
+                  <Mail className="h-4 w-4 mr-2" />
+                  Liên hệ email
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
-          </ConferencePermissionGuard>
-    </MainLayout>
+    </div>
   );
 }

@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { PublicHeader } from "@/components/layout/public-header"
 import {
   ArrowRight,
   Users,
@@ -69,30 +70,8 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-serif font-bold text-xl text-slate-800">ConferenceHub</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="secondary" className="hidden sm:inline-flex">
-                <Wifi className="w-3 h-3 mr-1" />
-                Trực tuyến
-              </Badge>
-              <Link href="/login">
-                <Button variant="outline" size="sm">
-                  Đăng nhập
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Public Header */}
+      <PublicHeader />
 
       {/* Hero Section */}
       <section className="py-20 px-4">
@@ -120,7 +99,7 @@ export default function LandingPage() {
                   size="lg"
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-3"
                 >
-                  Bắt đầu ngay
+                  Đăng nhập Admin
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
@@ -128,6 +107,82 @@ export default function LandingPage() {
                 Xem demo
               </Button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Quick Access Section */}
+      <section className="py-16 bg-white/30 backdrop-blur-sm">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-serif font-bold text-slate-800 mb-4">
+              Truy cập nhanh các tính năng chính
+            </h2>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+              Không cần đăng nhập, bạn có thể truy cập ngay các tính năng dành cho người tham dự
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Link href="/checkin-public">
+              <Card className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-0 bg-white/80 backdrop-blur-sm hover:bg-white hover:scale-105">
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <QrCode className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Check-in QR</h3>
+                  <p className="text-slate-600 text-sm mb-4">Quét mã QR để check-in tham dự hội nghị</p>
+                  <Button variant="outline" size="sm" className="w-full">
+                    Truy cập ngay
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/venue-public">
+              <Card className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-0 bg-white/80 backdrop-blur-sm hover:bg-white hover:scale-105">
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <MapPin className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Bản đồ địa điểm</h3>
+                  <p className="text-slate-600 text-sm mb-4">Xem bản đồ và tìm đường đến hội nghị</p>
+                  <Button variant="outline" size="sm" className="w-full">
+                    Xem bản đồ
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/mobile-public">
+              <Card className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-0 bg-white/80 backdrop-blur-sm hover:bg-white hover:scale-105">
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <Smartphone className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Ứng dụng di động</h3>
+                  <p className="text-slate-600 text-sm mb-4">Tải ứng dụng di động cho trải nghiệm tốt nhất</p>
+                  <Button variant="outline" size="sm" className="w-full">
+                    Tải ứng dụng
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/sessions">
+              <Card className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-0 bg-white/80 backdrop-blur-sm hover:bg-white hover:scale-105">
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <Calendar className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">Lịch trình</h3>
+                  <p className="text-slate-600 text-sm mb-4">Xem lịch trình và phiên họp của hội nghị</p>
+                  <Button variant="outline" size="sm" className="w-full">
+                    Xem lịch trình
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         </div>
       </section>

@@ -19,7 +19,7 @@ import {
   Search
 } from "lucide-react";
 
-export default function SessionsPage() {
+export default function SessionsPublicPage() {
   const [selectedDay, setSelectedDay] = useState("day1");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTrack, setSelectedTrack] = useState("all");

@@ -1,6 +1,24 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Define public routes that don't require authentication
+const publicRoutes = [
+  '/',
+  '/login',
+  '/register',
+  '/register-simple',
+  '/forgot-password',
+  '/reset-password',
+  '/checkin-public',
+  '/venue-public',
+  '/mobile-public',
+  '/sessions',
+  '/badges',
+  '/networking',
+  '/test-public-pages',
+  '/test-middleware'
+]
+
 // Define protected routes that require authentication
 const protectedRoutes = [
   '/dashboard',
@@ -9,10 +27,7 @@ const protectedRoutes = [
   '/conferences',
   '/conference-management',
   '/attendees',
-  '/sessions',
-  '/badges',
   '/checkin',
-  '/networking',
   '/analytics',
   '/audit',
   '/roles',
@@ -20,27 +35,22 @@ const protectedRoutes = [
   '/my-events'
 ]
 
-// Define public routes that don't require authentication
-const publicRoutes = [
-  '/',
-  '/login',
-  '/register',
-  '/register-simple',
-  '/forgot-password',
-  '/reset-password'
-]
-
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  
-  // Check if the current path is a protected route
-  const isProtectedRoute = protectedRoutes.some(route => 
-    pathname.startsWith(route)
-  )
   
   // Check if the current path is a public route
   const isPublicRoute = publicRoutes.some(route => 
     pathname === route || pathname.startsWith(route)
+  )
+  
+  // If it's a public route, allow access without authentication
+  if (isPublicRoute) {
+    return NextResponse.next()
+  }
+  
+  // Check if the current path is a protected route
+  const isProtectedRoute = protectedRoutes.some(route => 
+    pathname.startsWith(route)
   )
   
   // Get the access token from cookies or headers
@@ -75,13 +85,6 @@ export function middleware(request: NextRequest) {
       response.cookies.delete('refreshToken')
       return response
     }
-  }
-  
-  // For protected routes, if no token, redirect to login
-  if (isProtectedRoute && !token) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(loginUrl)
   }
   
   // If user is already authenticated and trying to access auth pages, redirect to dashboard

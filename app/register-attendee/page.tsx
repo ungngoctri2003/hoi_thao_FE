@@ -3,12 +3,16 @@
 import React from "react"
 import { AttendeeRegistrationForm } from "@/components/attendees/attendee-registration-form"
 import { useNotification } from "@/hooks/use-notification"
+import { PublicHeader } from "@/components/layout/public-header"
 
 export default function RegisterAttendeePage() {
   const { showSuccess, showError } = useNotification()
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      {/* Header */}
+      <PublicHeader />
+      
       {/* Animated background */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900">
         {/* Floating orbs */}
