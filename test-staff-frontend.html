@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Staff Audit - Frontend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .log {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Staff Audit System - Frontend</h1>
+        
+        <div>
+            <h3>1. Login as Staff</h3>
+            <button class="button" onclick="loginAsStaff()">Login as Staff</button>
+            <div id="loginStatus"></div>
+        </div>
+        
+        <div>
+            <h3>2. Test Staff Actions</h3>
+            <button class="button" onclick="testStaffActions()">Test All Staff Actions</button>
+            <button class="button" onclick="testNavigation()">Test Navigation</button>
+            <button class="button" onclick="testCRUD()">Test CRUD Operations</button>
+            <button class="button" onclick="testCheckin()">Test Check-in</button>
+        </div>
+        
+        <div>
+            <h3>3. View Audit Logs</h3>
+            <button class="button" onclick="viewAuditLogs()">View Recent Audit Logs</button>
+            <div id="auditLogs"></div>
+        </div>
+        
+        <div>
+            <h3>4. Logs</h3>
+            <div id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        let token = null;
+        const baseURL = 'http://localhost:4000/api/v1';
+        
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log';
+            logDiv.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${message}`;
+            if (type === 'success') logDiv.classList.add('success');
+            if (type === 'error') logDiv.classList.add('error');
+            logsDiv.appendChild(logDiv);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        async function loginAsStaff() {
+            try {
+                log('Logging in as staff...');
+                const response = await fetch(`${baseURL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'staff2@conference.vn',
+                        password: 'staff123'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    token = data.data.accessToken;
+                    document.getElementById('loginStatus').innerHTML = 
+                        '<div class="success">✅ Staff login successful!</div>';
+                    log('Staff login successful!', 'success');
+                } else {
+                    const error = await response.json();
+                    document.getElementById('loginStatus').innerHTML = 
+                        '<div class="error">❌ Login failed: ' + error.error.message + '</div>';
+                    log('Login failed: ' + error.error.message, 'error');
+                }
+            } catch (error) {
+                document.getElementById('loginStatus').innerHTML = 
+                    '<div class="error">❌ Error: ' + error.message + '</div>';
+                log('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function testStaffActions() {
+            if (!token) {
+                log('Please login first!', 'error');
+                return;
+            }
+            
+            const actions = [
+                { action: 'Truy cập trang Dashboard', page: 'Bảng điều khiển', details: 'Staff accessed dashboard via frontend' },
+                { action: 'Xem danh sách người tham dự', page: 'Quản lý người tham dự', details: 'Staff viewed attendees list' },
+                { action: 'Tạo mới người tham dự', page: 'Quản lý người tham dự', details: 'Staff created new attendee' },
+                { action: 'Cập nhật thông tin người tham dự', page: 'Quản lý người tham dự', details: 'Staff updated attendee info' },
+                { action: 'Check-in người tham dự', page: 'Check-in', details: 'Staff performed check-in' },
+                { action: 'Xem báo cáo tham dự', page: 'Phân tích', details: 'Staff viewed attendance reports' }
+            ];
+            
+            for (let i = 0; i < actions.length; i++) {
+                const action = actions[i];
+                log(`Testing: ${action.action}`);
+                
+                try {
+                    const response = await fetch(`${baseURL}/audit/frontend`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(action)
+                    });
+                    
+                    if (response.ok) {
+                        log(`✅ ${action.action} logged successfully`, 'success');
+                    } else {
+                        const error = await response.json();
+                        log(`❌ ${action.action} failed: ${error.error.message}`, 'error');
+                    }
+                } catch (error) {
+                    log(`❌ ${action.action} error: ${error.message}`, 'error');
+                }
+                
+                // Small delay between actions
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            log('Staff actions test completed!', 'success');
+        }
+        
+        async function testNavigation() {
+            if (!token) {
+                log('Please login first!', 'error');
+                return;
+            }
+            
+            const pages = ['Dashboard', 'Quản lý người tham dự', 'Check-in', 'Phân tích', 'Cài đặt'];
+            
+            for (const page of pages) {
+                log(`Navigating to: ${page}`);
+                
+                try {
+                    const response = await fetch(`${baseURL}/audit/frontend`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            action: 'Truy cập trang',
+                            page: page,
+                            details: `Staff navigated to ${page}`
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        log(`✅ Navigation to ${page} logged`, 'success');
+                    } else {
+                        const error = await response.json();
+                        log(`❌ Navigation to ${page} failed: ${error.error.message}`, 'error');
+                    }
+                } catch (error) {
+                    log(`❌ Navigation to ${page} error: ${error.message}`, 'error');
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        }
+        
+        async function testCRUD() {
+            if (!token) {
+                log('Please login first!', 'error');
+                return;
+            }
+            
+            const operations = [
+                { action: 'Tạo mới', item: 'người tham dự', page: 'Quản lý người tham dự' },
+                { action: 'Xem', item: 'danh sách người tham dự', page: 'Quản lý người tham dự' },
+                { action: 'Cập nhật', item: 'thông tin người tham dự', page: 'Quản lý người tham dự' },
+                { action: 'Xóa', item: 'người tham dự', page: 'Quản lý người tham dự' }
+            ];
+            
+            for (const op of operations) {
+                log(`Testing ${op.action} ${op.item}`);
+                
+                try {
+                    const response = await fetch(`${baseURL}/audit/frontend`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            action: `${op.action} ${op.item}`,
+                            page: op.page,
+                            details: `Staff performed ${op.action.toLowerCase()} operation on ${op.item}`
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        log(`✅ ${op.action} ${op.item} logged`, 'success');
+                    } else {
+                        const error = await response.json();
+                        log(`❌ ${op.action} ${op.item} failed: ${error.error.message}`, 'error');
+                    }
+                } catch (error) {
+                    log(`❌ ${op.action} ${op.item} error: ${error.message}`, 'error');
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        }
+        
+        async function testCheckin() {
+            if (!token) {
+                log('Please login first!', 'error');
+                return;
+            }
+            
+            const checkinActions = [
+                { action: 'Check-in', conference: 'Hội nghị Công nghệ 2024', details: 'Staff performed check-in for conference' },
+                { action: 'Check-out', conference: 'Hội nghị Công nghệ 2024', details: 'Staff performed check-out for conference' },
+                { action: 'Xem lịch sử Check-in', page: 'Check-in', details: 'Staff viewed check-in history' }
+            ];
+            
+            for (const action of checkinActions) {
+                log(`Testing: ${action.action}`);
+                
+                try {
+                    const response = await fetch(`${baseURL}/audit/frontend`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            action: action.action,
+                            page: action.page || 'Check-in',
+                            details: action.details
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        log(`✅ ${action.action} logged`, 'success');
+                    } else {
+                        const error = await response.json();
+                        log(`❌ ${action.action} failed: ${error.error.message}`, 'error');
+                    }
+                } catch (error) {
+                    log(`❌ ${action.action} error: ${error.message}`, 'error');
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        }
+        
+        async function viewAuditLogs() {
+            if (!token) {
+                log('Please login first!', 'error');
+                return;
+            }
+            
+            try {
+                log('Fetching audit logs...');
+                const response = await fetch(`${baseURL}/audit/logs`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const logs = data.data || [];
+                    
+                    document.getElementById('auditLogs').innerHTML = `
+                        <div class="success">✅ Found ${logs.length} audit logs</div>
+                        <div style="max-height: 300px; overflow-y: auto; margin-top: 10px;">
+                            ${logs.slice(0, 10).map((log, index) => `
+                                <div class="log">
+                                    <strong>${index + 1}.</strong> 
+                                    [User ${log.USER_ID || 'Unknown'}] 
+                                    ${log.ACTION_NAME || 'Unknown Action'} - 
+                                    ${log.RESOURCE_NAME || 'Unknown Resource'} 
+                                    (${log.CATEGORY || 'Unknown Category'}) - 
+                                    ${log.TS || 'Unknown Time'}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                    
+                    log(`Retrieved ${logs.length} audit logs`, 'success');
+                } else {
+                    const error = await response.json();
+                    document.getElementById('auditLogs').innerHTML = 
+                        '<div class="error">❌ Failed to fetch audit logs: ' + error.error.message + '</div>';
+                    log('Failed to fetch audit logs: ' + error.error.message, 'error');
+                }
+            } catch (error) {
+                document.getElementById('auditLogs').innerHTML = 
+                    '<div class="error">❌ Error: ' + error.message + '</div>';
+                log('Error: ' + error.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

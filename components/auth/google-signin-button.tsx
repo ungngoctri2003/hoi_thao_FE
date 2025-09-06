@@ -4,6 +4,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useFirebaseAuth } from '@/hooks/use-firebase-auth';
 import { useNotification } from '@/hooks/use-notification';
+import { useSafeAudit } from '@/hooks/use-safe-audit';
 import { apiClient } from '@/lib/api';
 
 interface GoogleSignInButtonProps {
@@ -27,9 +28,17 @@ export function GoogleSignInButton({
 }: GoogleSignInButtonProps) {
   const { signInWithGoogle, loading } = useFirebaseAuth();
   const { showSuccess, showError } = useNotification();
+  const { actions } = useSafeAudit();
 
   const handleGoogleSignIn = async () => {
     try {
+      // Log the attempt
+      if (mode === "login") {
+        await actions.login();
+      } else {
+        await actions.custom("Đăng ký với Google", "Xác thực");
+      }
+      
       // With redirect flow, this will redirect the user to Google
       // The actual authentication will be handled when they return
       await signInWithGoogle(mode);

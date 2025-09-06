@@ -1763,6 +1763,66 @@ class ApiClient {
     await Promise.all(promises);
     return users;
   }
+
+  // Frontend Audit Logs
+  async logFrontendAction(action: string, page?: string, details?: string): Promise<void> {
+    try {
+      const logData = {
+        action,
+        page: page || this.getCurrentPage(),
+        details,
+        timestamp: new Date().toISOString()
+      };
+
+      await this.request('/audit/frontend', {
+        method: 'POST',
+        body: JSON.stringify(logData)
+      });
+    } catch (error) {
+      console.warn('Failed to log frontend action:', error);
+    }
+  }
+
+  // Get current page name
+  private getCurrentPage(): string {
+    if (typeof window === 'undefined') return 'Unknown';
+    
+    const path = window.location.pathname;
+    
+    // Map common routes to page names
+    const pageMap: Record<string, string> = {
+      '/': 'Trang chủ',
+      '/dashboard': 'Bảng điều khiển',
+      '/attendees': 'Quản lý người tham dự',
+      '/conferences': 'Quản lý hội nghị',
+      '/sessions': 'Quản lý phiên họp',
+      '/registrations': 'Quản lý đăng ký',
+      '/checkin': 'Check-in',
+      '/analytics': 'Phân tích',
+      '/audit': 'Nhật ký hệ thống',
+      '/profile': 'Hồ sơ cá nhân',
+      '/settings': 'Cài đặt',
+      '/users': 'Quản lý người dùng',
+      '/roles': 'Quản lý vai trò',
+      '/permissions': 'Quản lý quyền',
+      '/notifications': 'Thông báo',
+      '/messages': 'Tin nhắn',
+      '/matches': 'Kết nối',
+      '/badges': 'Huy hiệu',
+      '/certificates': 'Chứng chỉ',
+      '/venue': 'Địa điểm'
+    };
+
+    // Find matching page
+    for (const [route, pageName] of Object.entries(pageMap)) {
+      if (path.startsWith(route)) {
+        return pageName;
+      }
+    }
+
+    // Fallback to path
+    return path;
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

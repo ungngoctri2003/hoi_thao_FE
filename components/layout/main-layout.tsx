@@ -7,6 +7,7 @@ import { Header } from "./header"
 import { SessionExpirationHandler } from "@/components/auth/session-expiration-handler"
 import { AccountDisabledAlert } from "@/components/auth/account-disabled-alert"
 import { RoleChangeNotification } from "@/components/auth/role-change-notification"
+import { AuditProvider } from "@/components/audit/audit-provider"
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -17,18 +18,20 @@ interface MainLayoutProps {
 
 export function MainLayout({ children, userRole, userName, userAvatar }: MainLayoutProps) {
   return (
-    <div className="flex h-screen bg-background">
-      <SessionExpirationHandler />
-      <AccountDisabledAlert />
-      <RoleChangeNotification />
-      <SidebarWrapper userRole={userRole} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header userName={userName} userRole={userRole} userAvatar={userAvatar} />
-        <main className="flex-1 overflow-auto p-6">
+    <AuditProvider>
+      <div className="flex h-screen bg-background">
+        <SessionExpirationHandler />
+        <AccountDisabledAlert />
+        <RoleChangeNotification />
+        <SidebarWrapper userRole={userRole} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header userName={userName} userRole={userRole} userAvatar={userAvatar} />
+          <main className="flex-1 overflow-auto p-6">
 
-          {children}
-        </main>
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </AuditProvider>
   )
 }

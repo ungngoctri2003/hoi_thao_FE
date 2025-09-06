@@ -100,6 +100,11 @@ const formatDetails = (details: string, actionName: string, resourceName: string
     // Try to parse JSON details
     const parsed = JSON.parse(details)
     
+    // Check if it's a frontend log
+    if (parsed.type === 'frontend') {
+      return formatFrontendDetails(parsed, actionName)
+    }
+    
     // Format based on action type
     if (actionName?.toLowerCase().includes('update')) {
       return formatUpdateDetails(parsed, resourceName)
@@ -321,6 +326,19 @@ const formatLoginDetails = (parsed: any) => {
   return result
 }
 
+const formatFrontendDetails = (parsed: any, actionName: string) => {
+  const page = parsed.page || 'Trang không xác định'
+  const details = parsed.details || ''
+  
+  let result = `Trên trang: ${page}`
+  
+  if (details) {
+    result += ` - ${details}`
+  }
+  
+  return result
+}
+
 const formatGenericDetails = (parsed: any) => {
   const method = parsed.method || ''
   const path = parsed.path || ''
@@ -404,6 +422,7 @@ const categoryColors = {
   conference: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
   system: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
   data: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
+  frontend: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
 }
 
 const categoryLabels = {
@@ -412,6 +431,7 @@ const categoryLabels = {
   conference: "Hội nghị",
   system: "Hệ thống",
   data: "Dữ liệu",
+  frontend: "Giao diện",
 }
 
 export function AuditLogs() {
@@ -770,6 +790,7 @@ export function AuditLogs() {
                         <SelectItem value="conference">🏢 Hội nghị</SelectItem>
                         <SelectItem value="system">⚙️ Hệ thống</SelectItem>
                         <SelectItem value="data">📊 Dữ liệu</SelectItem>
+                        <SelectItem value="frontend">🖥️ Giao diện</SelectItem>
                     </SelectContent>
                   </Select>
                   {categoryFilter !== "all" && (
