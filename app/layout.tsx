@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { Work_Sans, Open_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "sonner";
 import "./globals.css";
 
 const workSans = Work_Sans({
@@ -93,7 +92,6 @@ export default function RootLayout({
         >
           {children}
           <Toaster />
-          <SonnerToaster />
         </ThemeProvider>
       </body>
     </html>

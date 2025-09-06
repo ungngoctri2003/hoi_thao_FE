@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Attendees API Simple</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Test Attendees API Simple</h1>
+    
+    <div class="section info">
+        <h3>1. Kiểm tra Token</h3>
+        <button onclick="checkToken()">Kiểm tra Token</button>
+        <div id="tokenInfo"></div>
+    </div>
+
+    <div class="section">
+        <h3>2. Test API với token hiện tại</h3>
+        <button onclick="testAPI()">Test API</button>
+        <div id="apiResult"></div>
+    </div>
+
+    <div class="section">
+        <h3>3. Đăng nhập và test lại</h3>
+        <button onclick="loginAndTest()">Đăng nhập và Test</button>
+        <div id="loginResult"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000/api/v1';
+
+        function checkToken() {
+            const token = localStorage.getItem('accessToken');
+            const tokenInfo = document.getElementById('tokenInfo');
+            
+            if (token) {
+                tokenInfo.innerHTML = `
+                    <div class="success">
+                        <p><strong>Token found:</strong></p>
+                        <pre>${token.substring(0, 50)}...</pre>
+                    </div>
+                `;
+            } else {
+                tokenInfo.innerHTML = `
+                    <div class="error">
+                        <p><strong>No token found</strong></p>
+                    </div>
+                `;
+            }
+        }
+
+        async function testAPI() {
+            const token = localStorage.getItem('accessToken');
+            const resultDiv = document.getElementById('apiResult');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/attendees?page=1&limit=20`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token && { 'Authorization': `Bearer ${token}` })
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <p><strong>API successful!</strong></p>
+                            <p>Status: ${response.status}</p>
+                            <p>Data count: ${data.data ? data.data.length : 0}</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <p><strong>API failed:</strong></p>
+                            <p>Status: ${response.status}</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <p><strong>API error:</strong></p>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        async function loginAndTest() {
+            const resultDiv = document.getElementById('loginResult');
+            
+            try {
+                // Login first
+                const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        email: 'admin@example.com', 
+                        password: 'admin123' 
+                    })
+                });
+
+                const loginData = await loginResponse.json();
+                
+                if (loginResponse.ok) {
+                    localStorage.setItem('accessToken', loginData.token);
+                    
+                    // Test API after login
+                    const apiResponse = await fetch(`${API_BASE_URL}/attendees?page=1&limit=20`, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${loginData.token}`
+                        }
+                    });
+
+                    const apiData = await apiResponse.json();
+                    
+                    if (apiResponse.ok) {
+                        resultDiv.innerHTML = `
+                            <div class="success">
+                                <p><strong>Login and API successful!</strong></p>
+                                <p>Login Status: ${loginResponse.status}</p>
+                                <p>API Status: ${apiResponse.status}</p>
+                                <p>Data count: ${apiData.data ? apiData.data.length : 0}</p>
+                                <pre>${JSON.stringify(apiData, null, 2)}</pre>
+                            </div>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="error">
+                                <p><strong>Login successful but API failed:</strong></p>
+                                <p>Login Status: ${loginResponse.status}</p>
+                                <p>API Status: ${apiResponse.status}</p>
+                                <pre>${JSON.stringify(apiData, null, 2)}</pre>
+                            </div>
+                        `;
+                    }
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <p><strong>Login failed:</strong></p>
+                            <p>Status: ${loginResponse.status}</p>
+                            <pre>${JSON.stringify(loginData, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <p><strong>Error:</strong></p>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        // Auto-check token on load
+        window.onload = function() {
+            checkToken();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Attendee Dialog Update Behavior</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .pending-changes {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .conference-item {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-registered { background-color: #cce5ff; color: #0066cc; }
+        .status-checked-in { background-color: #d4edda; color: #155724; }
+        .status-checked-out { background-color: #fff3cd; color: #856404; }
+        .status-cancelled { background-color: #f8d7da; color: #721c24; }
+        .status-no-show { background-color: #e2e3e5; color: #383d41; }
+        .pending-badge {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Attendee Dialog Update Behavior</h1>
+        <p>Kiểm tra chức năng chỉ gọi API khi ấn nút "Update" trong dialog chỉnh sửa tham dự viên.</p>
+
+        <div class="test-section">
+            <h3>🎯 Mục tiêu</h3>
+            <p>Đảm bảo rằng:</p>
+            <ul>
+                <li>Khi thay đổi trạng thái checkin/checkout, không gọi API ngay lập tức</li>
+                <li>Khi đăng ký hội nghị mới, không gọi API ngay lập tức</li>
+                <li>Chỉ khi ấn nút "Update" thì mới gọi tất cả các API cần thiết</li>
+                <li>Hiển thị trạng thái "Chờ cập nhật" cho các thay đổi pending</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Test Cases</h3>
+            
+            <div class="conference-item">
+                <h4>Hội nghị 1: AI Conference 2024</h4>
+                <p>QR Code: QR001</p>
+                <p>Đăng ký: 15/01/2024 10:30</p>
+                <div>
+                    <span class="status-badge status-registered">Đã đăng ký</span>
+                    <span class="pending-badge">Chờ cập nhật</span>
+                </div>
+                <div style="margin-top: 10px;">
+                    <button onclick="simulateCheckin(1)">Check-in</button>
+                    <button onclick="simulateCheckout(1)">Check-out</button>
+                    <select onchange="simulateStatusChange(1, this.value)">
+                        <option value="registered">Đã đăng ký</option>
+                        <option value="checked-in">Đã check-in</option>
+                        <option value="checked-out">Đã check-out</option>
+                        <option value="cancelled">Đã hủy</option>
+                        <option value="no-show">Không tham dự</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="conference-item">
+                <h4>Hội nghị 2: Tech Summit 2024</h4>
+                <p>QR Code: QR002</p>
+                <p>Đăng ký: 16/01/2024 14:00</p>
+                <div>
+                    <span class="status-badge status-checked-in">Đã check-in</span>
+                </div>
+                <div style="margin-top: 10px;">
+                    <button onclick="simulateCheckin(2)" disabled>Check-in</button>
+                    <button onclick="simulateCheckout(2)">Check-out</button>
+                    <select onchange="simulateStatusChange(2, this.value)">
+                        <option value="registered">Đã đăng ký</option>
+                        <option value="checked-in" selected>Đã check-in</option>
+                        <option value="checked-out">Đã check-out</option>
+                        <option value="cancelled">Đã hủy</option>
+                        <option value="no-show">Không tham dự</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="conference-item">
+                <h4>Đăng ký hội nghị mới</h4>
+                <div>
+                    <select id="newConference">
+                        <option value="">Chọn hội nghị để đăng ký</option>
+                        <option value="3">Blockchain Conference 2024</option>
+                        <option value="4">Cloud Computing Summit</option>
+                        <option value="5">Data Science Workshop</option>
+                    </select>
+                    <button onclick="simulateRegisterConference()">Đăng ký</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Trạng thái Pending Changes</h3>
+            <div id="pendingChanges" class="pending-changes">
+                <p><strong>Thay đổi chờ cập nhật:</strong></p>
+                <ul id="pendingList">
+                    <li>Chưa có thay đổi nào</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Test Actions</h3>
+            <button onclick="simulateUpdate()" id="updateBtn" disabled>
+                Cập nhật (0 thay đổi)
+            </button>
+            <button onclick="clearPendingChanges()">Xóa thay đổi pending</button>
+            <button onclick="resetTest()">Reset test</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Log</h3>
+            <div id="log" style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; max-height: 300px; overflow-y: auto;">
+                <p>Chờ thực hiện test...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let pendingChanges = {
+            checkinUpdates: new Map(),
+            registrations: []
+        };
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('p');
+            logEntry.className = type;
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updatePendingDisplay() {
+            const pendingList = document.getElementById('pendingList');
+            const updateBtn = document.getElementById('updateBtn');
+            
+            let totalChanges = pendingChanges.checkinUpdates.size + pendingChanges.registrations.length;
+            
+            if (totalChanges === 0) {
+                pendingList.innerHTML = '<li>Chưa có thay đổi nào</li>';
+                updateBtn.disabled = true;
+                updateBtn.textContent = 'Cập nhật (0 thay đổi)';
+            } else {
+                let html = '';
+                
+                // Checkin updates
+                for (let [registrationId, status] of pendingChanges.checkinUpdates) {
+                    html += `<li>Registration ${registrationId}: Cập nhật trạng thái thành "${status}"</li>`;
+                }
+                
+                // New registrations
+                for (let conferenceId of pendingChanges.registrations) {
+                    html += `<li>Đăng ký hội nghị mới: Conference ${conferenceId}</li>`;
+                }
+                
+                pendingList.innerHTML = html;
+                updateBtn.disabled = false;
+                updateBtn.textContent = `Cập nhật (${totalChanges} thay đổi)`;
+            }
+        }
+
+        function simulateCheckin(registrationId) {
+            pendingChanges.checkinUpdates.set(registrationId, 'checked-in');
+            log(`Đã thêm check-in cho registration ${registrationId} vào danh sách pending`, 'success');
+            updatePendingDisplay();
+        }
+
+        function simulateCheckout(registrationId) {
+            pendingChanges.checkinUpdates.set(registrationId, 'checked-out');
+            log(`Đã thêm check-out cho registration ${registrationId} vào danh sách pending`, 'success');
+            updatePendingDisplay();
+        }
+
+        function simulateStatusChange(registrationId, status) {
+            pendingChanges.checkinUpdates.set(registrationId, status);
+            log(`Đã thêm thay đổi trạng thái cho registration ${registrationId} thành "${status}" vào danh sách pending`, 'success');
+            updatePendingDisplay();
+        }
+
+        function simulateRegisterConference() {
+            const select = document.getElementById('newConference');
+            const conferenceId = select.value;
+            
+            if (!conferenceId) {
+                log('Vui lòng chọn hội nghị để đăng ký', 'error');
+                return;
+            }
+            
+            if (pendingChanges.registrations.includes(parseInt(conferenceId))) {
+                log('Hội nghị này đã được thêm vào danh sách đăng ký', 'warning');
+                return;
+            }
+            
+            pendingChanges.registrations.push(parseInt(conferenceId));
+            log(`Đã thêm đăng ký hội nghị ${conferenceId} vào danh sách pending`, 'success');
+            updatePendingDisplay();
+            
+            // Reset select
+            select.value = '';
+        }
+
+        function simulateUpdate() {
+            const totalChanges = pendingChanges.checkinUpdates.size + pendingChanges.registrations.length;
+            
+            if (totalChanges === 0) {
+                log('Không có thay đổi nào để cập nhật', 'warning');
+                return;
+            }
+            
+            log(`Bắt đầu xử lý ${totalChanges} thay đổi...`, 'info');
+            
+            // Simulate API calls
+            let apiCalls = [];
+            
+            // Checkin updates
+            for (let [registrationId, status] of pendingChanges.checkinUpdates) {
+                apiCalls.push(`PATCH /api/v1/registrations/${registrationId} - Status: ${status}`);
+            }
+            
+            // New registrations
+            for (let conferenceId of pendingChanges.registrations) {
+                apiCalls.push(`POST /api/v1/attendees/{attendeeId}/registrations - Conference: ${conferenceId}`);
+            }
+            
+            // Log all API calls
+            apiCalls.forEach((call, index) => {
+                setTimeout(() => {
+                    log(`API Call ${index + 1}: ${call}`, 'info');
+                }, (index + 1) * 500);
+            });
+            
+            // Clear pending changes after delay
+            setTimeout(() => {
+                log('Tất cả API calls đã hoàn thành!', 'success');
+                clearPendingChanges();
+            }, (apiCalls.length + 1) * 500);
+        }
+
+        function clearPendingChanges() {
+            pendingChanges.checkinUpdates.clear();
+            pendingChanges.registrations = [];
+            log('Đã xóa tất cả thay đổi pending', 'info');
+            updatePendingDisplay();
+        }
+
+        function resetTest() {
+            clearPendingChanges();
+            document.getElementById('log').innerHTML = '<p>Test đã được reset</p>';
+            log('Test đã được reset', 'info');
+        }
+
+        // Initialize
+        updatePendingDisplay();
+        log('Test page đã được khởi tạo. Bắt đầu test chức năng!', 'success');
+    </script>
+</body>
+</html>

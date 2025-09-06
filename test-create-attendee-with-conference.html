@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Create Attendee with Conference Registration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .feature-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .feature-section h3 {
+            color: #333;
+            margin-top: 0;
+        }
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .feature-item {
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+        .feature-item.new {
+            border-left-color: #2196F3;
+        }
+        .feature-item.enhanced {
+            border-left-color: #FF9800;
+        }
+        .feature-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .feature-description {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .status.new {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.enhanced {
+            background-color: #fff3e0;
+            color: #f57c00;
+        }
+        .status.existing {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+        }
+        .improvements {
+            background-color: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .improvements h4 {
+            color: #2e7d32;
+            margin-top: 0;
+        }
+        .improvements ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .improvements li {
+            margin: 5px 0;
+        }
+        .test-steps {
+            background-color: #f0f8ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .test-steps h4 {
+            color: #1976d2;
+            margin-top: 0;
+        }
+        .test-steps ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .test-steps li {
+            margin: 8px 0;
+        }
+        .workflow {
+            background-color: #fff3e0;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .workflow h4 {
+            color: #f57c00;
+            margin-top: 0;
+        }
+        .workflow-step {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 3px solid #f57c00;
+        }
+        .workflow-step h5 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .workflow-step p {
+            margin: 5px 0;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Tạo Tham dự viên Mới với Đăng ký Hội nghị</h1>
+            <p>Kiểm tra chức năng tạo tham dự viên mới với khả năng chọn hội nghị để đăng ký</p>
+        </div>
+
+        <div class="feature-section">
+            <h3>🆕 Tính năng mới trong chế độ tạo mới</h3>
+            <div class="feature-list">
+                <div class="feature-item new">
+                    <div class="feature-name">Hiển thị phần quản lý hội nghị</div>
+                    <div class="feature-description">Phần quản lý hội nghị hiển thị sau khi điền tên và email</div>
+                    <span class="status new">Mới thêm</span>
+                </div>
+                
+                <div class="feature-item new">
+                    <div class="feature-name">Chọn hội nghị để đăng ký</div>
+                    <div class="feature-description">Dropdown hiển thị tất cả hội nghị có thể đăng ký</div>
+                    <span class="status new">Mới thêm</span>
+                </div>
+                
+                <div class="feature-item new">
+                    <div class="feature-name">Danh sách hội nghị chờ đăng ký</div>
+                    <div class="feature-description">Hiển thị các hội nghị sẽ được đăng ký khi tạo tham dự viên</div>
+                    <span class="status new">Mới thêm</span>
+                </div>
+                
+                <div class="feature-item new">
+                    <div class="feature-name">Xóa hội nghị khỏi danh sách</div>
+                    <div class="feature-description">Có thể xóa hội nghị khỏi danh sách chờ đăng ký</div>
+                    <span class="status new">Mới thêm</span>
+                </div>
+                
+                <div class="feature-item new">
+                    <div class="feature-name">Lọc hội nghị đã chọn</div>
+                    <div class="feature-description">Dropdown không hiển thị hội nghị đã được chọn</div>
+                    <span class="status new">Mới thêm</span>
+                </div>
+                
+                <div class="feature-item new">
+                    <div class="feature-name">Thông báo đăng ký</div>
+                    <div class="feature-description">Thông báo số lượng hội nghị sẽ được đăng ký</div>
+                    <span class="status new">Mới thêm</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="workflow">
+            <h4>🔄 Quy trình tạo tham dự viên mới với hội nghị</h4>
+            <div class="workflow-step">
+                <h5>Bước 1: Mở form tạo mới</h5>
+                <p>Click "Thêm tham dự viên" trong trang /attendees</p>
+                <p>Form hiển thị với các trường thông tin cơ bản</p>
+            </div>
+            <div class="workflow-step">
+                <h5>Bước 2: Điền thông tin cơ bản</h5>
+                <p>Nhập tên và email (bắt buộc)</p>
+                <p>Phần quản lý hội nghị sẽ hiển thị sau khi có tên và email</p>
+            </div>
+            <div class="workflow-step">
+                <h5>Bước 3: Chọn hội nghị</h5>
+                <p>Chọn hội nghị từ dropdown "Chọn hội nghị để đăng ký"</p>
+                <p>Click "Đăng ký" để thêm vào danh sách chờ</p>
+                <p>Hội nghị sẽ xuất hiện trong "Hội nghị sẽ đăng ký"</p>
+            </div>
+            <div class="workflow-step">
+                <h5>Bước 4: Quản lý danh sách hội nghị</h5>
+                <p>Có thể thêm nhiều hội nghị</p>
+                <p>Có thể xóa hội nghị khỏi danh sách bằng nút X</p>
+                <p>Dropdown sẽ tự động lọc hội nghị đã chọn</p>
+            </div>
+            <div class="workflow-step">
+                <h5>Bước 5: Lưu tham dự viên</h5>
+                <p>Click "Tạo mới" để lưu tham dự viên</p>
+                <p>Hệ thống sẽ thông báo số lượng hội nghị sẽ được đăng ký</p>
+                <p>Tham dự viên được tạo và form đóng</p>
+            </div>
+        </div>
+
+        <div class="feature-section">
+            <h3>🎨 Cải thiện giao diện</h3>
+            <div class="feature-list">
+                <div class="feature-item enhanced">
+                    <div class="feature-name">Hiển thị có điều kiện</div>
+                    <div class="feature-description">Phần quản lý hội nghị chỉ hiển thị khi có tên và email</div>
+                    <span class="status enhanced">Cải thiện</span>
+                </div>
+                
+                <div class="feature-item enhanced">
+                    <div class="feature-name">Màu sắc phân biệt</div>
+                    <div class="feature-description">Hội nghị chờ đăng ký có màu xanh nhạt để phân biệt</div>
+                    <span class="status enhanced">Cải thiện</span>
+                </div>
+                
+                <div class="feature-item enhanced">
+                    <div class="feature-name">Badge trạng thái</div>
+                    <div class="feature-description">Hiển thị "Chờ đăng ký" cho hội nghị đã chọn</div>
+                    <span class="status enhanced">Cải thiện</span>
+                </div>
+                
+                <div class="feature-item enhanced">
+                    <div class="feature-name">Mô tả động</div>
+                    <div class="feature-description">Mô tả thay đổi theo chế độ (tạo mới vs chỉnh sửa)</div>
+                    <span class="status enhanced">Cải thiện</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-steps">
+            <h4>🧪 Hướng dẫn Test chi tiết</h4>
+            <ol>
+                <li><strong>Test hiển thị có điều kiện:</strong>
+                    <ul>
+                        <li>Mở form tạo mới tham dự viên</li>
+                        <li>Kiểm tra phần quản lý hội nghị KHÔNG hiển thị</li>
+                        <li>Nhập tên và email</li>
+                        <li>Kiểm tra phần quản lý hội nghị hiển thị</li>
+                    </ul>
+                </li>
+                <li><strong>Test chọn hội nghị:</strong>
+                    <ul>
+                        <li>Chọn hội nghị từ dropdown</li>
+                        <li>Click "Đăng ký"</li>
+                        <li>Kiểm tra hội nghị xuất hiện trong danh sách "Hội nghị sẽ đăng ký"</li>
+                        <li>Kiểm tra hội nghị không còn trong dropdown</li>
+                    </ul>
+                </li>
+                <li><strong>Test quản lý danh sách:</strong>
+                    <ul>
+                        <li>Thêm nhiều hội nghị khác nhau</li>
+                        <li>Kiểm tra tất cả hiển thị trong danh sách</li>
+                        <li>Xóa một hội nghị bằng nút X</li>
+                        <li>Kiểm tra hội nghị quay lại dropdown</li>
+                    </ul>
+                </li>
+                <li><strong>Test lưu tham dự viên:</strong>
+                    <ul>
+                        <li>Điền đầy đủ thông tin tham dự viên</li>
+                        <li>Chọn một hoặc nhiều hội nghị</li>
+                        <li>Click "Tạo mới"</li>
+                        <li>Kiểm tra thông báo về số lượng hội nghị</li>
+                        <li>Kiểm tra form đóng và tham dự viên được tạo</li>
+                    </ul>
+                </li>
+                <li><strong>Test validation:</strong>
+                    <ul>
+                        <li>Thử tạo tham dự viên không có tên/email</li>
+                        <li>Kiểm tra phần quản lý hội nghị không hiển thị</li>
+                        <li>Thử chọn hội nghị trùng lặp</li>
+                        <li>Kiểm tra thông báo lỗi phù hợp</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+
+        <div class="improvements">
+            <h4>✅ Tóm tắt cải thiện</h4>
+            <ul>
+                <li><strong>Hiển thị có điều kiện:</strong> Phần quản lý hội nghị chỉ hiển thị khi cần thiết</li>
+                <li><strong>Quản lý danh sách hội nghị:</strong> Thêm, xóa, lọc hội nghị trong chế độ tạo mới</li>
+                <li><strong>Giao diện trực quan:</strong> Màu sắc và badge phân biệt trạng thái</li>
+                <li><strong>Trải nghiệm người dùng:</strong> Workflow mượt mà từ chọn hội nghị đến tạo tham dự viên</li>
+                <li><strong>Validation thông minh:</strong> Ngăn chặn lỗi và hướng dẫn người dùng</li>
+                <li><strong>Thông báo rõ ràng:</strong> Thông báo về số lượng hội nghị sẽ được đăng ký</li>
+            </ul>
+        </div>
+
+        <div class="feature-section">
+            <h3>🔍 So sánh các chế độ</h3>
+            <div class="feature-list">
+                <div class="feature-item existing">
+                    <div class="feature-name">Chế độ tạo mới</div>
+                    <div class="feature-description">
+                        - Hiển thị có điều kiện (cần tên + email)<br>
+                        - Hội nghị được lưu vào danh sách chờ<br>
+                        - Không thể check-in/check-out<br>
+                        - Thông báo về hội nghị sẽ đăng ký
+                    </div>
+                </div>
+                <div class="feature-item existing">
+                    <div class="feature-name">Chế độ chỉnh sửa</div>
+                    <div class="feature-description">
+                        - Hiển thị ngay lập tức<br>
+                        - Hội nghị được đăng ký ngay<br>
+                        - Có thể check-in/check-out<br>
+                        - Quản lý trạng thái đầy đủ
+                    </div>
+                </div>
+                <div class="feature-item existing">
+                    <div class="feature-name">Chế độ xem</div>
+                    <div class="feature-description">
+                        - Hiển thị ngay lập tức<br>
+                        - Chỉ xem thông tin<br>
+                        - Không thể thay đổi<br>
+                        - Hiển thị lịch sử đầy đủ
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,75 @@
+/* Tắt animation cho Select component nhưng giữ positioning */
+[data-radix-select-content] {
+  animation: none !important;
+  transition: none !important;
+  /* Giữ transform để positioning vẫn hoạt động */
+}
+
+[data-radix-select-trigger] {
+  transition: none !important;
+}
+
+[data-radix-select-item] {
+  transition: none !important;
+}
+
+[data-radix-select-viewport] {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Tắt animation cho dropdown */
+.select-content {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Tắt animation cho các element con */
+.select-content * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Tắt tất cả animation và transition cho Radix Select nhưng giữ positioning */
+[data-radix-select-content] {
+  animation: none !important;
+  transition: none !important;
+}
+
+[data-radix-select-content] *,
+[data-radix-select-trigger],
+[data-radix-select-item],
+[data-radix-select-viewport],
+[data-radix-select-scroll-up-button],
+[data-radix-select-scroll-down-button] {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Đảm bảo dropdown xuất hiện ngay lập tức nhưng vẫn có positioning */
+[data-state="open"] {
+  animation: none !important;
+  transition: none !important;
+}
+
+[data-state="closed"] {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Đảm bảo dropdown vẫn hiển thị đúng vị trí */
+[data-radix-select-content][data-side="bottom"] {
+  transform: translateY(4px) !important;
+}
+
+[data-radix-select-content][data-side="top"] {
+  transform: translateY(-4px) !important;
+}
+
+[data-radix-select-content][data-side="left"] {
+  transform: translateX(-4px) !important;
+}
+
+[data-radix-select-content][data-side="right"] {
+  transform: translateX(4px) !important;
+}

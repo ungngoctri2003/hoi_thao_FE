@@ -1,4 +1,6 @@
 @import "tw-animate-css";
+@import "../styles/toast.css";
+@import "../styles/select-no-animation.css";
 
 @tailwind base;
 @tailwind components;

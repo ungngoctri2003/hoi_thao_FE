@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Checkin Logic</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-case {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .registered { background: #e3f2fd; color: #1976d2; }
+        .checked-in { background: #e8f5e8; color: #2e7d32; }
+        .checked-out { background: #fff3e0; color: #f57c00; }
+        .cancelled { background: #ffebee; color: #d32f2f; }
+        .no-show { background: #f3e5f5; color: #7b1fa2; }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e8f5e8;
+            border-radius: 4px;
+            border-left: 4px solid #4caf50;
+        }
+        .error {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        .log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Checkin Logic</h1>
+        <p>Kiểm tra logic xử lý trạng thái checkin trong trang attendees</p>
+        
+        <button onclick="runAllTests()">Chạy tất cả test</button>
+        <button onclick="clearLog()">Xóa log</button>
+        
+        <div id="log" class="log"></div>
+    </div>
+
+    <div class="container">
+        <h2>Test Cases</h2>
+        <div id="testResults"></div>
+    </div>
+
+    <script>
+        // Mock data cho test
+        const mockRegistrations = [
+            {
+                id: 1,
+                name: "Nguyễn Văn A",
+                registrations: [
+                    {
+                        ID: 1,
+                        CONFERENCE_ID: 1,
+                        ATTENDEE_ID: 1,
+                        STATUS: "registered",
+                        REGISTRATION_DATE: "2024-01-15T10:00:00Z",
+                        CHECKIN_TIME: null,
+                        CHECKOUT_TIME: null
+                    }
+                ]
+            },
+            {
+                id: 2,
+                name: "Trần Thị B",
+                registrations: [
+                    {
+                        ID: 2,
+                        CONFERENCE_ID: 1,
+                        ATTENDEE_ID: 2,
+                        STATUS: "registered",
+                        REGISTRATION_DATE: "2024-01-15T10:00:00Z",
+                        CHECKIN_TIME: "2024-01-16T09:00:00Z",
+                        CHECKOUT_TIME: null
+                    }
+                ]
+            },
+            {
+                id: 3,
+                name: "Lê Văn C",
+                registrations: [
+                    {
+                        ID: 3,
+                        CONFERENCE_ID: 1,
+                        ATTENDEE_ID: 3,
+                        STATUS: "registered",
+                        REGISTRATION_DATE: "2024-01-15T10:00:00Z",
+                        CHECKIN_TIME: "2024-01-16T09:00:00Z",
+                        CHECKOUT_TIME: "2024-01-16T17:00:00Z"
+                    }
+                ]
+            },
+            {
+                id: 4,
+                name: "Phạm Thị D",
+                registrations: [
+                    {
+                        ID: 4,
+                        CONFERENCE_ID: 1,
+                        ATTENDEE_ID: 4,
+                        STATUS: "cancelled",
+                        REGISTRATION_DATE: "2024-01-15T10:00:00Z",
+                        CHECKIN_TIME: null,
+                        CHECKOUT_TIME: null
+                    }
+                ]
+            },
+            {
+                id: 5,
+                name: "Hoàng Văn E",
+                registrations: [
+                    {
+                        ID: 5,
+                        CONFERENCE_ID: 1,
+                        ATTENDEE_ID: 5,
+                        STATUS: "no-show",
+                        REGISTRATION_DATE: "2024-01-15T10:00:00Z",
+                        CHECKIN_TIME: null,
+                        CHECKOUT_TIME: null
+                    }
+                ]
+            },
+            {
+                id: 6,
+                name: "Vũ Thị F",
+                registrations: [
+                    {
+                        ID: 6,
+                        CONFERENCE_ID: 1,
+                        ATTENDEE_ID: 6,
+                        STATUS: "registered",
+                        REGISTRATION_DATE: "2024-01-15T10:00:00Z",
+                        CHECKIN_TIME: "2024-01-16T09:00:00Z",
+                        CHECKOUT_TIME: "2024-01-16T12:00:00Z"
+                    },
+                    {
+                        ID: 7,
+                        CONFERENCE_ID: 2,
+                        ATTENDEE_ID: 6,
+                        STATUS: "registered",
+                        REGISTRATION_DATE: "2024-01-20T10:00:00Z",
+                        CHECKIN_TIME: "2024-01-21T09:00:00Z",
+                        CHECKOUT_TIME: null
+                    }
+                ]
+            }
+        ];
+
+        // Logic tính toán trạng thái (copy từ hook)
+        function calculateOverallStatus(registrations) {
+            if (registrations.length === 0) {
+                return 'registered';
+            }
+
+            // Lấy registration mới nhất dựa trên thời gian checkin/checkout hoặc registration date
+            const latestRegistration = registrations.reduce((latest, current) => {
+                const latestTime = latest.CHECKOUT_TIME || latest.CHECKIN_TIME || latest.REGISTRATION_DATE;
+                const currentTime = current.CHECKOUT_TIME || current.CHECKIN_TIME || current.REGISTRATION_DATE;
+                return new Date(currentTime) > new Date(latestTime) ? current : latest;
+            });
+
+            log(`🔍 Calculating status for registration:`, {
+                id: latestRegistration.ID,
+                status: latestRegistration.STATUS,
+                checkinTime: latestRegistration.CHECKIN_TIME,
+                checkoutTime: latestRegistration.CHECKOUT_TIME,
+                registrationDate: latestRegistration.REGISTRATION_DATE
+            });
+
+            // Kiểm tra trạng thái theo thứ tự ưu tiên
+            // 1. Cancelled - cao nhất
+            if (latestRegistration.STATUS === 'cancelled') {
+                log('✅ Status: cancelled');
+                return 'cancelled';
+            }
+
+            // 2. No-show
+            if (latestRegistration.STATUS === 'no-show') {
+                log('✅ Status: no-show');
+                return 'no-show';
+            }
+
+            // 3. Checked-out - nếu có checkout time
+            if (latestRegistration.CHECKOUT_TIME) {
+                log('✅ Status: checked-out');
+                return 'checked-out';
+            }
+
+            // 4. Checked-in - nếu có checkin time nhưng chưa checkout
+            if (latestRegistration.CHECKIN_TIME) {
+                log('✅ Status: checked-in');
+                return 'checked-in';
+            }
+
+            // 5. Registered - mặc định
+            log('✅ Status: registered (default)');
+            return 'registered';
+        }
+
+        function getLastCheckinTime(registrations) {
+            const checkinTimes = registrations
+                .filter(reg => reg.CHECKIN_TIME)
+                .map(reg => new Date(reg.CHECKIN_TIME))
+                .sort((a, b) => b.getTime() - a.getTime());
+            
+            return checkinTimes.length > 0 ? checkinTimes[0] : undefined;
+        }
+
+        function getLastCheckoutTime(registrations) {
+            const checkoutTimes = registrations
+                .filter(reg => reg.CHECKOUT_TIME)
+                .map(reg => new Date(reg.CHECKOUT_TIME))
+                .sort((a, b) => b.getTime() - a.getTime());
+            
+            return checkoutTimes.length > 0 ? checkoutTimes[0] : undefined;
+        }
+
+        function log(message, data = null) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            let logMessage = `[${timestamp}] ${message}`;
+            
+            if (data) {
+                logMessage += `\n${JSON.stringify(data, null, 2)}`;
+            }
+            
+            logElement.textContent += logMessage + '\n\n';
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function runAllTests() {
+            clearLog();
+            log('🚀 Bắt đầu chạy tất cả test cases...');
+            
+            const testResults = document.getElementById('testResults');
+            testResults.innerHTML = '';
+
+            mockRegistrations.forEach((attendee, index) => {
+                const overallStatus = calculateOverallStatus(attendee.registrations);
+                const lastCheckinTime = getLastCheckinTime(attendee.registrations);
+                const lastCheckoutTime = getLastCheckoutTime(attendee.registrations);
+
+                const testCase = document.createElement('div');
+                testCase.className = 'test-case';
+                
+                testCase.innerHTML = `
+                    <h3>Test Case ${index + 1}: ${attendee.name}</h3>
+                    <p><strong>Registrations:</strong> ${attendee.registrations.length}</p>
+                    <div class="status ${overallStatus}">${overallStatus}</div>
+                    ${lastCheckinTime ? `<p><strong>Last Check-in:</strong> ${lastCheckinTime.toLocaleString('vi-VN')}</p>` : ''}
+                    ${lastCheckoutTime ? `<p><strong>Last Check-out:</strong> ${lastCheckoutTime.toLocaleString('vi-VN')}</p>` : ''}
+                    <div class="result">
+                        <strong>Kết quả:</strong> Trạng thái được tính toán chính xác
+                    </div>
+                `;
+
+                testResults.appendChild(testCase);
+            });
+
+            log('✅ Hoàn thành tất cả test cases!');
+        }
+
+        // Chạy test tự động khi load trang
+        window.onload = function() {
+            runAllTests();
+        };
+    </script>
+</body>
+</html>

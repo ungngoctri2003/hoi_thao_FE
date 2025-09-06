@@ -53,6 +53,14 @@ const allNavigationItems = [
     description: "Tạo, chỉnh sửa và quản lý các hội nghị"
   },
   { 
+    href: "/attendees", 
+    icon: Users, 
+    label: "Danh sách tham dự", 
+    requiredPermissions: ["attendees.manage"],
+    description: "Quản lý danh sách người tham dự toàn bộ hội nghị",
+    adminOnly: true
+  },
+  { 
     href: "/roles", 
     icon: Shield, 
     label: "Phân quyền", 
@@ -101,6 +109,16 @@ const getNavigationItems = (
       return userRole === 'admin';
     }
     
+    // Special handling for global attendees management - only show to admin
+    if (item.href === '/attendees' && item.adminOnly) {
+      return userRole === 'admin';
+    }
+    
+    // Admin always has access to attendees management regardless of permissions
+    if (item.href === '/attendees' && userRole === 'admin') {
+      return true;
+    }
+    
     // Check if user has basic role-based permission
     const hasBasicPermission = item.requiredPermissions.every(permission => hasPermission(permission));
     
@@ -108,7 +126,7 @@ const getNavigationItems = (
     if (userRole === 'admin' || userRole === 'staff') {
       // For conference-specific features, check if user has basic permission OR conference permission
       const conferenceSpecificFeatures = [
-        '/attendees', '/checkin', '/networking', 
+        '/checkin', '/networking', 
         '/venue', '/sessions', '/badges', '/analytics', '/my-events'
       ];
       
@@ -122,7 +140,7 @@ const getNavigationItems = (
     
     // For attendees, require both basic and conference permissions for conference features
     const conferenceSpecificFeatures = [
-      '/attendees', '/checkin', '/networking', 
+      '/checkin', '/networking', 
       '/venue', '/sessions', '/badges', '/analytics', '/my-events'
     ];
     
@@ -165,6 +183,17 @@ export function Sidebar({ userRole }: SidebarProps) {
   
   // Get navigation items based on user permissions and conference permissions
   const items = getNavigationItems(hasPermission, hasConferencePermission, currentRole);
+  
+  // Debug logs for attendees management
+  console.log('🔍 Sidebar Debug:', {
+    currentRole,
+    userRole: user?.role,
+    hasAttendeesPermission: hasPermission('attendees.manage'),
+    itemsCount: items.length,
+    hasAttendeesItem: items.some(item => item.href === '/attendees'),
+    showAttendeesAsSeparateItem: currentRole === 'admin',
+    allItems: allNavigationItems.filter(item => item.href === '/attendees')
+  });
   
   // Get available conferences - admin sees all conferences, staff/attendees see only assigned ones
   const availableConferences = getAvailableConferences();
@@ -213,7 +242,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       ["/dashboard", "/profile"].includes(item.href)
     ),
     management: items.filter(item => 
-      ["/conference-management", "/roles", "/audit", "/settings"].includes(item.href)
+      ["/conference-management", "/attendees", "/roles", "/audit", "/settings"].includes(item.href)
     ),
     features: items.filter(item => 
       ["/my-events"].includes(item.href)
