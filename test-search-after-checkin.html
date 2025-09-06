@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Search After Check-in</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 3px; }
+        .search-box { margin: 20px 0; }
+        input { padding: 8px; margin: 0 10px; width: 200px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Search After Check-in</h1>
+        
+        <div class="test-section info">
+            <h3>🎯 Test Search Filtering After Check-in</h3>
+            <p>Test để đảm bảo sau khi check-in, user đó sẽ không xuất hiện trong kết quả tìm kiếm nữa.</p>
+        </div>
+
+        <div class="search-box">
+            <label for="searchQuery">Tìm kiếm attendee:</label>
+            <input type="text" id="searchQuery" placeholder="Nhập tên, email, phone hoặc QR code..." value="test">
+            <button onclick="testSearchAttendees()">Tìm kiếm</button>
+            <button onclick="testCheckInAndSearch()">Check-in và Tìm kiếm lại</button>
+        </div>
+
+        <div class="grid">
+            <div class="test-section">
+                <h3>Kết quả tìm kiếm trước khi check-in</h3>
+                <div id="search-before-results"></div>
+            </div>
+
+            <div class="test-section">
+                <h3>Kết quả tìm kiếm sau khi check-in</h3>
+                <div id="search-after-results"></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Results Summary</h3>
+            <div id="summary-results"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000/api/v1';
+        let testResults = [];
+        let lastSearchResults = [];
+
+        function log(message, type = 'info', containerId = 'summary-results') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `<pre>${JSON.stringify(message, null, 2)}</pre>`;
+            container.appendChild(div);
+            
+            testResults.push({ message, type, timestamp: new Date() });
+        }
+
+        async function testSearchAttendees() {
+            const query = document.getElementById('searchQuery').value;
+            
+            if (!query.trim()) {
+                log({
+                    test: 'Search Attendees',
+                    status: 'ERROR',
+                    message: 'Vui lòng nhập từ khóa tìm kiếm'
+                }, 'error', 'search-before-results');
+                return;
+            }
+            
+            try {
+                log(`Tìm kiếm: "${query}"...`, 'info', 'search-before-results');
+                
+                const response = await fetch(`${API_BASE}/public/attendees/search?q=${encodeURIComponent(query)}&conferenceId=1`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const attendees = data.data || [];
+                    lastSearchResults = attendees;
+                    
+                    log({
+                        test: 'Search Attendees',
+                        status: 'SUCCESS',
+                        query: query,
+                        resultCount: attendees.length,
+                        attendees: attendees.map(a => ({
+                            id: a.ID || a.id,
+                            name: a.NAME || a.name,
+                            email: a.EMAIL || a.email,
+                            qrCode: a.QR_CODE || a.qrCode
+                        }))
+                    }, 'success', 'search-before-results');
+                } else {
+                    log({
+                        test: 'Search Attendees',
+                        status: 'ERROR',
+                        statusCode: response.status,
+                        response: data
+                    }, 'error', 'search-before-results');
+                }
+            } catch (error) {
+                log({
+                    test: 'Search Attendees',
+                    status: 'NETWORK_ERROR',
+                    error: error.message
+                }, 'error', 'search-before-results');
+            }
+        }
+
+        async function testCheckInAndSearch() {
+            const query = document.getElementById('searchQuery').value;
+            
+            if (!query.trim()) {
+                log({
+                    test: 'Check-in and Search',
+                    status: 'ERROR',
+                    message: 'Vui lòng nhập từ khóa tìm kiếm'
+                }, 'error', 'search-after-results');
+                return;
+            }
+            
+            try {
+                // First, check-in the first attendee from last search
+                if (lastSearchResults.length === 0) {
+                    log({
+                        test: 'Check-in and Search',
+                        status: 'ERROR',
+                        message: 'Không có attendee nào để check-in. Vui lòng tìm kiếm trước.'
+                    }, 'error', 'search-after-results');
+                    return;
+                }
+                
+                const attendeeToCheckIn = lastSearchResults[0];
+                log(`Check-in attendee: ${attendeeToCheckIn.NAME || attendeeToCheckIn.name}...`, 'info', 'search-after-results');
+                
+                // Perform check-in
+                const checkInResponse = await fetch(`${API_BASE}/public/checkins/checkin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        attendeeId: attendeeToCheckIn.ID || attendeeToCheckIn.id,
+                        qrCode: attendeeToCheckIn.QR_CODE || attendeeToCheckIn.qrCode,
+                        conferenceId: 1,
+                        checkInMethod: 'manual'
+                    })
+                });
+
+                const checkInData = await checkInResponse.json();
+                
+                if (checkInResponse.ok) {
+                    log(`Check-in thành công!`, 'success', 'search-after-results');
+                    
+                    // Now search again
+                    log(`Tìm kiếm lại: "${query}"...`, 'info', 'search-after-results');
+                    
+                    const searchResponse = await fetch(`${API_BASE}/public/attendees/search?q=${encodeURIComponent(query)}&conferenceId=1`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+
+                    const searchData = await searchResponse.json();
+                    
+                    if (searchResponse.ok) {
+                        const newAttendees = searchData.data || [];
+                        
+                        // Check if the checked-in attendee is still in results
+                        const checkedInAttendeeStillInResults = newAttendees.some(a => 
+                            (a.ID || a.id) === (attendeeToCheckIn.ID || attendeeToCheckIn.id)
+                        );
+                        
+                        log({
+                            test: 'Check-in and Search',
+                            status: 'SUCCESS',
+                            checkedInAttendee: {
+                                id: attendeeToCheckIn.ID || attendeeToCheckIn.id,
+                                name: attendeeToCheckIn.NAME || attendeeToCheckIn.name
+                            },
+                            beforeCheckIn: lastSearchResults.length,
+                            afterCheckIn: newAttendees.length,
+                            checkedInAttendeeStillInResults: checkedInAttendeeStillInResults,
+                            isFilteringWorking: !checkedInAttendeeStillInResults,
+                            newResults: newAttendees.map(a => ({
+                                id: a.ID || a.id,
+                                name: a.NAME || a.name,
+                                email: a.EMAIL || a.email
+                            }))
+                        }, !checkedInAttendeeStillInResults ? 'success' : 'warning', 'search-after-results');
+                        
+                    } else {
+                        log({
+                            test: 'Search After Check-in',
+                            status: 'ERROR',
+                            statusCode: searchResponse.status,
+                            response: searchData
+                        }, 'error', 'search-after-results');
+                    }
+                } else {
+                    log({
+                        test: 'Check-in',
+                        status: 'ERROR',
+                        statusCode: checkInResponse.status,
+                        response: checkInData
+                    }, 'error', 'search-after-results');
+                }
+            } catch (error) {
+                log({
+                    test: 'Check-in and Search',
+                    status: 'NETWORK_ERROR',
+                    error: error.message
+                }, 'error', 'search-after-results');
+            }
+        }
+
+        // Test on page load
+        window.onload = function() {
+            log('Page loaded. Enter a search query and click "Tìm kiếm" to test search functionality.', 'info');
+        };
+    </script>
+</body>
+</html>

@@ -20,59 +20,64 @@ import {
 export function UsageGuide() {
   const [isOpen, setIsOpen] = useState(false);
 
-  const guideSteps = [
+  const guideOptions = [
     {
       id: 'select-conference',
-      title: 'Chọn Hội nghị',
+      title: '1. Chọn Hội nghị',
       icon: CheckCircle,
-      description: 'Chọn hội nghị từ dropdown ở đầu trang để bắt đầu check-in',
-      details: 'Tất cả các thao tác check-in sẽ áp dụng cho hội nghị đã chọn. Đảm bảo chọn đúng hội nghị trước khi thực hiện check-in.'
+      description: 'Bước đầu tiên bắt buộc',
+      details: 'Chọn hội nghị từ dropdown ở đầu trang. Tất cả các thao tác check-in sẽ áp dụng cho hội nghị đã chọn.'
     },
     {
-      id: 'qr-scan',
-      title: 'Quét QR Code',
-      icon: QrCode,
-      description: 'Sử dụng camera để quét mã QR của tham dự viên',
-      details: 'Chuyển sang tab "Quét QR Code", nhấn "Bắt đầu quét" để kích hoạt camera. Đặt mã QR trong khung quét và hệ thống sẽ tự động phát hiện.'
-    },
-    {
-      id: 'manual-checkin',
-      title: 'Check-in Thủ công',
+      id: 'checkin-methods',
+      title: '2. Chọn Phương thức Check-in',
       icon: Users,
-      description: 'Tìm kiếm và check-in tham dự viên bằng cách nhập thông tin',
-      details: 'Chuyển sang tab "Check-in Thủ công", tìm kiếm tham dự viên hoặc sử dụng form check-in thủ công cho tham dự viên mới.'
+      description: 'Bạn có thể chọn một trong hai phương thức sau:',
+      details: 'Hai phương thức check-in độc lập, bạn có thể sử dụng bất kỳ phương thức nào phù hợp.',
+      options: [
+        {
+          title: 'Quét QR Code',
+          icon: QrCode,
+          description: 'Sử dụng camera để quét mã QR của tham dự viên',
+          details: 'Chuyển sang tab "Quét QR Code", nhấn "Bắt đầu quét" để kích hoạt camera. Đặt mã QR trong khung quét và hệ thống sẽ tự động phát hiện.'
+        },
+        {
+          title: 'Check-in Thủ công',
+          icon: Users,
+          description: 'Tìm kiếm và check-in tham dự viên đã đăng ký',
+          details: 'Chuyển sang tab "Check-in Thủ công", tìm kiếm tham dự viên bằng tên, email, số điện thoại hoặc mã QR.'
+        }
+      ]
     },
     {
       id: 'view-records',
-      title: 'Xem Lịch sử',
+      title: '3. Xem Lịch sử Check-in',
       icon: Search,
-      description: 'Xem danh sách tất cả các lần check-in đã thực hiện',
-      details: 'Cuộn xuống để xem danh sách lịch sử check-in. Sử dụng thanh tìm kiếm để lọc kết quả theo tên, email hoặc mã QR.'
-    },
-    {
-      id: 'export-data',
-      title: 'Xuất Báo cáo',
-      icon: CheckCircle,
-      description: 'Xuất dữ liệu check-in ra file Excel',
-      details: 'Nhấn nút "Xuất báo cáo" để tải file Excel chứa tất cả dữ liệu check-in của hội nghị đã chọn.'
+      description: 'Theo dõi và quản lý lịch sử check-in',
+      details: 'Cuộn xuống để xem danh sách lịch sử check-in của hội nghị đã chọn. Sử dụng thanh tìm kiếm để lọc kết quả theo tên, email hoặc mã QR.'
     }
   ];
 
   const tips = [
     {
       icon: Camera,
-      title: 'Camera Tips',
-      text: 'Đảm bảo có đủ ánh sáng và mã QR rõ nét khi quét'
+      title: 'QR Code Tips',
+      text: 'Đảm bảo có đủ ánh sáng và mã QR rõ nét khi quét. Camera sẽ quét toàn màn hình.'
+    },
+    {
+      icon: Search,
+      title: 'Tìm kiếm Tips',
+      text: 'Có thể tìm kiếm bằng tên, email, số điện thoại hoặc mã QR. Kết quả sẽ tự động cập nhật sau khi check-in.'
     },
     {
       icon: AlertCircle,
       title: 'Lỗi Check-in',
-      text: 'Kiểm tra mã QR có hợp lệ và tham dự viên đã đăng ký hội nghị'
+      text: 'Kiểm tra mã QR có hợp lệ và tham dự viên đã đăng ký hội nghị. Hệ thống sẽ hiển thị lỗi rõ ràng.'
     },
     {
       icon: Info,
-      title: 'API Status',
-      text: 'Hệ thống sẽ tự động chuyển sang chế độ mock nếu API không khả dụng'
+      title: 'Lịch sử Check-in',
+      text: 'Lịch sử chỉ hiển thị data của hội nghị được chọn. Có thể tìm kiếm và lọc kết quả.'
     }
   ];
 
@@ -100,27 +105,50 @@ export function UsageGuide() {
         
         <CollapsibleContent>
           <CardContent className="space-y-6">
-            {/* Steps */}
+            {/* Guide Options */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">Các bước thực hiện</h3>
-              <div className="space-y-4">
-                {guideSteps.map((step, index) => {
-                  const IconComponent = step.icon;
+              <h3 className="text-lg font-semibold mb-4">Hướng dẫn sử dụng</h3>
+              <div className="space-y-6">
+                {guideOptions.map((option) => {
+                  const IconComponent = option.icon;
                   return (
-                    <div key={step.id} className="flex items-start space-x-3 p-4 border rounded-lg">
-                      <div className="flex-shrink-0">
-                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                          <IconComponent className="h-4 w-4 text-primary" />
+                    <div key={option.id} className="space-y-4">
+                      <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                        <div className="flex-shrink-0">
+                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                            <IconComponent className="h-4 w-4 text-primary" />
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium mb-1">{option.title}</h4>
+                          <p className="text-sm text-muted-foreground mb-2">{option.description}</p>
+                          <p className="text-xs text-muted-foreground">{option.details}</p>
                         </div>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className="text-sm font-medium text-primary">Bước {index + 1}</span>
-                          <h4 className="font-medium">{step.title}</h4>
+                      
+                      {/* Sub-options for check-in methods */}
+                      {option.options && (
+                        <div className="ml-8 space-y-3">
+                          <p className="text-sm font-medium text-muted-foreground">Các phương thức có sẵn:</p>
+                          {option.options.map((subOption, subIndex) => {
+                            const SubIconComponent = subOption.icon;
+                            return (
+                              <div key={subIndex} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                                <div className="flex-shrink-0">
+                                  <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
+                                    <SubIconComponent className="h-3 w-3 text-primary" />
+                                  </div>
+                                </div>
+                                <div className="flex-1">
+                                  <h5 className="font-medium text-sm">{subOption.title}</h5>
+                                  <p className="text-xs text-muted-foreground mb-1">{subOption.description}</p>
+                                  <p className="text-xs text-muted-foreground">{subOption.details}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                        <p className="text-sm text-muted-foreground mb-2">{step.description}</p>
-                        <p className="text-xs text-muted-foreground">{step.details}</p>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
@@ -149,19 +177,21 @@ export function UsageGuide() {
             {/* Quick Actions */}
             <div className="pt-4 border-t">
               <h3 className="text-lg font-semibold mb-4">Thao tác nhanh</h3>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm">
-                  <QrCode className="h-4 w-4 mr-2" />
-                  Quét QR
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Users className="h-4 w-4 mr-2" />
-                  Check-in Thủ công
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Search className="h-4 w-4 mr-2" />
-                  Tìm kiếm
-                </Button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <QrCode className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium text-blue-900">Quét QR Code</span>
+                  </div>
+                  <p className="text-xs text-blue-700">Sử dụng camera để quét mã QR nhanh chóng</p>
+                </div>
+                <div className="p-3 bg-green-50 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Search className="h-4 w-4 text-green-600" />
+                    <span className="font-medium text-green-900">Tìm kiếm & Check-in</span>
+                  </div>
+                  <p className="text-xs text-green-700">Tìm kiếm tham dự viên và check-in thủ công</p>
+                </div>
               </div>
             </div>
           </CardContent>

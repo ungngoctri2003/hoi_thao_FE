@@ -3,16 +3,7 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserCheck, XCircle, Clock, QrCode, Users, Calendar } from "lucide-react";
-
-interface CheckInRecord {
-  id: number;
-  attendeeName: string;
-  attendeeEmail: string;
-  checkInTime: string;
-  status: 'success' | 'failed' | 'duplicate';
-  qrCode: string;
-  conferenceId: number;
-}
+import { type CheckInRecord } from "../types";
 
 interface StatsCardsProps {
   records: CheckInRecord[];

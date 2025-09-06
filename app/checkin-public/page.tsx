@@ -15,10 +15,10 @@ import { CheckInRecordsList } from "./components/checkin-records-list";
 import { ConferenceInfo } from "./components/conference-info";
 import { UsageGuide } from "./components/usage-guide";
 import { ToastNotification } from "./components/toast-notification";
-import { checkInAPI, type CheckInResponse, type Attendee, type Conference } from "./lib/checkin-api";
+import { checkInAPI, type CheckInResponse } from "./lib/checkin-api";
+import { type CheckInRecord, type Attendee, type Conference } from "./types";
 import { 
   QrCode, 
-  Download, 
   CheckCircle,
   XCircle,
   ArrowLeft,
@@ -26,16 +26,6 @@ import {
   Calendar
 } from "lucide-react";
 import Link from "next/link";
-
-interface CheckInRecord {
-  id: number;
-  attendeeName: string;
-  attendeeEmail: string;
-  checkInTime: string;
-  status: 'success' | 'failed' | 'duplicate';
-  qrCode: string;
-  conferenceId: number;
-}
 
 export default function PublicCheckInPage() {
   const [checkInRecords, setCheckInRecords] = useState<CheckInRecord[]>([]);
@@ -60,19 +50,36 @@ export default function PublicCheckInPage() {
     loadInitialData();
   }, []);
 
+  // Load checkin records when conference changes
+  useEffect(() => {
+    if (selectedConference) {
+      loadCheckInRecords(parseInt(selectedConference));
+    } else {
+      setCheckInRecords([]);
+    }
+  }, [selectedConference]);
+
   const loadInitialData = async () => {
     try {
       setIsLoading(true);
-      const [conferencesData, recordsData] = await Promise.all([
-        checkInAPI.getConferences(),
-        checkInAPI.getCheckInRecords()
-      ]);
-      
+      const conferencesData = await checkInAPI.getConferences();
       setConferences(conferencesData);
-      setCheckInRecords(recordsData);
     } catch (err) {
       console.error('Error loading initial data:', err);
       setError("Lỗi khi tải dữ liệu");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadCheckInRecords = async (conferenceId: number) => {
+    try {
+      setIsLoading(true);
+      const recordsData = await checkInAPI.getCheckInRecords(conferenceId);
+      setCheckInRecords(recordsData);
+    } catch (err) {
+      console.error('Error loading checkin records:', err);
+      setError("Lỗi khi tải lịch sử check-in");
     } finally {
       setIsLoading(false);
     }
@@ -106,7 +113,10 @@ export default function PublicCheckInPage() {
       });
 
       if (response.success && response.data) {
-        setCheckInRecords(prev => [response.data!, ...prev]);
+        // Reload checkin records for the current conference
+        if (selectedConference) {
+          await loadCheckInRecords(parseInt(selectedConference));
+        }
         setToast({
           message: `Check-in thành công cho ${response.data.attendeeName}`,
           type: 'success',
@@ -138,32 +148,26 @@ export default function PublicCheckInPage() {
     try {
       setError("");
       
-      const response = await checkInAPI.checkInAttendee({
-        attendeeId: attendee.id,
+      // Create check-in record from attendee data
+      const checkInRecord: CheckInRecord = {
+        id: Date.now(),
+        attendeeName: attendee.name,
+        attendeeEmail: attendee.email,
+        checkInTime: new Date().toLocaleString('vi-VN'),
+        status: 'success',
         qrCode: attendee.qrCode,
-        conferenceId: attendee.conferenceId,
-        checkInMethod: 'manual',
-        attendeeInfo: {
-          name: attendee.name,
-          email: attendee.email,
-          phone: attendee.phone
-        }
-      });
+        conferenceId: attendee.conferenceId
+      };
 
-      if (response.success && response.data) {
-        setCheckInRecords(prev => [response.data!, ...prev]);
-        setToast({
-          message: `Check-in thành công cho ${response.data.attendeeName}`,
-          type: 'success',
-          isVisible: true
-        });
-      } else {
-        setToast({
-          message: response.message || "Lỗi khi check-in",
-          type: 'error',
-          isVisible: true
-        });
+      // Reload checkin records for the current conference
+      if (selectedConference) {
+        await loadCheckInRecords(parseInt(selectedConference));
       }
+      setToast({
+        message: `Check-in thành công cho ${attendee.name}`,
+        type: 'success',
+        isVisible: true
+      });
     } catch (err) {
       console.error('Manual check-in error:', err);
       setToast({
@@ -178,25 +182,38 @@ export default function PublicCheckInPage() {
     setError(error);
   };
 
-  const handleExportRecords = async () => {
+  const handleDeleteRecord = async (recordId: number, qrCode: string) => {
     try {
-      const conferenceId = selectedConference ? parseInt(selectedConference) : undefined;
-      const blob = await checkInAPI.exportCheckInRecords(conferenceId, 'excel');
+      const response = await checkInAPI.deleteCheckInRecord(recordId, qrCode);
       
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `checkin-records-${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      if (response.success) {
+        // Reload checkin records
+        if (selectedConference) {
+          await loadCheckInRecords(parseInt(selectedConference));
+        }
+        
+        setToast({
+          message: response.message,
+          type: 'success',
+          isVisible: true
+        });
+      } else {
+        setToast({
+          message: response.message,
+          type: 'error',
+          isVisible: true
+        });
+      }
     } catch (err) {
-      console.error('Export error:', err);
-      setError("Lỗi khi xuất báo cáo");
+      console.error('Delete record error:', err);
+      setToast({
+        message: "Lỗi khi xóa check-in",
+        type: 'error',
+        isVisible: true
+      });
     }
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -228,39 +245,69 @@ export default function PublicCheckInPage() {
                 </p>
               </div>
             </div>
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={handleExportRecords}>
-                <Download className="h-4 w-4 mr-2" />
-                Xuất báo cáo
-              </Button>
-            </div>
           </div>
 
           {/* Conference Selection */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-4">
-                <Calendar className="h-5 w-5 text-primary" />
-                <div className="flex-1">
-                  <label className="text-sm font-medium">Chọn hội nghị:</label>
-                  <select
-                    value={selectedConference}
-                    onChange={(e) => setSelectedConference(e.target.value)}
-                    className="ml-2 px-3 py-1 border rounded-md"
-                  >
-                    <option value="">-- Chọn hội nghị --</option>
-                    {conferences
-                      .filter(conference => conference.id !== undefined && conference.id !== null)
-                      .map((conference) => (
-                        <option 
-                          key={conference.id} 
-                          value={conference.id.toString()}
-                        >
-                          {conference.name || 'Unknown Conference'} - {conference.date || 'N/A'}
-                        </option>
-                      ))}
-                  </select>
+          <Card className="border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-blue-50">
+            <CardHeader className="pb-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-white" />
                 </div>
+                <div>
+                  <CardTitle className="text-lg text-primary">Bước 1: Chọn Hội nghị</CardTitle>
+                  <CardDescription className="text-sm">
+                    Vui lòng chọn hội nghị để bắt đầu quá trình check-in
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Chọn hội nghị từ danh sách:
+                    </label>
+                    <select
+                      value={selectedConference}
+                      onChange={(e) => setSelectedConference(e.target.value)}
+                      className="w-full px-4 py-3 text-lg border-2 border-primary/30 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 bg-white shadow-sm"
+                    >
+                      <option value="">-- Vui lòng chọn hội nghị --</option>
+                      {conferences
+                        .filter(conference => conference.id !== undefined && conference.id !== null)
+                        .map((conference) => (
+                          <option 
+                            key={conference.id} 
+                            value={conference.id.toString()}
+                          >
+                            {conference.name || 'Unknown Conference'} - {conference.date || 'N/A'}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+                
+                {!selectedConference && (
+                  <div className="flex items-center space-x-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">!</span>
+                    </div>
+                    <p className="text-sm text-amber-700 font-medium">
+                      ⚠️ Bạn cần chọn hội nghị trước khi có thể thực hiện check-in
+                    </p>
+                  </div>
+                )}
+                
+                {selectedConference && (
+                  <div className="flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <p className="text-sm text-green-700 font-medium">
+                      ✅ Đã chọn hội nghị. Bạn có thể bắt đầu check-in!
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -295,17 +342,29 @@ export default function PublicCheckInPage() {
           />
 
           {/* Check-in Methods Tabs */}
-          <Tabs defaultValue="qr" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="qr" className="flex items-center space-x-2">
-                <QrCode className="h-4 w-4" />
-                <span>Quét QR Code</span>
-              </TabsTrigger>
-              <TabsTrigger value="manual" className="flex items-center space-x-2">
-                <Users className="h-4 w-4" />
-                <span>Check-in Thủ công</span>
-              </TabsTrigger>
-            </TabsList>
+          {selectedConference ? (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-bold">2</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Bước 2: Chọn Phương thức Check-in</h3>
+                  <p className="text-sm text-gray-600">Chọn một trong hai phương thức dưới đây</p>
+                </div>
+              </div>
+              
+              <Tabs defaultValue="qr" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 h-12">
+                  <TabsTrigger value="qr" className="flex items-center space-x-2 text-base font-medium">
+                    <QrCode className="h-5 w-5" />
+                    <span>Quét QR Code</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="manual" className="flex items-center space-x-2 text-base font-medium">
+                    <Users className="h-5 w-5" />
+                    <span>Check-in Thủ công</span>
+                  </TabsTrigger>
+                </TabsList>
             
             <TabsContent value="qr" className="mt-6">
               <QRScanner
@@ -317,14 +376,34 @@ export default function PublicCheckInPage() {
               />
             </TabsContent>
             
-            <TabsContent value="manual" className="mt-6">
-              <ManualCheckInForm
-                onCheckInSuccess={handleManualCheckInSuccess}
-                onCheckInError={handleManualCheckInError}
-                conferences={conferences}
-              />
-            </TabsContent>
-          </Tabs>
+                <TabsContent value="manual" className="mt-6">
+                  <ManualCheckInForm
+                    onCheckInSuccess={handleManualCheckInSuccess}
+                    onCheckInError={handleManualCheckInError}
+                    conferences={conferences}
+                  />
+                </TabsContent>
+              </Tabs>
+            </div>
+          ) : (
+            <Card className="border-2 border-amber-200 bg-amber-50">
+              <CardContent className="p-8 text-center">
+                <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Calendar className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold text-amber-800 mb-2">
+                  Chưa chọn hội nghị
+                </h3>
+                <p className="text-amber-700 mb-4">
+                  Vui lòng chọn hội nghị ở bước 1 để có thể thực hiện check-in
+                </p>
+                <div className="flex items-center justify-center space-x-2 text-sm text-amber-600">
+                  <span>👆</span>
+                  <span>Cuộn lên trên để chọn hội nghị</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Usage Guide */}
           <UsageGuide />
@@ -333,7 +412,8 @@ export default function PublicCheckInPage() {
           <CheckInRecordsList
             records={checkInRecords}
             isLoading={isLoading}
-            onExport={handleExportRecords}
+            selectedConference={selectedConference}
+            onDeleteRecord={handleDeleteRecord}
           />
         </div>
       </div>

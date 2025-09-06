@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   User, 
@@ -16,19 +15,9 @@ import {
   CheckCircle, 
   XCircle, 
   Loader2,
-  Search,
-  UserPlus
+  Search
 } from "lucide-react";
-
-interface Attendee {
-  id: number;
-  name: string;
-  email: string;
-  phone?: string;
-  qrCode: string;
-  conferenceId: number;
-  isRegistered: boolean;
-}
+import { type Attendee } from "../types";
 
 interface ManualCheckInFormProps {
   onCheckInSuccess: (attendee: Attendee) => void;
@@ -43,13 +32,6 @@ export function ManualCheckInForm({ onCheckInSuccess, onCheckInError, conference
   const [isSearching, setIsSearching] = useState(false);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [selectedAttendee, setSelectedAttendee] = useState<Attendee | null>(null);
-  const [showManualForm, setShowManualForm] = useState(false);
-  const [manualForm, setManualForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    qrCode: ""
-  });
   const [error, setError] = useState("");
 
   // Search attendees using API
@@ -62,7 +44,9 @@ export function ManualCheckInForm({ onCheckInSuccess, onCheckInError, conference
     try {
       // Import checkInAPI dynamically to avoid circular dependency
       const { checkInAPI } = await import('../lib/checkin-api');
+      console.log('Searching for:', query, 'in conference:', conferenceId);
       const results = await checkInAPI.searchAttendees(query, parseInt(conferenceId));
+      console.log('Search results:', results);
       setSearchResults(results);
     } catch (err) {
       console.error('Search error:', err);
@@ -101,6 +85,9 @@ export function ManualCheckInForm({ onCheckInSuccess, onCheckInError, conference
         setSelectedAttendee(null);
         setSearchResults([]);
         setSearchTerm("");
+        
+        // Show success message
+        setError(""); // Clear any previous errors
       } else {
         setError(response.message || "Lỗi khi check-in");
         onCheckInError("Check-in failed");
@@ -114,62 +101,19 @@ export function ManualCheckInForm({ onCheckInSuccess, onCheckInError, conference
     }
   };
 
-  const handleManualCheckIn = async () => {
-    if (!manualForm.name || !manualForm.email || !selectedConference) {
-      setError("Vui lòng điền đầy đủ thông tin bắt buộc");
-      return;
-    }
-    
-    setIsCheckingIn(true);
-    setError("");
-    
-    try {
-      // Import checkInAPI dynamically to avoid circular dependency
-      const { checkInAPI } = await import('../lib/checkin-api');
-      
-      const response = await checkInAPI.checkInAttendee({
-        conferenceId: parseInt(selectedConference),
-        checkInMethod: 'manual',
-        attendeeInfo: {
-          name: manualForm.name,
-          email: manualForm.email,
-          phone: manualForm.phone
-        },
-        qrCode: manualForm.qrCode || `MANUAL_${Date.now()}`
-      });
-      
-      if (response.success && response.data) {
-        const newAttendee: Attendee = {
-          id: response.data.id,
-          name: response.data.attendeeName,
-          email: response.data.attendeeEmail,
-          phone: manualForm.phone,
-          qrCode: response.data.qrCode,
-          conferenceId: parseInt(selectedConference),
-          isRegistered: true
-        };
-        
-        onCheckInSuccess(newAttendee);
-        setManualForm({ name: "", email: "", phone: "", qrCode: "" });
-        setShowManualForm(false);
-      } else {
-        setError(response.message || "Lỗi khi check-in thủ công");
-        onCheckInError("Manual check-in failed");
-      }
-    } catch (err) {
-      console.error('Manual check-in error:', err);
-      setError("Lỗi khi check-in thủ công");
-      onCheckInError("Manual check-in failed");
-    } finally {
-      setIsCheckingIn(false);
+  // Refresh search results after check-in
+  const refreshSearchResults = async () => {
+    if (searchTerm.trim() && selectedConference) {
+      await searchAttendees(searchTerm, selectedConference);
     }
   };
+
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
-          <UserPlus className="h-5 w-5" />
+          <User className="h-5 w-5" />
           <span>Check-in Thủ công</span>
         </CardTitle>
         <CardDescription>
@@ -204,7 +148,7 @@ export function ManualCheckInForm({ onCheckInSuccess, onCheckInError, conference
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="search"
-                    placeholder="Nhập tên, email, số điện thoại hoặc QR code..."
+                    placeholder="Nhập tên, email hoặc số điện thoại..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -230,7 +174,22 @@ export function ManualCheckInForm({ onCheckInSuccess, onCheckInError, conference
             {/* Search Results */}
             {searchResults.length > 0 && (
               <div className="space-y-2">
-                <Label>Kết quả tìm kiếm ({searchResults.length})</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Kết quả tìm kiếm ({searchResults.length})</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={refreshSearchResults}
+                    disabled={isSearching}
+                  >
+                    {isSearching ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4 mr-1" />
+                    )}
+                    Làm mới
+                  </Button>
+                </div>
                 <div className="max-h-60 overflow-y-auto space-y-2">
                   {searchResults.map((attendee) => (
                     <div key={attendee.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -244,7 +203,6 @@ export function ManualCheckInForm({ onCheckInSuccess, onCheckInError, conference
                           {attendee.phone && (
                             <p className="text-xs text-muted-foreground">{attendee.phone}</p>
                           )}
-                          <p className="text-xs text-muted-foreground">QR: {attendee.qrCode}</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -274,76 +232,6 @@ export function ManualCheckInForm({ onCheckInSuccess, onCheckInError, conference
               </div>
             )}
 
-            {/* Manual Check-in Form */}
-            <div className="border-t pt-4">
-              <div className="flex items-center justify-between mb-4">
-                <Label className="text-base font-medium">Check-in thủ công</Label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowManualForm(!showManualForm)}
-                >
-                  {showManualForm ? "Ẩn form" : "Hiện form"}
-                </Button>
-              </div>
-
-              {showManualForm && (
-                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="manual-name">Họ và tên *</Label>
-                      <Input
-                        id="manual-name"
-                        placeholder="Nhập họ và tên..."
-                        value={manualForm.name}
-                        onChange={(e) => setManualForm(prev => ({ ...prev, name: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="manual-email">Email *</Label>
-                      <Input
-                        id="manual-email"
-                        type="email"
-                        placeholder="Nhập email..."
-                        value={manualForm.email}
-                        onChange={(e) => setManualForm(prev => ({ ...prev, email: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="manual-phone">Số điện thoại</Label>
-                      <Input
-                        id="manual-phone"
-                        placeholder="Nhập số điện thoại..."
-                        value={manualForm.phone}
-                        onChange={(e) => setManualForm(prev => ({ ...prev, phone: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="manual-qr">Mã QR (tùy chọn)</Label>
-                      <Input
-                        id="manual-qr"
-                        placeholder="Nhập mã QR..."
-                        value={manualForm.qrCode}
-                        onChange={(e) => setManualForm(prev => ({ ...prev, qrCode: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                  
-                  <Button
-                    onClick={handleManualCheckIn}
-                    disabled={isCheckingIn || !manualForm.name || !manualForm.email || !selectedConference}
-                    className="w-full"
-                  >
-                    {isCheckingIn ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <UserPlus className="h-4 w-4 mr-2" />
-                    )}
-                    Check-in thủ công
-                  </Button>
-                </div>
-              )}
-            </div>
 
             {/* Error Message */}
             {error && (

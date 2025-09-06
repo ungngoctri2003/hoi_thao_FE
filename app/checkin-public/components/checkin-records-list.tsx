@@ -5,31 +5,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Download, QrCode, CheckCircle, XCircle, Clock } from "lucide-react";
-
-interface CheckInRecord {
-  id: number;
-  attendeeName: string;
-  attendeeEmail: string;
-  checkInTime: string;
-  status: 'success' | 'failed' | 'duplicate';
-  qrCode: string;
-  conferenceId: number;
-}
+import { Search, QrCode, CheckCircle, XCircle, Clock, Trash2, AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { type CheckInRecord } from "../types";
 
 interface CheckInRecordsListProps {
   records: CheckInRecord[];
   isLoading: boolean;
-  onExport: () => void;
+  selectedConference?: string;
+  onDeleteRecord?: (recordId: number, qrCode: string) => void;
 }
 
-export function CheckInRecordsList({ records, isLoading, onExport }: CheckInRecordsListProps) {
+export function CheckInRecordsList({ records, isLoading, selectedConference, onDeleteRecord }: CheckInRecordsListProps) {
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [deletingId, setDeletingId] = React.useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState<number | null>(null);
+  const [qrCodeInput, setQrCodeInput] = React.useState("");
+  const [showQrInput, setShowQrInput] = React.useState<number | null>(null);
 
   const filteredRecords = records.filter(record =>
-    record.attendeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.attendeeEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.qrCode.toLowerCase().includes(searchTerm.toLowerCase())
+    (record.attendeeName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (record.attendeeEmail || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getStatusBadge = (status: string) => {
@@ -66,20 +61,41 @@ export function CheckInRecordsList({ records, isLoading, onExport }: CheckInReco
     }
   };
 
+  const handleDeleteRecord = async (recordId: number) => {
+    if (!onDeleteRecord || !qrCodeInput.trim()) return;
+    
+    setDeletingId(recordId);
+    try {
+      await onDeleteRecord(recordId, qrCodeInput.trim());
+      setShowDeleteConfirm(null);
+      setShowQrInput(null);
+      setQrCodeInput("");
+    } catch (error) {
+      console.error('Delete error:', error);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleStartDelete = (recordId: number) => {
+    setShowQrInput(recordId);
+    setQrCodeInput("");
+  };
+
+  const handleCancelDelete = () => {
+    setShowQrInput(null);
+    setShowDeleteConfirm(null);
+    setQrCodeInput("");
+  };
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Lịch sử Check-in ({filteredRecords.length})</CardTitle>
-            <CardDescription>
-              Danh sách tất cả các lần check-in đã thực hiện
-            </CardDescription>
-          </div>
-          <Button variant="outline" onClick={onExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Xuất Excel
-          </Button>
+        <div>
+          <CardTitle>Lịch sử Check-in ({filteredRecords.length})</CardTitle>
+          <CardDescription>
+            Danh sách tất cả các lần check-in đã thực hiện
+          </CardDescription>
         </div>
       </CardHeader>
       <CardContent>
@@ -105,7 +121,12 @@ export function CheckInRecordsList({ records, isLoading, onExport }: CheckInReco
           <div className="text-center py-8">
             <QrCode className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">
-              {searchTerm ? "Không tìm thấy kết quả phù hợp" : "Chưa có lịch sử check-in nào"}
+              {!selectedConference 
+                ? "Vui lòng chọn hội nghị để xem lịch sử check-in" 
+                : searchTerm 
+                  ? "Không tìm thấy kết quả phù hợp" 
+                  : "Chưa có lịch sử check-in nào cho hội nghị này"
+              }
             </p>
           </div>
         ) : (
@@ -117,9 +138,8 @@ export function CheckInRecordsList({ records, isLoading, onExport }: CheckInReco
                     <QrCode className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium">{record.attendeeName}</p>
-                    <p className="text-sm text-muted-foreground">{record.attendeeEmail}</p>
-                    <p className="text-xs text-muted-foreground">QR: {record.qrCode}</p>
+                    <p className="font-medium">{record.attendeeName || 'N/A'}</p>
+                    <p className="text-sm text-muted-foreground">{record.attendeeEmail || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">
@@ -127,6 +147,57 @@ export function CheckInRecordsList({ records, isLoading, onExport }: CheckInReco
                     <p className="text-sm font-medium">{formatDateTime(record.checkInTime)}</p>
                     {getStatusBadge(record.status)}
                   </div>
+                  {onDeleteRecord && (
+                    <div className="flex items-center space-x-2">
+                      {showQrInput === record.id ? (
+                        <div className="flex items-center space-x-2">
+                          <div className="flex flex-col space-y-2">
+                            <div className="flex items-center space-x-2">
+                              <QrCode className="h-4 w-4 text-primary" />
+                              <Input
+                                placeholder="Nhập mã QR để xóa"
+                                value={qrCodeInput}
+                                onChange={(e) => setQrCodeInput(e.target.value)}
+                                className="w-56"
+                                autoFocus
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleDeleteRecord(record.id)}
+                                disabled={deletingId === record.id || !qrCodeInput.trim()}
+                              >
+                                {deletingId === record.id ? (
+                                  <Clock className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                                Xác nhận xóa
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleCancelDelete}
+                              >
+                                Hủy
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStartDelete(record.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

@@ -8,7 +8,6 @@ export const API_CONFIG = {
     CHECKIN: '/public/checkins/checkin',
     CHECKIN_RECORDS: '/public/checkins', // Use public checkins for listing records
     CHECKIN_VALIDATE_QR: '/public/checkins/validate-qr',
-    CHECKIN_EXPORT: '/checkins/export', // Keep protected for export
     ATTENDEES_SEARCH: '/public/attendees/search',
     CONFERENCES: '/public/conferences'
   },
