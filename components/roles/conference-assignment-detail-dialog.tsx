@@ -402,7 +402,7 @@ export function ConferenceAssignmentDetailDialog({
                         </div>
                         <div>
                           <Label className="text-sm font-medium">Trạng thái hội nghị</Label>
-                          <Badge variant={conference.status === 'active' ? 'default' : 'secondary'}>
+                          <Badge  variant={conference.status === 'active' ? 'default' : 'secondary'}>
                             {conference.status}
                           </Badge>
                         </div>

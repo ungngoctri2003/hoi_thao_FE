@@ -144,6 +144,7 @@ export interface UseAttendeeConferencesOptions {
   };
   search?: string;
   autoFetch?: boolean;
+  conferenceId?: number; // Add conferenceId filter
 }
 
 export interface UseAttendeeConferencesReturn {
@@ -165,7 +166,8 @@ export function useAttendeeConferences(options: UseAttendeeConferencesOptions = 
     limit = 20,
     filters = {},
     search = '',
-    autoFetch = true
+    autoFetch = true,
+    conferenceId
   } = options;
 
   const [attendeesWithConferences, setAttendeesWithConferences] = useState<AttendeeWithConferences[]>([]);
@@ -183,7 +185,7 @@ export function useAttendeeConferences(options: UseAttendeeConferencesOptions = 
       setIsLoading(true);
       setError(null);
 
-      console.log('🔄 Fetching attendees with their conferences...');
+      console.log('🔄 Fetching attendees with their conferences...', conferenceId ? `for conference ${conferenceId}` : 'for all conferences');
 
       // Get attendees list
       const attendeesResponse = await attendeesAPI.getAttendees({
@@ -196,7 +198,7 @@ export function useAttendeeConferences(options: UseAttendeeConferencesOptions = 
       console.log('✅ Got attendees:', attendeesResponse.data.length);
 
       // For each attendee, get their registrations and associated conferences
-      const attendeesWithConferencesData: AttendeeWithConferences[] = await Promise.all(
+      const attendeesWithConferencesData: (AttendeeWithConferences | null)[] = await Promise.all(
         attendeesResponse.data.map(async (attendee) => {
           try {
             // Get attendee's registrations
@@ -229,6 +231,15 @@ export function useAttendeeConferences(options: UseAttendeeConferencesOptions = 
                 conferences.push(conferenceResponse.data);
               } catch (err) {
                 console.error(`Error fetching conference ${registration.CONFERENCE_ID}:`, err);
+              }
+            }
+
+            // If conferenceId is specified, filter to only include attendees registered for that conference
+            if (conferenceId) {
+              const isRegisteredForConference = registrations.some(reg => reg.CONFERENCE_ID === conferenceId);
+              if (!isRegisteredForConference) {
+                console.log(`🚫 Attendee ${attendee.NAME} not registered for conference ${conferenceId}, skipping`);
+                return null; // Skip this attendee
               }
             }
 
@@ -266,9 +277,11 @@ export function useAttendeeConferences(options: UseAttendeeConferencesOptions = 
         })
       );
 
-      console.log('✅ Processed attendees with conferences:', attendeesWithConferencesData.length);
+      // Filter out null values (attendees not registered for the specific conference)
+      const filteredData = attendeesWithConferencesData.filter((attendee): attendee is AttendeeWithConferences => attendee !== null);
+      console.log('✅ Processed attendees with conferences:', filteredData.length);
 
-      setAttendeesWithConferences(attendeesWithConferencesData);
+      setAttendeesWithConferences(filteredData);
       setPagination({
         page: attendeesResponse.meta.page,
         limit: attendeesResponse.meta.limit,
@@ -282,7 +295,7 @@ export function useAttendeeConferences(options: UseAttendeeConferencesOptions = 
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, JSON.stringify(filters), search]);
+  }, [page, limit, JSON.stringify(filters), search, conferenceId]);
 
   useEffect(() => {
     if (autoFetch) {

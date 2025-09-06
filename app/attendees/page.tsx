@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { useConferencePermissions } from "@/hooks/use-conference-permissions";
 import { ConferencePermissionGuard } from "@/components/auth/conference-permission-guard";
 import { MainLayout } from "@/components/layout/main-layout";
@@ -54,6 +55,15 @@ import {
 export default function AttendeesPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { currentConferenceId, hasConferencePermission } = useConferencePermissions();
+  const searchParams = useSearchParams();
+  
+  // Get conferenceId from URL parameter
+  const conferenceIdParam = searchParams.get('conferenceId');
+  const conferenceId = conferenceIdParam ? parseInt(conferenceIdParam) : null;
+  
+  // Determine if this is a specific conference page or global admin page
+  const isGlobalAdminPage = !conferenceId;
+  const isConferenceSpecificPage = !!conferenceId;
   
   // State for filters and UI
   const [searchTerm, setSearchTerm] = useState("");
@@ -79,6 +89,10 @@ export default function AttendeesPage() {
   // State for all conferences
   const [allConferences, setAllConferences] = useState<any[]>([]);
   const [conferencesLoading, setConferencesLoading] = useState(false);
+  
+  // State for specific conference (when conferenceId is provided)
+  const [currentConference, setCurrentConference] = useState<any>(null);
+  const [conferenceLoading, setConferenceLoading] = useState(false);
 
   // Use the hook to fetch attendees with their conferences
   const {
@@ -95,7 +109,8 @@ export default function AttendeesPage() {
       gender: filterGender !== "all" ? filterGender : undefined,
     },
     search: searchTerm || undefined,
-    autoFetch: true
+    autoFetch: true,
+    conferenceId: conferenceId || undefined
   });
 
   // Extract attendees and conferences from the combined data
@@ -134,6 +149,41 @@ export default function AttendeesPage() {
     fetchAllConferences();
   }, []);
 
+  // Fetch specific conference details when conferenceId is provided
+  useEffect(() => {
+    const fetchCurrentConference = async () => {
+      if (!conferenceId) {
+        setCurrentConference(null);
+        return;
+      }
+
+      try {
+        setConferenceLoading(true);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/conferences/${conferenceId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setCurrentConference(data.data);
+          console.log('🏛️ Fetched current conference:', data.data?.NAME);
+        } else {
+          console.error('Failed to fetch current conference:', response.statusText);
+          setCurrentConference(null);
+        }
+      } catch (error) {
+        console.error('Error fetching current conference:', error);
+        setCurrentConference(null);
+      } finally {
+        setConferenceLoading(false);
+      }
+    };
+
+    fetchCurrentConference();
+  }, [conferenceId]);
+
   // Filter attendees based on current filters - memoized to prevent unnecessary re-renders
   const filteredAttendees = useMemo(() => {
     console.log('🔍 Filtering attendees:', { 
@@ -152,13 +202,13 @@ export default function AttendeesPage() {
       
       const matchesGender = filterGender === "all" || attendee.GENDER === filterGender;
       
-      // Filter by conference
+      // Filter by conference (only for global admin page)
       let matchesConference = true;
-      if (filterConference !== "all") {
+      if (isGlobalAdminPage && filterConference !== "all") {
         const attendeeWithConferences = attendeesWithConferences.find(a => a.ID === attendee.ID);
         const attendeeConferences = attendeeWithConferences?.conferences || [];
-        const conferenceId = parseInt(filterConference);
-        matchesConference = attendeeConferences.some(conf => conf.ID === conferenceId);
+        const filterConferenceId = parseInt(filterConference);
+        matchesConference = attendeeConferences.some(conf => conf.ID === filterConferenceId);
       }
       
       // Filter by checkin status
@@ -196,7 +246,7 @@ export default function AttendeesPage() {
     
     console.log('🔍 Filtered result:', filtered.length);
     return filtered;
-  }, [attendees, attendeesWithConferences, searchTerm, filterGender, filterConference, filterCheckinStatus, sortBy]);
+  }, [attendees, attendeesWithConferences, searchTerm, filterGender, filterConference, filterCheckinStatus, sortBy, isGlobalAdminPage]);
 
   // Debug logs
   console.log('📊 Attendees data:', { 
@@ -291,6 +341,26 @@ export default function AttendeesPage() {
         <span>{config.icon}</span>
         <span>{config.label}</span>
       </Badge>
+    );
+  };
+
+  const getConferenceStatusIcon = (status: string) => {
+    const statusConfig = {
+      "active": { icon: "🟢", label: "Hoạt động", color: "text-green-600" },
+      "inactive": { icon: "🔴", label: "Không hoạt động", color: "text-red-600" },
+      "pending": { icon: "🟡", label: "Chờ duyệt", color: "text-yellow-600" },
+      "completed": { icon: "✅", label: "Hoàn thành", color: "text-blue-600" },
+      "cancelled": { icon: "❌", label: "Đã hủy", color: "text-gray-600" }
+    };
+    
+    const config = statusConfig[status?.toLowerCase() as keyof typeof statusConfig] || 
+                   { icon: "❓", label: status || "N/A", color: "text-gray-600" };
+    
+    return (
+      <div className="flex items-center space-x-1">
+        <span className="text-lg">{config.icon}</span>
+        <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
+      </div>
     );
   };
 
@@ -617,8 +687,15 @@ export default function AttendeesPage() {
 
   // Check if user is admin for global attendees management
   const isAdmin = user?.role === 'admin';
-  const canManage = isAdmin || hasConferencePermission("attendees.manage");
-  const canView = isAdmin || hasConferencePermission("attendees.view");
+  
+  // For global admin page: only admin can access
+  // For conference-specific page: check conference permissions
+  const canManage = isGlobalAdminPage 
+    ? isAdmin 
+    : hasConferencePermission("attendees.manage");
+  const canView = isGlobalAdminPage 
+    ? isAdmin 
+    : hasConferencePermission("attendees.view");
 
   // Show loading state while auth is loading
   if (authLoading) {
@@ -652,8 +729,8 @@ export default function AttendeesPage() {
   const userName = user.name || "Người dùng";
   const userAvatar = user.avatar;
 
-  // Only admin can access global attendees management
-  if (!isAdmin) {
+  // Check permissions based on page type
+  if (isGlobalAdminPage && !isAdmin) {
     return (
       <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
         <div className="flex items-center justify-center min-h-screen">
@@ -662,6 +739,23 @@ export default function AttendeesPage() {
               <CardTitle className="text-center text-red-600">Không có quyền truy cập</CardTitle>
               <CardDescription className="text-center">
                 Chỉ quản trị viên mới có thể truy cập quản lý người tham dự toàn bộ hội nghị
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (isConferenceSpecificPage && !canView) {
+    return (
+      <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
+        <div className="flex items-center justify-center min-h-screen">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center text-red-600">Không có quyền truy cập</CardTitle>
+              <CardDescription className="text-center">
+                Bạn không có quyền xem danh sách tham dự viên của hội nghị này
               </CardDescription>
             </CardHeader>
           </Card>
@@ -682,10 +776,24 @@ export default function AttendeesPage() {
           <div className="flex items-center space-x-4">
             <Users className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-3xl font-bold">Quản lý người tham dự hội nghị</h1>
+              <h1 className="text-3xl font-bold">
+                {isGlobalAdminPage 
+                  ? "Quản lý người tham dự hội nghị" 
+                  : `Danh sách tham dự viên - ${currentConference?.NAME || "Đang tải..."}`
+                }
+              </h1>
               <p className="text-muted-foreground">
-                Quản lý và theo dõi thông tin chi tiết của người tham dự từ tất cả hội nghị
+                {isGlobalAdminPage 
+                  ? "Quản lý và theo dõi thông tin chi tiết của người tham dự từ tất cả hội nghị"
+                  : `Quản lý danh sách tham dự viên của hội nghị ${currentConference?.NAME || ""}`
+                }
               </p>
+              {isConferenceSpecificPage && currentConference && (
+                <div className="mt-2 text-sm text-muted-foreground">
+                  <p>📅 {new Date(currentConference.START_DATE).toLocaleDateString('vi-VN')} - {new Date(currentConference.END_DATE).toLocaleDateString('vi-VN')}</p>
+                  {currentConference.VENUE && <p>📍 {currentConference.VENUE}</p>}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex space-x-2">
@@ -719,9 +827,13 @@ export default function AttendeesPage() {
               <div className="flex items-center space-x-2">
                 <Users className="h-4 w-4 text-blue-600" />
                 <div>
-                  <p className="text-sm font-medium">Tổng tham dự viên</p>
+                  <p className="text-sm font-medium">
+                    {isGlobalAdminPage ? "Tổng tham dự viên" : "Tham dự viên hội nghị"}
+                  </p>
                   <p className="text-2xl font-bold">{pagination.total}</p>
-                  <p className="text-xs text-muted-foreground">Tất cả hội nghị</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isGlobalAdminPage ? "Tất cả hội nghị" : currentConference?.NAME || "Đang tải..."}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -743,12 +855,20 @@ export default function AttendeesPage() {
               <div className="flex items-center space-x-2">
                 <Calendar className="h-4 w-4 text-orange-600" />
                 <div>
-                  <p className="text-sm font-medium">Hội nghị</p>
-                  <p className="text-2xl font-bold">
-                    {conferencesLoading ? "..." : allConferences.length}
+                  <p className="text-sm font-medium">
+                    {isGlobalAdminPage ? "Hội nghị" : "Trạng thái hội nghị"}
                   </p>
+                  <div className="text-2xl">
+                    {isGlobalAdminPage 
+                      ? (conferencesLoading ? "..." : allConferences.length)
+                      : (conferenceLoading ? "..." : getConferenceStatusIcon(currentConference?.STATUS || "N/A"))
+                    }
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    {conferencesLoading ? "Đang tải..." : "Tổng số hội nghị"}
+                    {isGlobalAdminPage 
+                      ? (conferencesLoading ? "Đang tải..." : "Tổng số hội nghị")
+                      : (conferenceLoading ? "Đang tải..." : "Trạng thái hiện tại")
+                    }
                   </p>
                 </div>
               </div>
@@ -762,7 +882,10 @@ export default function AttendeesPage() {
                   <p className="text-sm font-medium">Đã lọc</p>
                   <p className="text-2xl font-bold">{filteredAttendees.length}</p>
                   <p className="text-xs text-muted-foreground">
-                    {filterConference !== "all" ? `Hội nghị: ${allConferences.find(c => c.ID.toString() === filterConference)?.NAME || "Không xác định"}` : "Kết quả hiện tại"}
+                    {isGlobalAdminPage 
+                      ? (filterConference !== "all" ? `Hội nghị: ${allConferences.find(c => c.ID.toString() === filterConference)?.NAME || "Không xác định"}` : "Kết quả hiện tại")
+                      : "Kết quả hiện tại"
+                    }
                   </p>
                 </div>
               </div>
@@ -780,7 +903,7 @@ export default function AttendeesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className={`grid grid-cols-1 md:grid-cols-2 ${isGlobalAdminPage ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Giới tính</label>
                   <select
@@ -794,24 +917,26 @@ export default function AttendeesPage() {
                     <option value="other">Khác</option>
                   </select>
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Hội nghị</label>
-                  <select
-                    value={filterConference}
-                    onChange={(e) => setFilterConference(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md"
-                    disabled={conferencesLoading}
-                  >
-                    <option value="all">
-                      {conferencesLoading ? "Đang tải hội nghị..." : "Tất cả hội nghị"}
-                    </option>
-                    {allConferences.map((conference) => (
-                      <option key={conference.ID} value={conference.ID.toString()}>
-                        {conference.NAME}
+                {isGlobalAdminPage && (
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Hội nghị</label>
+                    <select
+                      value={filterConference}
+                      onChange={(e) => setFilterConference(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md"
+                      disabled={conferencesLoading}
+                    >
+                      <option value="all">
+                        {conferencesLoading ? "Đang tải hội nghị..." : "Tất cả hội nghị"}
                       </option>
-                    ))}
-                  </select>
-                </div>
+                      {allConferences.map((conference) => (
+                        <option key={conference.ID} value={conference.ID.toString()}>
+                          {conference.NAME}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Trạng thái</label>
                   <select
@@ -1001,7 +1126,7 @@ export default function AttendeesPage() {
                       <TableHead>Thông tin</TableHead>
                       <TableHead>Liên hệ</TableHead>
                       <TableHead>Công ty</TableHead>
-                      <TableHead>Hội nghị</TableHead>
+                      {isGlobalAdminPage && <TableHead>Hội nghị</TableHead>}
                       <TableHead>Trạng thái</TableHead>
                       <TableHead>Giới tính</TableHead>
                       <TableHead>Ngày tạo</TableHead>
@@ -1066,16 +1191,18 @@ export default function AttendeesPage() {
                             <p className="text-sm text-muted-foreground">{attendee.POSITION || ""}</p>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="max-w-32 truncate">
-                            <p className="text-sm font-medium">
-                              {attendeeConferences.length > 0 ? attendeeConferences[0].NAME : "Chưa có hội nghị"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {attendeeConferences.length > 1 ? `+${attendeeConferences.length - 1} hội nghị khác` : ""}
-                            </p>
-                          </div>
-                        </TableCell>
+                        {isGlobalAdminPage && (
+                          <TableCell>
+                            <div className="max-w-32 truncate">
+                              <p className="text-sm font-medium">
+                                {attendeeConferences.length > 0 ? attendeeConferences[0].NAME : "Chưa có hội nghị"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {attendeeConferences.length > 1 ? `+${attendeeConferences.length - 1} hội nghị khác` : ""}
+                              </p>
+                            </div>
+                          </TableCell>
+                        )}
                         <TableCell>
                           <div className="space-y-1">
                             {getCheckinStatusBadge(attendeeWithConferences?.overallStatus || 'registered')}
@@ -1232,10 +1359,12 @@ export default function AttendeesPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Hội nghị:</span>
-                      <span className="font-medium">{attendeeConferences.length > 0 ? attendeeConferences[0].NAME : "Chưa có"}</span>
-                    </div>
+                    {isGlobalAdminPage && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Hội nghị:</span>
+                        <span className="font-medium">{attendeeConferences.length > 0 ? attendeeConferences[0].NAME : "Chưa có"}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-sm">
                       <span>Trạng thái:</span>
                       <div className="flex items-center space-x-1">
@@ -1334,10 +1463,12 @@ export default function AttendeesPage() {
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <span className="truncate">{attendee.COMPANY || "Chưa cập nhật"}</span>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>{attendeeConferences.length > 0 ? attendeeConferences[0].NAME : "Chưa có hội nghị"}</span>
-                    </div>
+                    {isGlobalAdminPage && (
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span>{attendeeConferences.length > 0 ? attendeeConferences[0].NAME : "Chưa có hội nghị"}</span>
+                      </div>
+                    )}
                     <div className="flex items-center space-x-2">
                       <span className="text-muted-foreground">Trạng thái:</span>
                       {getCheckinStatusBadge(attendeeWithConferences?.overallStatus || 'registered')}
