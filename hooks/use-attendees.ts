@@ -57,7 +57,7 @@ export function useAttendees(options: UseAttendeesOptions = {}): UseAttendeesRet
   });
 
   const debouncedApi = useDebouncedApi({
-    debounceMs: 500
+    debounceMs: 800 // Increased debounce time to reduce API calls
   });
 
   // Auto-fetch on mount and when dependencies change

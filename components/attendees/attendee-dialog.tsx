@@ -68,7 +68,6 @@ export function AttendeeDialog({
         DATE_OF_BIRTH: null,
         GENDER: '',
         FIREBASE_UID: '',
-        ADDRESS: '',
       });
     }
   }, [attendee, mode]);
@@ -528,18 +527,6 @@ export function AttendeeDialog({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="address">Địa chỉ</Label>
-                <Textarea
-                  id="address"
-                  value={formData.ADDRESS || ''}
-                  onChange={(e) => handleInputChange('ADDRESS', e.target.value)}
-                  disabled={isReadOnly}
-                  placeholder="Nhập địa chỉ (nếu có)"
-                  rows={2}
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="dietary">Yêu cầu ăn uống</Label>
                 <Textarea
                   id="dietary"
@@ -605,14 +592,6 @@ export function AttendeeDialog({
                   </div>
                 )}
 
-                {attendee.ADDRESS && (
-                  <div className="space-y-2">
-                    <Label>Địa chỉ</Label>
-                    <div className="p-2 bg-gray-100 rounded-md">
-                      <span className="text-sm">{attendee.ADDRESS}</span>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}

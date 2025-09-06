@@ -13,7 +13,6 @@ export interface Attendee {
   DATE_OF_BIRTH: Date | null;
   GENDER: string | null;
   FIREBASE_UID: string | null;
-  ADDRESS?: string | null;
   CREATED_AT: Date;
 }
 
@@ -88,7 +87,9 @@ class AttendeesAPI {
   private requestQueue: Array<() => Promise<any>> = [];
   private isProcessing = false;
   private lastRequestTime = 0;
-  private readonly MIN_REQUEST_INTERVAL = 100; // Minimum 100ms between requests
+  private readonly MIN_REQUEST_INTERVAL = 300; // Increased to 300ms between requests
+  private readonly MAX_RETRIES = 3; // Maximum retry attempts
+  private readonly RETRY_DELAY = 1000; // Base delay for retries (1 second)
 
   private async request<T>(
     endpoint: string,
@@ -254,7 +255,7 @@ class ConferencesAPI {
   private requestQueue: Array<() => Promise<any>> = [];
   private isProcessing = false;
   private lastRequestTime = 0;
-  private readonly MIN_REQUEST_INTERVAL = 100; // Minimum 100ms between requests
+  private readonly MIN_REQUEST_INTERVAL = 300; // Increased to 300ms between requests
 
   private async request<T>(
     endpoint: string,
