@@ -274,6 +274,42 @@ export interface SessionInfo {
   createdAt: string;
 }
 
+// Audit Logs Interfaces
+export interface AuditLog {
+  id: number;
+  timestamp: string;
+  userId?: number;
+  actionName?: string;
+  resourceName?: string;
+  details?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  status?: "success" | "failed" | "warning";
+  category?: "auth" | "user" | "conference" | "system" | "data";
+  // Backend fields (uppercase)
+  ID?: number;
+  TS?: string;
+  USER_ID?: number;
+  ACTION_NAME?: string;
+  RESOURCE_NAME?: string;
+  DETAILS?: string;
+  IP_ADDRESS?: string;
+  USER_AGENT?: string;
+  STATUS?: string;
+  CATEGORY?: string;
+}
+
+export interface AuditLogFilters {
+  page?: number;
+  limit?: number;
+  userId?: number | number[];
+  category?: string;
+  status?: string;
+  q?: string;
+  from?: string;
+  to?: string;
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -1614,6 +1650,118 @@ class ApiClient {
     });
 
     return { data: response.data };
+  }
+
+  // Audit Logs endpoints
+  async getAuditLogs(filters?: AuditLogFilters): Promise<{ data: AuditLog[]; meta: any }> {
+    const queryParams = new URLSearchParams();
+    if (filters?.page) queryParams.append('page', filters.page.toString());
+    if (filters?.limit) queryParams.append('limit', filters.limit.toString());
+    if (filters?.userId) {
+      if (Array.isArray(filters.userId)) {
+        // For multiple user IDs, we'll handle this in the hook
+        queryParams.append('userId', filters.userId[0].toString());
+      } else {
+        queryParams.append('userId', filters.userId.toString());
+      }
+    }
+    if (filters?.category) queryParams.append('category', filters.category);
+    if (filters?.status) queryParams.append('status', filters.status);
+    if (filters?.q) queryParams.append('q', filters.q);
+    if (filters?.from) queryParams.append('from', filters.from);
+    if (filters?.to) queryParams.append('to', filters.to);
+
+    const endpoint = `/audit/logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    console.log('Audit logs API call:', { filters, endpoint });
+    
+    const response = await this.request<AuditLog[]>(endpoint, {
+      method: 'GET',
+    });
+
+    // Map backend fields to frontend fields
+    const mapped: AuditLog[] = (response.data || []).map((row: any) => ({
+      id: row.ID ?? row.id,
+      timestamp: row.TS ?? row.timestamp ?? row.ts,
+      userId: row.USER_ID ?? row.userId,
+      actionName: row.ACTION_NAME ?? row.actionName ?? row.action_name,
+      resourceName: row.RESOURCE_NAME ?? row.resourceName ?? row.resource_name,
+      details: row.DETAILS ?? row.details,
+      ipAddress: row.IP_ADDRESS ?? row.ipAddress ?? row.ip_address,
+      userAgent: row.USER_AGENT ?? row.userAgent ?? row.user_agent,
+      status: (row.STATUS ?? row.status) as "success" | "failed" | "warning",
+      category: (row.CATEGORY ?? row.category) as "auth" | "user" | "conference" | "system" | "data",
+    }));
+
+    return {
+      data: mapped,
+      meta: response.meta || {}
+    };
+  }
+
+  async getAuditLogById(id: number): Promise<AuditLog> {
+    const response = await this.request<any>(`/audit/${id}`, {
+      method: 'GET',
+    });
+
+    const row = response.data;
+    return {
+      id: row.ID ?? row.id,
+      timestamp: row.TS ?? row.timestamp ?? row.ts,
+      userId: row.USER_ID ?? row.userId,
+      actionName: row.ACTION_NAME ?? row.actionName ?? row.action_name,
+      resourceName: row.RESOURCE_NAME ?? row.resourceName ?? row.resource_name,
+      details: row.DETAILS ?? row.details,
+      ipAddress: row.IP_ADDRESS ?? row.ipAddress ?? row.ip_address,
+      userAgent: row.USER_AGENT ?? row.userAgent ?? row.user_agent,
+      status: (row.STATUS ?? row.status) as "success" | "failed" | "warning",
+      category: (row.CATEGORY ?? row.category) as "auth" | "user" | "conference" | "system" | "data",
+    };
+  }
+
+  // Get user info by ID
+  async getUserById(id: number): Promise<{ id: number; name: string; email: string; role: string; avatar?: string } | null> {
+    try {
+      const response = await this.request<any>(`/users/${id}`, {
+        method: 'GET',
+      });
+      
+      const user = response.data;
+      console.log(`User ${id} data from API:`, user);
+      
+      const role = user.ROLE_CODE ?? user.role_code ?? user.role ?? 'attendee';
+      console.log(`Role for user ${id}:`, role);
+      
+      return {
+        id: user.ID ?? user.id,
+        name: user.NAME ?? user.name,
+        email: user.EMAIL ?? user.email,
+        role: role,
+        avatar: user.AVATAR_URL ?? user.avatar_url ?? user.avatar
+      };
+    } catch (error) {
+      console.warn(`Could not fetch user ${id}:`, error);
+      return null;
+    }
+  }
+
+  // Get multiple users by IDs
+  async getUsersByIds(ids: number[]): Promise<Record<number, { id: number; name: string; email: string; role: string; avatar?: string }>> {
+    const users: Record<number, { id: number; name: string; email: string; role: string; avatar?: string }> = {};
+    
+    // Fetch users in parallel
+    const promises = ids.map(async (id) => {
+      try {
+        const user = await this.getUserById(id);
+        if (user) {
+          users[id] = user;
+        }
+      } catch (error) {
+        console.warn(`Could not fetch user ${id}:`, error);
+      }
+    });
+    
+    await Promise.all(promises);
+    return users;
   }
 }
 

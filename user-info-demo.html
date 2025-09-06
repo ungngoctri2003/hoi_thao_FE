@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo: Hiển thị Tên Người Dùng Thật</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .demo-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .before {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+        }
+        .after {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+        }
+        .example {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .user-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin: 8px 0;
+        }
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #007bff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .user-info {
+            flex: 1;
+        }
+        .user-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .user-role {
+            font-size: 12px;
+            color: #666;
+        }
+        h2 {
+            color: #333;
+            margin-top: 0;
+        }
+        h3 {
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .improvement {
+            background: #e3f2fd;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid #2196f3;
+        }
+        .feature-list {
+            background: #f0f8ff;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .feature-list ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .feature-list li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👤 Demo: Hiển thị Tên Người Dùng Thật trong Audit Logs</h1>
+        
+        <div class="demo-section before">
+            <h2>❌ Trước khi cải tiến</h2>
+            <h3>Hiển thị cũ - Chỉ có User ID:</h3>
+            
+            <div class="user-card">
+                <div class="avatar">U1</div>
+                <div class="user-info">
+                    <div class="user-name">User 1</div>
+                    <div class="user-role">user</div>
+                </div>
+            </div>
+            
+            <div class="user-card">
+                <div class="avatar">U3</div>
+                <div class="user-info">
+                    <div class="user-name">User 3</div>
+                    <div class="user-role">user</div>
+                </div>
+            </div>
+            
+            <div class="user-card">
+                <div class="avatar">U5</div>
+                <div class="user-info">
+                    <div class="user-name">User 5</div>
+                    <div class="user-role">user</div>
+                </div>
+            </div>
+            
+            <div class="improvement">
+                <strong>Vấn đề:</strong>
+                <ul>
+                    <li>Không biết ai đã thực hiện hành động</li>
+                    <li>Phải tra cứu thủ công để biết tên thật</li>
+                    <li>Khó theo dõi hoạt động của từng người</li>
+                    <li>Thiếu thông tin context quan trọng</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="demo-section after">
+            <h2>✅ Sau khi cải tiến</h2>
+            <h3>Hiển thị mới - Tên thật + Thông tin đầy đủ:</h3>
+            
+            <div class="user-card">
+                <div class="avatar">NA</div>
+                <div class="user-info">
+                    <div class="user-name">Nguyễn Văn Admin</div>
+                    <div class="user-role">admin • ID: 1</div>
+                </div>
+            </div>
+            
+            <div class="user-card">
+                <div class="avatar">TT</div>
+                <div class="user-info">
+                    <div class="user-name">Trần Thị Staff</div>
+                    <div class="user-role">staff • ID: 3</div>
+                </div>
+            </div>
+            
+            <div class="user-card">
+                <div class="avatar">LV</div>
+                <div class="user-info">
+                    <div class="user-name">Lê Văn Attendee</div>
+                    <div class="user-role">attendee • ID: 5</div>
+                </div>
+            </div>
+            
+            <div class="user-card">
+                <div class="avatar">HT</div>
+                <div class="user-info">
+                    <div class="user-name">Hệ thống</div>
+                    <div class="user-role">Hệ thống</div>
+                </div>
+            </div>
+            
+            <div class="improvement">
+                <strong>Cải tiến:</strong>
+                <ul>
+                    <li>✅ <span class="highlight">Tên thật</span>: "Nguyễn Văn Admin" thay vì "User 1"</li>
+                    <li>✅ <span class="highlight">Vai trò rõ ràng</span>: admin, staff, attendee</li>
+                    <li>✅ <span class="highlight">ID vẫn hiển thị</span>: Để tra cứu kỹ thuật</li>
+                    <li>✅ <span class="highlight">Hệ thống</span>: Phân biệt hoạt động tự động</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🔧 Cách hoạt động</h2>
+            
+            <div class="feature-list">
+                <h3>1. API Integration</h3>
+                <ul>
+                    <li><strong>getUserById()</strong>: Lấy thông tin user theo ID</li>
+                    <li><strong>getUsersByIds()</strong>: Lấy nhiều user cùng lúc (tối ưu performance)</li>
+                    <li><strong>Parallel fetching</strong>: Tải song song để nhanh hơn</li>
+                </ul>
+            </div>
+            
+            <div class="feature-list">
+                <h3>2. Smart Caching</h3>
+                <ul>
+                    <li><strong>Cache users</strong>: Lưu thông tin user để tái sử dụng</li>
+                    <li><strong>Merge data</strong>: Gộp với dữ liệu cũ khi load trang mới</li>
+                    <li><strong>Error handling</strong>: Không crash khi không lấy được user info</li>
+                </ul>
+            </div>
+            
+            <div class="feature-list">
+                <h3>3. Fallback Strategy</h3>
+                <ul>
+                    <li><strong>User found</strong>: Hiển thị tên thật + email + role</li>
+                    <li><strong>User not found</strong>: Fallback về "User #ID"</li>
+                    <li><strong>System action</strong>: Hiển thị "Hệ thống"</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📊 Ví dụ trong Popup Chi tiết</h2>
+            
+            <div class="example">
+                <strong>Trước:</strong><br>
+                Người dùng: User 1<br>
+                Vai trò: Không xác định
+            </div>
+            
+            <div class="example">
+                <strong>Sau:</strong><br>
+                Người dùng: Nguyễn Văn Admin (admin@example.com)<br>
+                Vai trò: admin
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🎯 Lợi ích</h2>
+            
+            <div class="feature-list">
+                <h3>Cho Quản trị viên:</h3>
+                <ul>
+                    <li>Dễ dàng theo dõi hoạt động của từng người</li>
+                    <li>Nhanh chóng xác định ai đã thực hiện hành động</li>
+                    <li>Phân quyền và bảo mật tốt hơn</li>
+                </ul>
+            </div>
+            
+            <div class="feature-list">
+                <h3>Cho Người dùng:</h3>
+                <ul>
+                    <li>Thông tin rõ ràng, dễ hiểu</li>
+                    <li>Không cần tra cứu thủ công</li>
+                    <li>Trải nghiệm tốt hơn</li>
+                </ul>
+            </div>
+            
+            <div class="feature-list">
+                <h3>Cho Hệ thống:</h3>
+                <ul>
+                    <li>Performance tối ưu với parallel fetching</li>
+                    <li>Error handling robust</li>
+                    <li>Cache thông minh</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🚀 Kết quả</h2>
+            <div class="improvement">
+                <strong>Trước:</strong> "User 1" - Không biết ai<br><br>
+                <strong>Sau:</strong> "Nguyễn Văn Admin (admin@example.com)" - Rõ ràng và đầy đủ thông tin!<br><br>
+                <em>Giờ đây người dùng có thể dễ dàng biết ai đã thực hiện hành động gì trong hệ thống!</em>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

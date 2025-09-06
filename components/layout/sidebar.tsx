@@ -184,17 +184,6 @@ export function Sidebar({ userRole }: SidebarProps) {
   // Get navigation items based on user permissions and conference permissions
   const items = getNavigationItems(hasPermission, hasConferencePermission, currentRole);
   
-  // Debug logs for attendees management
-  console.log('🔍 Sidebar Debug:', {
-    currentRole,
-    userRole: user?.role,
-    hasAttendeesPermission: hasPermission('attendees.manage'),
-    itemsCount: items.length,
-    hasAttendeesItem: items.some(item => item.href === '/attendees'),
-    showAttendeesAsSeparateItem: currentRole === 'admin',
-    allItems: allNavigationItems.filter(item => item.href === '/attendees')
-  });
-  
   // Get available conferences - admin sees all conferences, staff/attendees see only assigned ones
   const availableConferences = getAvailableConferences();
   
