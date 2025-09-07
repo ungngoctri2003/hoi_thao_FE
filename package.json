@@ -4,9 +4,19 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
+    "dev": "node scripts/startup-check.js && next dev",
+    "dev:raw": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "node scripts/startup-check.js && next start",
+    "start:raw": "next start",
+    "env:generate": "node scripts/generate-env.js ensure",
+    "env:update": "node scripts/generate-env.js update",
+    "env:check": "node scripts/generate-env.js check",
+    "env:auto": "node scripts/generate-env.js auto",
+    "env:sync": "node scripts/generate-env.js sync",
+    "startup:check": "node scripts/startup-check.js",
+    "security:check": "node scripts/security-check.js check",
+    "security:fix": "node scripts/security-check.js fix"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
