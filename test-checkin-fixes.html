@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Check-in Fixes</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Check-in Fixes</h1>
+        
+        <div class="test-section info">
+            <h3>🔧 Fixed Issues</h3>
+            <ul>
+                <li>✅ API được gọi 2 lần khi checkin</li>
+                <li>✅ Lịch sử checkin hiển thị N/A</li>
+                <li>✅ Có thể checkin trùng lặp</li>
+                <li>✅ Backend API join với attendees table</li>
+            </ul>
+        </div>
+
+        <div class="grid">
+            <div class="test-section">
+                <h3>Test Check-in API</h3>
+                <button onclick="testCheckIn()">Test Check-in</button>
+                <button onclick="testDuplicateCheckIn()">Test Duplicate Check-in</button>
+                <button onclick="testManualCheckIn()">Test Manual Check-in</button>
+                <div id="checkin-results"></div>
+            </div>
+
+            <div class="test-section">
+                <h3>Test Check-in Records</h3>
+                <button onclick="testGetRecords()">Get Check-in Records</button>
+                <button onclick="testGetRecordsWithConference()">Get Records by Conference</button>
+                <div id="records-results"></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Results Summary</h3>
+            <div id="summary-results"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000/api/v1';
+        let testResults = [];
+
+        function log(message, type = 'info', containerId = 'summary-results') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `<pre>${JSON.stringify(message, null, 2)}</pre>`;
+            container.appendChild(div);
+            
+            testResults.push({ message, type, timestamp: new Date() });
+        }
+
+        async function testCheckIn() {
+            try {
+                log('Testing Check-in API...', 'info', 'checkin-results');
+                
+                const response = await fetch(`${API_BASE}/public/checkins/checkin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        attendeeId: 1,
+                        qrCode: 'QR001',
+                        conferenceId: 1,
+                        checkInMethod: 'qr'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log({
+                        test: 'Check-in API',
+                        status: 'SUCCESS',
+                        statusCode: response.status,
+                        response: data
+                    }, 'success', 'checkin-results');
+                } else {
+                    log({
+                        test: 'Check-in API',
+                        status: 'ERROR',
+                        statusCode: response.status,
+                        response: data
+                    }, 'error', 'checkin-results');
+                }
+            } catch (error) {
+                log({
+                    test: 'Check-in API',
+                    status: 'NETWORK_ERROR',
+                    error: error.message
+                }, 'error', 'checkin-results');
+            }
+        }
+
+        async function testDuplicateCheckIn() {
+            try {
+                log('Testing Duplicate Check-in...', 'info', 'checkin-results');
+                
+                // First check-in
+                const response1 = await fetch(`${API_BASE}/public/checkins/checkin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        attendeeId: 1,
+                        qrCode: 'QR001',
+                        conferenceId: 1,
+                        checkInMethod: 'qr'
+                    })
+                });
+
+                const data1 = await response1.json();
+                
+                // Second check-in (should be duplicate)
+                const response2 = await fetch(`${API_BASE}/public/checkins/checkin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        attendeeId: 1,
+                        qrCode: 'QR001',
+                        conferenceId: 1,
+                        checkInMethod: 'qr'
+                    })
+                });
+
+                const data2 = await response2.json();
+                
+                log({
+                    test: 'Duplicate Check-in',
+                    firstCheckin: { status: response1.status, data: data1 },
+                    secondCheckin: { status: response2.status, data: data2 },
+                    isDuplicate: data2.data?.STATUS === 'duplicate'
+                }, data2.data?.STATUS === 'duplicate' ? 'success' : 'warning', 'checkin-results');
+                
+            } catch (error) {
+                log({
+                    test: 'Duplicate Check-in',
+                    status: 'NETWORK_ERROR',
+                    error: error.message
+                }, 'error', 'checkin-results');
+            }
+        }
+
+        async function testManualCheckIn() {
+            try {
+                log('Testing Manual Check-in...', 'info', 'checkin-results');
+                
+                const response = await fetch(`${API_BASE}/public/checkins/checkin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        conferenceId: 1,
+                        checkInMethod: 'manual',
+                        attendeeInfo: {
+                            name: 'Test Manual User',
+                            email: 'testmanual@example.com',
+                            phone: '0123456789'
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log({
+                        test: 'Manual Check-in',
+                        status: 'SUCCESS',
+                        statusCode: response.status,
+                        response: data
+                    }, 'success', 'checkin-results');
+                } else {
+                    log({
+                        test: 'Manual Check-in',
+                        status: 'ERROR',
+                        statusCode: response.status,
+                        response: data
+                    }, 'error', 'checkin-results');
+                }
+            } catch (error) {
+                log({
+                    test: 'Manual Check-in',
+                    status: 'NETWORK_ERROR',
+                    error: error.message
+                }, 'error', 'checkin-results');
+            }
+        }
+
+        async function testGetRecords() {
+            try {
+                log('Testing Get Check-in Records...', 'info', 'records-results');
+                
+                const response = await fetch(`${API_BASE}/public/checkins`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log({
+                        test: 'Get Check-in Records',
+                        status: 'SUCCESS',
+                        statusCode: response.status,
+                        recordCount: data.data?.length || 0,
+                        sampleRecord: data.data?.[0] || null
+                    }, 'success', 'records-results');
+                } else {
+                    log({
+                        test: 'Get Check-in Records',
+                        status: 'ERROR',
+                        statusCode: response.status,
+                        response: data
+                    }, 'error', 'records-results');
+                }
+            } catch (error) {
+                log({
+                    test: 'Get Check-in Records',
+                    status: 'NETWORK_ERROR',
+                    error: error.message
+                }, 'error', 'records-results');
+            }
+        }
+
+        async function testGetRecordsWithConference() {
+            try {
+                log('Testing Get Check-in Records by Conference...', 'info', 'records-results');
+                
+                const response = await fetch(`${API_BASE}/public/checkins?conferenceId=1`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log({
+                        test: 'Get Check-in Records by Conference',
+                        status: 'SUCCESS',
+                        statusCode: response.status,
+                        recordCount: data.data?.length || 0,
+                        sampleRecord: data.data?.[0] || null
+                    }, 'success', 'records-results');
+                } else {
+                    log({
+                        test: 'Get Check-in Records by Conference',
+                        status: 'ERROR',
+                        statusCode: response.status,
+                        response: data
+                    }, 'error', 'records-results');
+                }
+            } catch (error) {
+                log({
+                    test: 'Get Check-in Records by Conference',
+                    status: 'NETWORK_ERROR',
+                    error: error.message
+                }, 'error', 'records-results');
+            }
+        }
+
+        // Test on page load
+        window.onload = function() {
+            log('Page loaded. Click buttons above to test the fixes.', 'info');
+        };
+    </script>
+</body>
+</html>

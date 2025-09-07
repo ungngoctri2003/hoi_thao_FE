@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Role Management Module</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .test-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.success { background: #28a745; color: white; }
+        .status.error { background: #dc3545; color: white; }
+        .status.loading { background: #ffc107; color: black; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Role Management Module</h1>
+        <p>Kiểm tra các chức năng của module Quản lý vai trò</p>
+        
+        <div class="test-section">
+            <h3>📊 API Connection Test</h3>
+            <button class="test-button" onclick="testApiConnection()">Test API Connection</button>
+            <div id="api-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>👥 Users API Test</h3>
+            <button class="test-button" onclick="testGetUsers()">Get Users</button>
+            <button class="test-button" onclick="testCreateUser()">Create User</button>
+            <button class="test-button" onclick="testUpdateUser()">Update User</button>
+            <button class="test-button" onclick="testDeleteUser()">Delete User</button>
+            <div id="users-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🛡️ Roles API Test</h3>
+            <button class="test-button" onclick="testGetRoles()">Get Roles</button>
+            <button class="test-button" onclick="testCreateRole()">Create Role</button>
+            <button class="test-button" onclick="testUpdateRole()">Update Role</button>
+            <button class="test-button" onclick="testDeleteRole()">Delete Role</button>
+            <div id="roles-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔑 Permissions API Test</h3>
+            <button class="test-button" onclick="testGetPermissions()">Get Permissions</button>
+            <button class="test-button" onclick="testGetRolePermissions()">Get Role Permissions</button>
+            <button class="test-button" onclick="testAssignPermission()">Assign Permission</button>
+            <button class="test-button" onclick="testRemovePermission()">Remove Permission</button>
+            <div id="permissions-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔄 Integration Test</h3>
+            <button class="test-button" onclick="testFullWorkflow()">Test Full Workflow</button>
+            <div id="integration-result" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001/api';
+        let testData = {
+            createdUserId: null,
+            createdRoleId: null,
+            testPermissionId: null
+        };
+
+        // Helper function to make API calls
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            const config = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            };
+            
+            if (body) {
+                config.body = JSON.stringify(body);
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+                
+                if (response.status === 204 || response.status === 205) {
+                    return { success: true, data: null };
+                }
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || `HTTP ${response.status}`);
+                }
+                
+                return { success: true, data };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        // Helper function to display results
+        function displayResult(elementId, result, isError = false) {
+            const element = document.getElementById(elementId);
+            const className = isError ? 'error' : (result.success ? 'success' : 'error');
+            const content = result.success ? 
+                JSON.stringify(result.data, null, 2) : 
+                `Error: ${result.error}`;
+            
+            element.className = `result ${className}`;
+            element.textContent = content;
+        }
+
+        // Test API Connection
+        async function testApiConnection() {
+            displayResult('api-result', { success: false, error: 'Testing...' });
+            
+            const result = await apiCall('/roles');
+            displayResult('api-result', result, !result.success);
+        }
+
+        // Test Users API
+        async function testGetUsers() {
+            displayResult('users-result', { success: false, error: 'Loading...' });
+            
+            const result = await apiCall('/users?page=1&limit=10');
+            displayResult('users-result', result, !result.success);
+        }
+
+        async function testCreateUser() {
+            displayResult('users-result', { success: false, error: 'Creating...' });
+            
+            const userData = {
+                name: 'Test User ' + Date.now(),
+                email: `test${Date.now()}@example.com`,
+                password: 'testpassword123'
+            };
+            
+            const result = await apiCall('/users', 'POST', userData);
+            if (result.success && result.data) {
+                testData.createdUserId = result.data.ID || result.data.id;
+            }
+            displayResult('users-result', result, !result.success);
+        }
+
+        async function testUpdateUser() {
+            if (!testData.createdUserId) {
+                displayResult('users-result', { success: false, error: 'No user to update. Create a user first.' });
+                return;
+            }
+            
+            displayResult('users-result', { success: false, error: 'Updating...' });
+            
+            const updateData = {
+                name: 'Updated Test User',
+                email: `updated${Date.now()}@example.com`
+            };
+            
+            const result = await apiCall(`/users/${testData.createdUserId}`, 'PATCH', updateData);
+            displayResult('users-result', result, !result.success);
+        }
+
+        async function testDeleteUser() {
+            if (!testData.createdUserId) {
+                displayResult('users-result', { success: false, error: 'No user to delete. Create a user first.' });
+                return;
+            }
+            
+            displayResult('users-result', { success: false, error: 'Deleting...' });
+            
+            const result = await apiCall(`/users/${testData.createdUserId}`, 'DELETE');
+            if (result.success) {
+                testData.createdUserId = null;
+            }
+            displayResult('users-result', result, !result.success);
+        }
+
+        // Test Roles API
+        async function testGetRoles() {
+            displayResult('roles-result', { success: false, error: 'Loading...' });
+            
+            const result = await apiCall('/roles');
+            displayResult('roles-result', result, !result.success);
+        }
+
+        async function testCreateRole() {
+            displayResult('roles-result', { success: false, error: 'Creating...' });
+            
+            const roleData = {
+                name: 'Test Role ' + Date.now(),
+                code: 'TEST_ROLE_' + Date.now()
+            };
+            
+            const result = await apiCall('/roles', 'POST', roleData);
+            if (result.success && result.data) {
+                testData.createdRoleId = result.data.id;
+            }
+            displayResult('roles-result', result, !result.success);
+        }
+
+        async function testUpdateRole() {
+            if (!testData.createdRoleId) {
+                displayResult('roles-result', { success: false, error: 'No role to update. Create a role first.' });
+                return;
+            }
+            
+            displayResult('roles-result', { success: false, error: 'Updating...' });
+            
+            const updateData = {
+                name: 'Updated Test Role',
+                code: 'UPDATED_TEST_ROLE'
+            };
+            
+            const result = await apiCall(`/roles/${testData.createdRoleId}`, 'PATCH', updateData);
+            displayResult('roles-result', result, !result.success);
+        }
+
+        async function testDeleteRole() {
+            if (!testData.createdRoleId) {
+                displayResult('roles-result', { success: false, error: 'No role to delete. Create a role first.' });
+                return;
+            }
+            
+            displayResult('roles-result', { success: false, error: 'Deleting...' });
+            
+            const result = await apiCall(`/roles/${testData.createdRoleId}`, 'DELETE');
+            if (result.success) {
+                testData.createdRoleId = null;
+            }
+            displayResult('roles-result', result, !result.success);
+        }
+
+        // Test Permissions API
+        async function testGetPermissions() {
+            displayResult('permissions-result', { success: false, error: 'Loading...' });
+            
+            const result = await apiCall('/permissions');
+            if (result.success && result.data && result.data.length > 0) {
+                testData.testPermissionId = result.data[0].ID || result.data[0].id;
+            }
+            displayResult('permissions-result', result, !result.success);
+        }
+
+        async function testGetRolePermissions() {
+            if (!testData.createdRoleId) {
+                displayResult('permissions-result', { success: false, error: 'No role to test. Create a role first.' });
+                return;
+            }
+            
+            displayResult('permissions-result', { success: false, error: 'Loading...' });
+            
+            const result = await apiCall(`/roles/${testData.createdRoleId}/permissions`);
+            displayResult('permissions-result', result, !result.success);
+        }
+
+        async function testAssignPermission() {
+            if (!testData.createdRoleId || !testData.testPermissionId) {
+                displayResult('permissions-result', { success: false, error: 'Need both role and permission. Create them first.' });
+                return;
+            }
+            
+            displayResult('permissions-result', { success: false, error: 'Assigning...' });
+            
+            const result = await apiCall(`/roles/${testData.createdRoleId}/permissions`, 'POST', {
+                permissionId: testData.testPermissionId
+            });
+            displayResult('permissions-result', result, !result.success);
+        }
+
+        async function testRemovePermission() {
+            if (!testData.createdRoleId || !testData.testPermissionId) {
+                displayResult('permissions-result', { success: false, error: 'Need both role and permission. Create them first.' });
+                return;
+            }
+            
+            displayResult('permissions-result', { success: false, error: 'Removing...' });
+            
+            const result = await apiCall(`/roles/${testData.createdRoleId}/permissions/${testData.testPermissionId}`, 'DELETE');
+            displayResult('permissions-result', result, !result.success);
+        }
+
+        // Test Full Workflow
+        async function testFullWorkflow() {
+            displayResult('integration-result', { success: false, error: 'Starting full workflow test...' });
+            
+            let results = [];
+            
+            // Step 1: Get roles and permissions
+            const rolesResult = await apiCall('/roles');
+            const permissionsResult = await apiCall('/permissions');
+            
+            results.push(`1. Get Roles: ${rolesResult.success ? '✅' : '❌'}`);
+            results.push(`2. Get Permissions: ${permissionsResult.success ? '✅' : '❌'}`);
+            
+            if (rolesResult.success && permissionsResult.success) {
+                // Step 2: Create a test role
+                const createRoleResult = await apiCall('/roles', 'POST', {
+                    name: 'Integration Test Role',
+                    code: 'INTEGRATION_TEST'
+                });
+                
+                results.push(`3. Create Role: ${createRoleResult.success ? '✅' : '❌'}`);
+                
+                if (createRoleResult.success && createRoleResult.data) {
+                    const roleId = createRoleResult.data.id;
+                    
+                    // Step 3: Assign permission if available
+                    if (permissionsResult.data && permissionsResult.data.length > 0) {
+                        const permissionId = permissionsResult.data[0].ID || permissionsResult.data[0].id;
+                        const assignResult = await apiCall(`/roles/${roleId}/permissions`, 'POST', {
+                            permissionId: permissionId
+                        });
+                        
+                        results.push(`4. Assign Permission: ${assignResult.success ? '✅' : '❌'}`);
+                        
+                        // Step 4: Get role permissions
+                        const getRolePermsResult = await apiCall(`/roles/${roleId}/permissions`);
+                        results.push(`5. Get Role Permissions: ${getRolePermsResult.success ? '✅' : '❌'}`);
+                        
+                        // Step 5: Remove permission
+                        const removeResult = await apiCall(`/roles/${roleId}/permissions/${permissionId}`, 'DELETE');
+                        results.push(`6. Remove Permission: ${removeResult.success ? '✅' : '❌'}`);
+                    }
+                    
+                    // Step 6: Delete the test role
+                    const deleteResult = await apiCall(`/roles/${roleId}`, 'DELETE');
+                    results.push(`7. Delete Role: ${deleteResult.success ? '✅' : '❌'}`);
+                }
+            }
+            
+            // Step 7: Get users
+            const usersResult = await apiCall('/users?page=1&limit=5');
+            results.push(`8. Get Users: ${usersResult.success ? '✅' : '❌'}`);
+            
+            const finalResult = {
+                success: results.every(r => r.includes('✅')),
+                data: results.join('\n')
+            };
+            
+            displayResult('integration-result', finalResult, !finalResult.success);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Role Management Test Page Loaded');
+        });
+    </script>
+</body>
+</html>

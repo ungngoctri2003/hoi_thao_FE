@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Account Disabled Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .success {
+            background: #28a745;
+        }
+        .success:hover {
+            background: #1e7e34;
+        }
+        .warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .warning:hover {
+            background: #e0a800;
+        }
+        .danger {
+            background: #dc3545;
+        }
+        .danger:hover {
+            background: #c82333;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .result.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .log {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.inactive {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.suspended {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Test Account Disabled Fix</h1>
+        <p>Kiểm tra và test các fix đã áp dụng cho lỗi "Account is disabled"</p>
+
+        <div class="test-section">
+            <h3>1. Kiểm tra tài khoản bị khóa</h3>
+            <p>Kiểm tra xem có tài khoản nào bị khóa trong hệ thống không</p>
+            <button onclick="checkDisabledAccounts()">Kiểm tra tài khoản bị khóa</button>
+            <div id="disabledAccountsResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Test đăng nhập với tài khoản bị khóa</h3>
+            <p>Thử đăng nhập với tài khoản bị khóa để xem fix có hoạt động không</p>
+            <input type="email" id="testEmail" placeholder="Email tài khoản bị khóa" style="width: 300px; padding: 8px; margin: 5px;">
+            <input type="password" id="testPassword" placeholder="Mật khẩu" style="width: 200px; padding: 8px; margin: 5px;">
+            <br>
+            <button onclick="testLoginWithDisabledAccount()">Test đăng nhập</button>
+            <div id="loginTestResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Test API call với tài khoản bị khóa</h3>
+            <p>Thử gọi API với token của tài khoản bị khóa</p>
+            <button onclick="testApiWithDisabledAccount()">Test API call</button>
+            <div id="apiTestResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Mở khóa tài khoản test</h3>
+            <p>Mở khóa tài khoản để test lại</p>
+            <button onclick="enableTestAccount()" class="success">Mở khóa tài khoản test</button>
+            <div id="enableResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Log chi tiết</h3>
+            <button onclick="clearLog()">Xóa log</button>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001/api';
+        let testToken = null;
+        let disabledAccounts = [];
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}\n`;
+            logDiv.textContent += logEntry;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        async function checkDisabledAccounts() {
+            log('Bắt đầu kiểm tra tài khoản bị khóa...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/users?page=1&limit=100`);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const allUsers = result.data || [];
+                    disabledAccounts = allUsers.filter(user => user.status !== 'active');
+                    
+                    log(`Tìm thấy ${allUsers.length} tài khoản, trong đó ${disabledAccounts.length} tài khoản bị khóa`, 'info');
+                    
+                    let resultText = `Tổng cộng: ${allUsers.length} tài khoản\n`;
+                    resultText += `Tài khoản bị khóa: ${disabledAccounts.length}\n`;
+                    resultText += `Tài khoản hoạt động: ${allUsers.length - disabledAccounts.length}\n\n`;
+                    
+                    if (disabledAccounts.length > 0) {
+                        resultText += 'Danh sách tài khoản bị khóa:\n';
+                        disabledAccounts.forEach((user, index) => {
+                            resultText += `${index + 1}. ${user.name} (${user.email}) - ${user.status}\n`;
+                        });
+                    }
+                    
+                    showResult('disabledAccountsResult', resultText, disabledAccounts.length > 0 ? 'warning' : 'success');
+                } else {
+                    throw new Error(result.message || 'Không thể lấy danh sách tài khoản');
+                }
+            } catch (error) {
+                log(`Lỗi khi kiểm tra tài khoản: ${error.message}`, 'error');
+                showResult('disabledAccountsResult', `Lỗi: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLoginWithDisabledAccount() {
+            const email = document.getElementById('testEmail').value;
+            const password = document.getElementById('testPassword').value;
+            
+            if (!email || !password) {
+                showResult('loginTestResult', 'Vui lòng nhập email và mật khẩu', 'error');
+                return;
+            }
+            
+            log(`Thử đăng nhập với tài khoản: ${email}`, 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password }),
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    testToken = result.data.accessToken;
+                    log(`Đăng nhập thành công với token: ${testToken.substring(0, 20)}...`, 'success');
+                    showResult('loginTestResult', 'Đăng nhập thành công! (Tài khoản không bị khóa)', 'success');
+                } else {
+                    if (result.error && result.error.code === 'ACCOUNT_DISABLED') {
+                        log(`✅ Fix hoạt động! Tài khoản bị khóa được phát hiện: ${result.error.message}`, 'success');
+                        showResult('loginTestResult', `✅ Fix hoạt động!\nLỗi: ${result.error.message}\nCode: ${result.error.code}`, 'success');
+                    } else {
+                        log(`Đăng nhập thất bại: ${result.message || result.error?.message}`, 'error');
+                        showResult('loginTestResult', `Đăng nhập thất bại: ${result.message || result.error?.message}`, 'error');
+                    }
+                }
+            } catch (error) {
+                log(`Lỗi khi đăng nhập: ${error.message}`, 'error');
+                showResult('loginTestResult', `Lỗi: ${error.message}`, 'error');
+            }
+        }
+
+        async function testApiWithDisabledAccount() {
+            if (!testToken) {
+                showResult('apiTestResult', 'Vui lòng đăng nhập trước để có token', 'error');
+                return;
+            }
+            
+            log('Thử gọi API với token của tài khoản bị khóa...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/users/me`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${testToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    log('API call thành công', 'success');
+                    showResult('apiTestResult', 'API call thành công! (Tài khoản không bị khóa)', 'success');
+                } else {
+                    if (result.error && result.error.code === 'ACCOUNT_DISABLED') {
+                        log(`✅ Fix hoạt động! API call bị từ chối do tài khoản bị khóa: ${result.error.message}`, 'success');
+                        showResult('apiTestResult', `✅ Fix hoạt động!\nAPI call bị từ chối do tài khoản bị khóa\nLỗi: ${result.error.message}\nCode: ${result.error.code}`, 'success');
+                    } else {
+                        log(`API call thất bại: ${result.message || result.error?.message}`, 'error');
+                        showResult('apiTestResult', `API call thất bại: ${result.message || result.error?.message}`, 'error');
+                    }
+                }
+            } catch (error) {
+                log(`Lỗi khi gọi API: ${error.message}`, 'error');
+                showResult('apiTestResult', `Lỗi: ${error.message}`, 'error');
+            }
+        }
+
+        async function enableTestAccount() {
+            const email = document.getElementById('testEmail').value;
+            
+            if (!email) {
+                showResult('enableResult', 'Vui lòng nhập email tài khoản cần mở khóa', 'error');
+                return;
+            }
+            
+            log(`Thử mở khóa tài khoản: ${email}`, 'info');
+            
+            try {
+                // Tìm user ID từ email
+                const user = disabledAccounts.find(u => u.email === email);
+                if (!user) {
+                    showResult('enableResult', 'Không tìm thấy tài khoản bị khóa với email này', 'error');
+                    return;
+                }
+                
+                const response = await fetch(`${API_BASE_URL}/users/${user.id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: user.name,
+                        email: user.email,
+                        status: 'active'
+                    }),
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Đã mở khóa tài khoản: ${email}`, 'success');
+                    showResult('enableResult', `✅ Đã mở khóa tài khoản: ${email}`, 'success');
+                    
+                    // Cập nhật danh sách
+                    disabledAccounts = disabledAccounts.filter(u => u.id !== user.id);
+                } else {
+                    log(`Không thể mở khóa tài khoản: ${result.message}`, 'error');
+                    showResult('enableResult', `Lỗi: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                log(`Lỗi khi mở khóa tài khoản: ${error.message}`, 'error');
+                showResult('enableResult', `Lỗi: ${error.message}`, 'error');
+            }
+        }
+
+        // Khởi tạo
+        log('Trang test Account Disabled Fix đã sẵn sàng', 'info');
+        log('Hướng dẫn:', 'info');
+        log('1. Nhấn "Kiểm tra tài khoản bị khóa" để xem danh sách', 'info');
+        log('2. Nhập email và mật khẩu của tài khoản bị khóa', 'info');
+        log('3. Nhấn "Test đăng nhập" để kiểm tra fix', 'info');
+        log('4. Nhấn "Test API call" để kiểm tra API với token bị khóa', 'info');
+        log('5. Nhấn "Mở khóa tài khoản test" để mở khóa tài khoản', 'info');
+    </script>
+</body>
+</html>

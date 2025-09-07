@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Attendees API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button.danger {
+            background: #dc3545;
+        }
+        .button.danger:hover {
+            background: #c82333;
+        }
+        .button.success {
+            background: #28a745;
+        }
+        .button.success:hover {
+            background: #218838;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .attendee-card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f9f9f9;
+        }
+        .attendee-card h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .attendee-card p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #007bff;
+            color: white;
+            border-radius: 12px;
+            font-size: 12px;
+            margin: 2px;
+        }
+        .badge.gender-male { background: #007bff; }
+        .badge.gender-female { background: #e83e8c; }
+        .badge.gender-other { background: #6c757d; }
+    </style>
+</head>
+<body>
+    <h1>Test Attendees API</h1>
+    
+    <div class="container">
+        <h2>API Configuration</h2>
+        <div class="form-group">
+            <label for="apiUrl">API Base URL:</label>
+            <input type="text" id="apiUrl" value="http://localhost:3001/api" placeholder="http://localhost:3001/api">
+        </div>
+        <div class="form-group">
+            <label for="authToken">Auth Token (optional):</label>
+            <input type="text" id="authToken" placeholder="Bearer token for authentication">
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Get All Attendees</h2>
+        <button class="button" onclick="getAllAttendees()">Get All Attendees</button>
+        <button class="button" onclick="getAttendeesWithPagination()">Get with Pagination (page=1, limit=5)</button>
+        <button class="button" onclick="searchAttendees()">Search Attendees</button>
+        <div id="attendeesResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>Get Attendee by ID</h2>
+        <div class="form-group">
+            <label for="attendeeId">Attendee ID:</label>
+            <input type="number" id="attendeeId" value="1" placeholder="Enter attendee ID">
+        </div>
+        <button class="button" onclick="getAttendeeById()">Get Attendee by ID</button>
+        <div id="attendeeResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>Create New Attendee</h2>
+        <div class="form-group">
+            <label for="createName">Name *:</label>
+            <input type="text" id="createName" placeholder="Enter name" required>
+        </div>
+        <div class="form-group">
+            <label for="createEmail">Email *:</label>
+            <input type="email" id="createEmail" placeholder="Enter email" required>
+        </div>
+        <div class="form-group">
+            <label for="createPhone">Phone:</label>
+            <input type="text" id="createPhone" placeholder="Enter phone">
+        </div>
+        <div class="form-group">
+            <label for="createCompany">Company:</label>
+            <input type="text" id="createCompany" placeholder="Enter company">
+        </div>
+        <div class="form-group">
+            <label for="createPosition">Position:</label>
+            <input type="text" id="createPosition" placeholder="Enter position">
+        </div>
+        <div class="form-group">
+            <label for="createGender">Gender:</label>
+            <select id="createGender">
+                <option value="">Select gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="createDietary">Dietary Requirements:</label>
+            <textarea id="createDietary" placeholder="Enter dietary requirements"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="createSpecialNeeds">Special Needs:</label>
+            <textarea id="createSpecialNeeds" placeholder="Enter special needs"></textarea>
+        </div>
+        <button class="button success" onclick="createAttendee()">Create Attendee</button>
+        <div id="createResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>Update Attendee</h2>
+        <div class="form-group">
+            <label for="updateId">Attendee ID:</label>
+            <input type="number" id="updateId" placeholder="Enter attendee ID to update">
+        </div>
+        <div class="form-group">
+            <label for="updateName">Name:</label>
+            <input type="text" id="updateName" placeholder="Enter new name">
+        </div>
+        <div class="form-group">
+            <label for="updateCompany">Company:</label>
+            <input type="text" id="updateCompany" placeholder="Enter new company">
+        </div>
+        <div class="form-group">
+            <label for="updatePosition">Position:</label>
+            <input type="text" id="updatePosition" placeholder="Enter new position">
+        </div>
+        <button class="button" onclick="updateAttendee()">Update Attendee</button>
+        <div id="updateResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>Delete Attendee</h2>
+        <div class="form-group">
+            <label for="deleteId">Attendee ID:</label>
+            <input type="number" id="deleteId" placeholder="Enter attendee ID to delete">
+        </div>
+        <button class="button danger" onclick="deleteAttendee()">Delete Attendee</button>
+        <div id="deleteResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>Get Conferences</h2>
+        <button class="button" onclick="getConferences()">Get All Conferences</button>
+        <div id="conferencesResult" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = document.getElementById('apiUrl').value;
+        
+        function getApiUrl() {
+            return document.getElementById('apiUrl').value;
+        }
+        
+        function getAuthToken() {
+            return document.getElementById('authToken').value;
+        }
+        
+        function getHeaders() {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            const token = getAuthToken();
+            if (token) {
+                headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+            }
+            return headers;
+        }
+        
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${isError ? 'error' : 'success'}`;
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+        
+        function showAttendees(elementId, attendees) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = 'result';
+            
+            if (attendees.length === 0) {
+                element.innerHTML = '<p>No attendees found.</p>';
+                return;
+            }
+            
+            let html = `<h3>Found ${attendees.length} attendees:</h3>`;
+            attendees.forEach(attendee => {
+                const genderClass = attendee.GENDER ? `gender-${attendee.GENDER}` : '';
+                html += `
+                    <div class="attendee-card">
+                        <h3>${attendee.NAME || 'N/A'}</h3>
+                        <p><strong>Email:</strong> ${attendee.EMAIL || 'N/A'}</p>
+                        <p><strong>Phone:</strong> ${attendee.PHONE || 'N/A'}</p>
+                        <p><strong>Company:</strong> ${attendee.COMPANY || 'N/A'}</p>
+                        <p><strong>Position:</strong> ${attendee.POSITION || 'N/A'}</p>
+                        <p><strong>Gender:</strong> <span class="badge ${genderClass}">${attendee.GENDER || 'N/A'}</span></p>
+                        <p><strong>Created:</strong> ${attendee.CREATED_AT ? new Date(attendee.CREATED_AT).toLocaleString('vi-VN') : 'N/A'}</p>
+                        <p><strong>ID:</strong> ${attendee.ID}</p>
+                    </div>
+                `;
+            });
+            element.innerHTML = html;
+        }
+        
+        async function getAllAttendees() {
+            try {
+                const response = await fetch(`${getApiUrl()}/attendees`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAttendees('attendeesResult', data.data || []);
+                } else {
+                    showResult('attendeesResult', data, true);
+                }
+            } catch (error) {
+                showResult('attendeesResult', { error: error.message }, true);
+            }
+        }
+        
+        async function getAttendeesWithPagination() {
+            try {
+                const response = await fetch(`${getApiUrl()}/attendees?page=1&limit=5`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('attendeesResult', data);
+                } else {
+                    showResult('attendeesResult', data, true);
+                }
+            } catch (error) {
+                showResult('attendeesResult', { error: error.message }, true);
+            }
+        }
+        
+        async function searchAttendees() {
+            try {
+                const query = prompt('Enter search query:');
+                if (!query) return;
+                
+                const response = await fetch(`${getApiUrl()}/attendees/search?q=${encodeURIComponent(query)}&limit=10`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAttendees('attendeesResult', data.data || []);
+                } else {
+                    showResult('attendeesResult', data, true);
+                }
+            } catch (error) {
+                showResult('attendeesResult', { error: error.message }, true);
+            }
+        }
+        
+        async function getAttendeeById() {
+            try {
+                const id = document.getElementById('attendeeId').value;
+                if (!id) {
+                    alert('Please enter an attendee ID');
+                    return;
+                }
+                
+                const response = await fetch(`${getApiUrl()}/attendees/${id}`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('attendeeResult', data);
+                } else {
+                    showResult('attendeeResult', data, true);
+                }
+            } catch (error) {
+                showResult('attendeeResult', { error: error.message }, true);
+            }
+        }
+        
+        async function createAttendee() {
+            try {
+                const name = document.getElementById('createName').value;
+                const email = document.getElementById('createEmail').value;
+                
+                if (!name || !email) {
+                    alert('Name and Email are required');
+                    return;
+                }
+                
+                const attendeeData = {
+                    NAME: name,
+                    EMAIL: email,
+                    PHONE: document.getElementById('createPhone').value || null,
+                    COMPANY: document.getElementById('createCompany').value || null,
+                    POSITION: document.getElementById('createPosition').value || null,
+                    GENDER: document.getElementById('createGender').value || null,
+                    DIETARY: document.getElementById('createDietary').value || null,
+                    SPECIAL_NEEDS: document.getElementById('createSpecialNeeds').value || null
+                };
+                
+                const response = await fetch(`${getApiUrl()}/attendees`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(attendeeData)
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('createResult', data);
+                    // Clear form
+                    document.getElementById('createName').value = '';
+                    document.getElementById('createEmail').value = '';
+                    document.getElementById('createPhone').value = '';
+                    document.getElementById('createCompany').value = '';
+                    document.getElementById('createPosition').value = '';
+                    document.getElementById('createGender').value = '';
+                    document.getElementById('createDietary').value = '';
+                    document.getElementById('createSpecialNeeds').value = '';
+                } else {
+                    showResult('createResult', data, true);
+                }
+            } catch (error) {
+                showResult('createResult', { error: error.message }, true);
+            }
+        }
+        
+        async function updateAttendee() {
+            try {
+                const id = document.getElementById('updateId').value;
+                if (!id) {
+                    alert('Please enter an attendee ID');
+                    return;
+                }
+                
+                const updateData = {};
+                const name = document.getElementById('updateName').value;
+                const company = document.getElementById('updateCompany').value;
+                const position = document.getElementById('updatePosition').value;
+                
+                if (name) updateData.NAME = name;
+                if (company) updateData.COMPANY = company;
+                if (position) updateData.POSITION = position;
+                
+                if (Object.keys(updateData).length === 0) {
+                    alert('Please enter at least one field to update');
+                    return;
+                }
+                
+                const response = await fetch(`${getApiUrl()}/attendees/${id}`, {
+                    method: 'PATCH',
+                    headers: getHeaders(),
+                    body: JSON.stringify(updateData)
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('updateResult', data);
+                } else {
+                    showResult('updateResult', data, true);
+                }
+            } catch (error) {
+                showResult('updateResult', { error: error.message }, true);
+            }
+        }
+        
+        async function deleteAttendee() {
+            try {
+                const id = document.getElementById('deleteId').value;
+                if (!id) {
+                    alert('Please enter an attendee ID');
+                    return;
+                }
+                
+                if (!confirm(`Are you sure you want to delete attendee with ID ${id}?`)) {
+                    return;
+                }
+                
+                const response = await fetch(`${getApiUrl()}/attendees/${id}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+                
+                if (response.ok) {
+                    showResult('deleteResult', { message: 'Attendee deleted successfully' });
+                } else {
+                    const data = await response.json();
+                    showResult('deleteResult', data, true);
+                }
+            } catch (error) {
+                showResult('deleteResult', { error: error.message }, true);
+            }
+        }
+        
+        async function getConferences() {
+            try {
+                const response = await fetch(`${getApiUrl()}/conferences`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('conferencesResult', data);
+                } else {
+                    showResult('conferencesResult', data, true);
+                }
+            } catch (error) {
+                showResult('conferencesResult', { error: error.message }, true);
+            }
+        }
+        
+        // Update API URL when input changes
+        document.getElementById('apiUrl').addEventListener('input', function() {
+            // Update the global API_BASE_URL if needed
+        });
+    </script>
+</body>
+</html>

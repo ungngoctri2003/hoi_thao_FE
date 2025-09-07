@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Conference Creation Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Test Conference Creation Permission Fix</h1>
+    
+    <div class="test-section info">
+        <h3>Test Steps:</h3>
+        <ol>
+            <li>Login with a user that has conferences.create permission</li>
+            <li>Try to create a conference</li>
+            <li>Check if the permission error is resolved</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h3>1. Login</h3>
+        <button onclick="login()">Login with Admin User</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Test Conference Creation</h3>
+        <button onclick="testCreateConference()">Test Create Conference</button>
+        <div id="create-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. Check User Permissions</h3>
+        <button onclick="checkPermissions()">Check Current User Permissions</button>
+        <div id="permissions-result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000/api/v1';
+        let accessToken = '';
+
+        async function login() {
+            const resultDiv = document.getElementById('login-result');
+            resultDiv.innerHTML = '<p>Logging in...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    accessToken = data.data.accessToken;
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <p><strong>Login successful!</strong></p>
+                            <p>Access token received</p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <p><strong>Login failed:</strong></p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <p><strong>Login error:</strong></p>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        async function testCreateConference() {
+            const resultDiv = document.getElementById('create-result');
+            resultDiv.innerHTML = '<p>Testing conference creation...</p>';
+            
+            if (!accessToken) {
+                resultDiv.innerHTML = '<div class="error"><p>Please login first!</p></div>';
+                return;
+            }
+
+            try {
+                const conferenceData = {
+                    NAME: 'Test Conference ' + new Date().toISOString(),
+                    DESCRIPTION: 'Test conference created to verify permission fix',
+                    START_DATE: '2024-12-20',
+                    END_DATE: '2024-12-22',
+                    LOCATION: 'Test Location',
+                    CAPACITY: 100,
+                    CATEGORY: 'Công nghệ',
+                    ORGANIZER: 'Test Organizer',
+                    STATUS: 'draft'
+                };
+
+                const response = await fetch(`${API_BASE_URL}/conferences`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify(conferenceData)
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <p><strong>Conference creation successful!</strong></p>
+                            <p>Permission fix is working correctly.</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <p><strong>Conference creation failed:</strong></p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <p><strong>Conference creation error:</strong></p>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        async function checkPermissions() {
+            const resultDiv = document.getElementById('permissions-result');
+            resultDiv.innerHTML = '<p>Checking permissions...</p>';
+            
+            if (!accessToken) {
+                resultDiv.innerHTML = '<div class="error"><p>Please login first!</p></div>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    const permissions = data.data.permissions || [];
+                    const hasCreatePermission = permissions.includes('conferences.create');
+                    const hasWritePermission = permissions.includes('conferences.write');
+                    
+                    resultDiv.innerHTML = `
+                        <div class="info">
+                            <p><strong>User Permissions:</strong></p>
+                            <p>Has conferences.create: <strong>${hasCreatePermission ? 'YES' : 'NO'}</strong></p>
+                            <p>Has conferences.write: <strong>${hasWritePermission ? 'YES' : 'NO'}</strong></p>
+                            <p>All permissions:</p>
+                            <pre>${JSON.stringify(permissions, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <p><strong>Failed to get permissions:</strong></p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <p><strong>Permission check error:</strong></p>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

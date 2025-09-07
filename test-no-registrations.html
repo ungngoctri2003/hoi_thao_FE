@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test No Registrations Status</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 2px;
+        }
+        .status-registered { background-color: #dbeafe; color: #1e40af; }
+        .status-checked-in { background-color: #dcfce7; color: #166534; }
+        .status-checked-out { background-color: #fed7aa; color: #c2410c; }
+        .status-cancelled { background-color: #fecaca; color: #dc2626; }
+        .status-no-show { background-color: #f3f4f6; color: #6b7280; }
+        
+        .api-response {
+            background-color: #f8fafc;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .success { background-color: #dcfce7; color: #166534; }
+        .error { background-color: #fecaca; color: #dc2626; }
+        .info { background-color: #dbeafe; color: #1e40af; }
+        
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background-color: #2563eb;
+        }
+        
+        button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+        }
+        
+        .test-case {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Test No Registrations Status</h1>
+        <p>Kiểm tra trạng thái khi user chưa có hội nghị (không có registrations)</p>
+    </div>
+
+    <div class="container">
+        <h2>📊 Test Case 1: User chưa có hội nghị</h2>
+        <div class="test-case">
+            <h3>Scenario: User chưa đăng ký hội nghị nào</h3>
+            <p><strong>API Response:</strong> <code>{"data": []}</code></p>
+            <p><strong>Expected Status:</strong> "Chưa đăng ký" (not-registered)</p>
+            <p><strong>Previous Behavior:</strong> "Đã đăng ký" (registered) ❌</p>
+            <p><strong>New Behavior:</strong> "Chưa đăng ký" (not-registered) ✅</p>
+            
+            <button onclick="testNoRegistrations()">Test No Registrations</button>
+            <div id="result1" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📊 Test Case 2: User có hội nghị nhưng chưa checkin</h2>
+        <div class="test-case">
+            <h3>Scenario: User đã đăng ký hội nghị nhưng chưa checkin</h3>
+            <p><strong>API Response:</strong> <code>{"data": [{"STATUS": "registered", ...}]}</code></p>
+            <p><strong>Expected Status:</strong> "Đã đăng ký" (registered)</p>
+            
+            <button onclick="testRegisteredStatus()">Test Registered Status</button>
+            <div id="result2" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📊 Test Case 3: User đã checkin</h2>
+        <div class="test-case">
+            <h3>Scenario: User đã checkin hội nghị</h3>
+            <p><strong>API Response:</strong> <code>{"data": [{"STATUS": "checked-in", ...}]}</code></p>
+            <p><strong>Expected Status:</strong> "Đã check-in" (checked-in)</p>
+            
+            <button onclick="testCheckedInStatus()">Test Checked-in Status</button>
+            <div id="result3" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📊 Test Case 4: Real API Test</h2>
+        <div class="test-case">
+            <h3>Test với API thực tế</h3>
+            <p>Kiểm tra attendee có registrations và attendee không có registrations</p>
+            
+            <button onclick="testRealAPI()" id="testBtn">Test Real API</button>
+            <div id="loading" style="display: none;" class="loading"></div>
+            <div id="result4" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000/api/v1';
+        
+        function getStatusBadge(status) {
+            const statusConfig = {
+                "not-registered": { label: "Chưa đăng ký", color: "status-no-show" },
+                registered: { label: "Đã đăng ký", color: "status-registered" },
+                "checked-in": { label: "Đã check-in", color: "status-checked-in" },
+                "checked-out": { label: "Đã check-out", color: "status-checked-out" },
+                cancelled: { label: "Đã hủy", color: "status-cancelled" },
+                "no-show": { label: "Không tham dự", color: "status-no-show" }
+            };
+            
+            const config = statusConfig[status] || statusConfig.registered;
+            return `<span class="status-badge ${config.color}">${config.label}</span>`;
+        }
+
+        function calculateOverallStatus(registrations) {
+            if (registrations.length === 0) {
+                return 'not-registered';
+            }
+
+            // Lấy registration mới nhất dựa trên thời gian registration date
+            const latestRegistration = registrations.reduce((latest, current) => {
+                const latestTime = latest.REGISTRATION_DATE;
+                const currentTime = current.REGISTRATION_DATE;
+                
+                const latestDate = new Date(latestTime);
+                const currentDate = new Date(currentTime);
+                
+                return currentDate > latestDate ? current : latest;
+            });
+
+            // Sử dụng trường STATUS từ API để xác định trạng thái
+            const status = latestRegistration.STATUS.toLowerCase();
+            
+            if (status === 'cancelled') return 'cancelled';
+            if (status === 'no-show') return 'no-show';
+            if (status === 'checked-out') return 'checked-out';
+            if (status === 'checked-in') return 'checked-in';
+            
+            return 'registered';
+        }
+
+        function testNoRegistrations() {
+            const registrations = [];
+            const result = calculateOverallStatus(registrations);
+            const resultDiv = document.getElementById('result1');
+            
+            resultDiv.innerHTML = `
+                <strong>Input:</strong> Empty registrations array<br>
+                <strong>Result:</strong> ${getStatusBadge(result)}<br>
+                <strong>Expected:</strong> ${getStatusBadge('not-registered')}<br>
+                <strong>Status:</strong> ${result === 'not-registered' ? '✅ PASS' : '❌ FAIL'}<br>
+                <strong>Note:</strong> ${result === 'not-registered' ? 'User chưa có hội nghị hiển thị đúng' : 'Logic cần sửa'}
+            `;
+            resultDiv.className = `result ${result === 'not-registered' ? 'success' : 'error'}`;
+            resultDiv.style.display = 'block';
+        }
+
+        function testRegisteredStatus() {
+            const registrations = [
+                {
+                    "ID": 1,
+                    "CONFERENCE_ID": 1,
+                    "STATUS": "registered",
+                    "QR_CODE": "REG-1-5-16D7106113",
+                    "REGISTRATION_DATE": "2025-09-02T16:23:23.873Z"
+                }
+            ];
+            const result = calculateOverallStatus(registrations);
+            const resultDiv = document.getElementById('result2');
+            
+            resultDiv.innerHTML = `
+                <strong>Input:</strong> Registration with STATUS "registered"<br>
+                <strong>Result:</strong> ${getStatusBadge(result)}<br>
+                <strong>Expected:</strong> ${getStatusBadge('registered')}<br>
+                <strong>Status:</strong> ${result === 'registered' ? '✅ PASS' : '❌ FAIL'}
+            `;
+            resultDiv.className = `result ${result === 'registered' ? 'success' : 'error'}`;
+            resultDiv.style.display = 'block';
+        }
+
+        function testCheckedInStatus() {
+            const registrations = [
+                {
+                    "ID": 1,
+                    "CONFERENCE_ID": 1,
+                    "STATUS": "checked-in",
+                    "QR_CODE": "REG-1-5-16D7106113",
+                    "REGISTRATION_DATE": "2025-09-02T16:23:23.873Z"
+                }
+            ];
+            const result = calculateOverallStatus(registrations);
+            const resultDiv = document.getElementById('result3');
+            
+            resultDiv.innerHTML = `
+                <strong>Input:</strong> Registration with STATUS "checked-in"<br>
+                <strong>Result:</strong> ${getStatusBadge(result)}<br>
+                <strong>Expected:</strong> ${getStatusBadge('checked-in')}<br>
+                <strong>Status:</strong> ${result === 'checked-in' ? '✅ PASS' : '❌ FAIL'}
+            `;
+            resultDiv.className = `result ${result === 'checked-in' ? 'success' : 'error'}`;
+            resultDiv.style.display = 'block';
+        }
+
+        async function testRealAPI() {
+            const testBtn = document.getElementById('testBtn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result4');
+            
+            testBtn.disabled = true;
+            loading.style.display = 'inline-block';
+            result.style.display = 'none';
+            
+            try {
+                const token = localStorage.getItem('accessToken');
+                
+                // Get attendees
+                const attendeesResponse = await fetch(`${API_BASE_URL}/attendees?limit=10`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!attendeesResponse.ok) {
+                    throw new Error(`HTTP error! status: ${attendeesResponse.status}`);
+                }
+                
+                const attendeesData = await attendeesResponse.json();
+                const attendees = attendeesData.data;
+                
+                let resultsHtml = `<strong>Testing ${attendees.length} attendees:</strong><br><br>`;
+                let notRegisteredCount = 0;
+                let registeredCount = 0;
+                let checkedInCount = 0;
+                let otherCount = 0;
+                
+                for (const attendee of attendees) {
+                    try {
+                        // Get registrations for each attendee
+                        const regResponse = await fetch(`${API_BASE_URL}/attendees/${attendee.ID}/registrations`, {
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        if (regResponse.ok) {
+                            const regData = await regResponse.json();
+                            const registrations = regData.data;
+                            const overallStatus = calculateOverallStatus(registrations);
+                            
+                            // Count statuses
+                            if (overallStatus === 'not-registered') notRegisteredCount++;
+                            else if (overallStatus === 'registered') registeredCount++;
+                            else if (overallStatus === 'checked-in') checkedInCount++;
+                            else otherCount++;
+                            
+                            resultsHtml += `
+                                <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                                    <strong>${attendee.NAME}</strong> (ID: ${attendee.ID})<br>
+                                    <strong>Status:</strong> ${getStatusBadge(overallStatus)}<br>
+                                    <strong>Registrations:</strong> ${registrations.length}<br>
+                                    ${registrations.length > 0 ? `
+                                        <strong>Latest Registration:</strong> ${getStatusBadge(registrations[registrations.length - 1].STATUS)}
+                                    ` : '<strong>No registrations found</strong>'}
+                                </div>
+                            `;
+                        } else {
+                            resultsHtml += `
+                                <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                                    <strong>${attendee.NAME}</strong> (ID: ${attendee.ID})<br>
+                                    <strong>Error:</strong> Failed to fetch registrations
+                                </div>
+                            `;
+                        }
+                    } catch (err) {
+                        resultsHtml += `
+                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                                <strong>${attendee.NAME}</strong> (ID: ${attendee.ID})<br>
+                                <strong>Error:</strong> ${err.message}
+                            </div>
+                        `;
+                    }
+                }
+                
+                // Add summary
+                resultsHtml += `
+                    <div style="margin: 20px 0; padding: 15px; background-color: #f0f9ff; border-radius: 6px;">
+                        <h3>📊 Summary:</h3>
+                        <p><strong>Chưa đăng ký:</strong> ${notRegisteredCount} attendees</p>
+                        <p><strong>Đã đăng ký:</strong> ${registeredCount} attendees</p>
+                        <p><strong>Đã check-in:</strong> ${checkedInCount} attendees</p>
+                        <p><strong>Khác:</strong> ${otherCount} attendees</p>
+                        <p><strong>Total:</strong> ${attendees.length} attendees</p>
+                    </div>
+                `;
+                
+                result.innerHTML = resultsHtml;
+                result.className = 'result info';
+                result.style.display = 'block';
+                
+            } catch (error) {
+                result.innerHTML = `
+                    <strong>Error:</strong> ${error.message}<br>
+                    <strong>Make sure:</strong>
+                    <ul>
+                        <li>Backend server is running on http://localhost:4000</li>
+                        <li>You are logged in (accessToken exists)</li>
+                    </ul>
+                `;
+                result.className = 'result error';
+                result.style.display = 'block';
+            } finally {
+                testBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        // Check if user is logged in
+        window.onload = function() {
+            const token = localStorage.getItem('accessToken');
+            if (!token) {
+                document.body.innerHTML = `
+                    <div class="container">
+                        <h1>❌ Not Logged In</h1>
+                        <p>Please log in first to test the API. You need an access token to make API calls.</p>
+                        <p>Go to the main application and log in, then come back to this page.</p>
+                    </div>
+                `;
+            } else {
+                console.log('✅ User is logged in, ready to test no registrations status');
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Audit API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .log-item { border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .log-header { font-weight: bold; color: #333; }
+        .log-details { margin: 5px 0; color: #666; }
+        .error { color: red; }
+        .success { color: green; }
+        .loading { color: blue; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Audit API</h1>
+        
+        <div>
+            <button onclick="testAuditAPI()">Test Audit API</button>
+            <button onclick="testWithFilters()">Test với Filters</button>
+            <button onclick="clearLogs()">Clear Logs</button>
+        </div>
+        
+        <div id="status" class="loading">Sẵn sàng test...</div>
+        
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000/api/v1';
+        
+        async function testAuditAPI() {
+            const statusEl = document.getElementById('status');
+            const logsEl = document.getElementById('logs');
+            
+            statusEl.textContent = 'Đang test API...';
+            statusEl.className = 'loading';
+            
+            try {
+                // Test basic audit logs endpoint
+                const response = await fetch(`${API_BASE_URL}/audit/logs?page=1&limit=5`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // Note: In real app, you'd need proper auth token
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('API Response:', data);
+                
+                statusEl.textContent = `API thành công! Tìm thấy ${data.data?.length || 0} logs`;
+                statusEl.className = 'success';
+                
+                // Display logs
+                logsEl.innerHTML = '';
+                if (data.data && data.data.length > 0) {
+                    data.data.forEach((log, index) => {
+                        const logEl = document.createElement('div');
+                        logEl.className = 'log-item';
+                        logEl.innerHTML = `
+                            <div class="log-header">Log ${index + 1} (ID: ${log.id})</div>
+                            <div class="log-details"><strong>Thời gian:</strong> ${new Date(log.timestamp).toLocaleString('vi-VN')}</div>
+                            <div class="log-details"><strong>User ID:</strong> ${log.userId || 'N/A'}</div>
+                            <div class="log-details"><strong>Hành động:</strong> ${log.actionName || 'N/A'}</div>
+                            <div class="log-details"><strong>Tài nguyên:</strong> ${log.resourceName || 'N/A'}</div>
+                            <div class="log-details"><strong>Chi tiết:</strong> ${log.details || 'N/A'}</div>
+                            <div class="log-details"><strong>IP:</strong> ${log.ipAddress || 'N/A'}</div>
+                            <div class="log-details"><strong>Status:</strong> ${log.status || 'N/A'}</div>
+                            <div class="log-details"><strong>Category:</strong> ${log.category || 'N/A'}</div>
+                        `;
+                        logsEl.appendChild(logEl);
+                    });
+                } else {
+                    logsEl.innerHTML = '<div class="log-item">Không có dữ liệu audit logs</div>';
+                }
+                
+            } catch (error) {
+                console.error('API Error:', error);
+                statusEl.textContent = `Lỗi API: ${error.message}`;
+                statusEl.className = 'error';
+                logsEl.innerHTML = `<div class="log-item error">Lỗi: ${error.message}</div>`;
+            }
+        }
+        
+        async function testWithFilters() {
+            const statusEl = document.getElementById('status');
+            const logsEl = document.getElementById('logs');
+            
+            statusEl.textContent = 'Đang test API với filters...';
+            statusEl.className = 'loading';
+            
+            try {
+                // Test with various filters
+                const filters = [
+                    '?page=1&limit=3&status=success',
+                    '?page=1&limit=3&category=user',
+                    '?page=1&limit=3&q=update'
+                ];
+                
+                logsEl.innerHTML = '';
+                
+                for (let i = 0; i < filters.length; i++) {
+                    const filter = filters[i];
+                    const response = await fetch(`${API_BASE_URL}/audit/logs${filter}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    const filterEl = document.createElement('div');
+                    filterEl.className = 'log-item';
+                    filterEl.innerHTML = `
+                        <div class="log-header">Filter Test ${i + 1}: ${filter}</div>
+                        <div class="log-details">Tìm thấy ${data.data?.length || 0} logs</div>
+                        <div class="log-details">Total: ${data.meta?.total || 0}</div>
+                    `;
+                    logsEl.appendChild(filterEl);
+                }
+                
+                statusEl.textContent = 'Test filters thành công!';
+                statusEl.className = 'success';
+                
+            } catch (error) {
+                console.error('Filter Test Error:', error);
+                statusEl.textContent = `Lỗi test filters: ${error.message}`;
+                statusEl.className = 'error';
+                logsEl.innerHTML = `<div class="log-item error">Lỗi: ${error.message}</div>`;
+            }
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            document.getElementById('status').textContent = 'Sẵn sàng test...';
+            document.getElementById('status').className = 'loading';
+        }
+    </script>
+</body>
+</html>

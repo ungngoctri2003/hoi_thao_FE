@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Roles Module</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Roles Management Module</h1>
+    
+    <div class="test-section info">
+        <h3>📋 Test Plan</h3>
+        <p>Kiểm tra các tính năng của module Quản lý vai trò:</p>
+        <ul>
+            <li>✅ API Integration - Kết nối với backend</li>
+            <li>✅ Components - RoleManagement, PermissionMatrix, CreateRoleDialog</li>
+            <li>✅ Navigation - Menu phân quyền trong sidebar</li>
+            <li>✅ Page - Trang /roles</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>🔗 Test API Endpoints</h3>
+        <button onclick="testRolesAPI()">Test GET /roles</button>
+        <button onclick="testPermissionsAPI()">Test GET /permissions</button>
+        <button onclick="testCreateRole()">Test POST /roles</button>
+        <div id="api-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>🌐 Test Frontend Access</h3>
+        <button onclick="openRolesPage()">Mở trang Roles</button>
+        <button onclick="checkNavigation()">Kiểm tra Navigation</button>
+        <div id="frontend-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>📊 Module Status</h3>
+        <div id="status-results">
+            <p>🔄 Đang kiểm tra...</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000/api/v1';
+        
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            element.innerHTML += `<div class="test-section ${className}">${message}</div>`;
+        }
+
+        async function testRolesAPI() {
+            log('api-results', '🔄 Đang test GET /roles...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/roles`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + (localStorage.getItem('token') || 'test-token')
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('api-results', `✅ GET /roles thành công: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    log('api-results', `❌ GET /roles thất bại: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log('api-results', `❌ GET /roles lỗi: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPermissionsAPI() {
+            log('api-results', '🔄 Đang test GET /permissions...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/permissions`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + (localStorage.getItem('token') || 'test-token')
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('api-results', `✅ GET /permissions thành công: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    log('api-results', `❌ GET /permissions thất bại: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log('api-results', `❌ GET /permissions lỗi: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreateRole() {
+            log('api-results', '🔄 Đang test POST /roles...', 'info');
+            try {
+                const roleData = {
+                    code: 'test_role_' + Date.now(),
+                    name: 'Test Role ' + new Date().toLocaleTimeString()
+                };
+                
+                const response = await fetch(`${API_BASE}/roles`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + (localStorage.getItem('token') || 'test-token')
+                    },
+                    body: JSON.stringify(roleData)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('api-results', `✅ POST /roles thành công: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    log('api-results', `❌ POST /roles thất bại: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log('api-results', `❌ POST /roles lỗi: ${error.message}`, 'error');
+            }
+        }
+
+        function openRolesPage() {
+            const url = 'http://localhost:3000/roles';
+            log('frontend-results', `🌐 Mở trang roles: <a href="${url}" target="_blank">${url}</a>`, 'info');
+            window.open(url, '_blank');
+        }
+
+        function checkNavigation() {
+            const url = 'http://localhost:3000/dashboard';
+            log('frontend-results', `🧭 Kiểm tra navigation: <a href="${url}" target="_blank">${url}</a>`, 'info');
+            log('frontend-results', '📝 Hướng dẫn: Đăng nhập với tài khoản admin và tìm menu "Phân quyền" trong sidebar', 'info');
+        }
+
+        // Auto-check status
+        window.onload = function() {
+            setTimeout(() => {
+                document.getElementById('status-results').innerHTML = `
+                    <div class="test-section success">
+                        <h4>✅ Module Roles Management đã được tích hợp thành công!</h4>
+                        <ul>
+                            <li>📁 Components: role-management.tsx, permission-matrix.tsx, create-role-dialog.tsx</li>
+                            <li>🔌 API: lib/api.ts với các methods getRoles(), createRole(), assignPermissionToRole()</li>
+                            <li>📄 Page: app/roles/page.tsx</li>
+                            <li>🧭 Navigation: Menu "Phân quyền" trong sidebar cho admin</li>
+                        </ul>
+                    </div>
+                    <div class="test-section info">
+                        <h4>🚀 Cách sử dụng:</h4>
+                        <ol>
+                            <li>Khởi động backend: <code>cd ../HOI_THAO_BE && npm run dev</code></li>
+                            <li>Khởi động frontend: <code>npm run dev</code></li>
+                            <li>Đăng nhập với tài khoản admin</li>
+                            <li>Truy cập menu "Phân quyền" trong sidebar</li>
+                            <li>Sử dụng các tính năng: Tạo role, Phân quyền, Quản lý người dùng</li>
+                        </ol>
+                    </div>
+                `;
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

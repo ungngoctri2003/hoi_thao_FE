@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Sidebar Conferences</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; background-color: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .conference { margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .conference h4 { margin: 0 0 10px 0; color: #333; }
+        .permissions { font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <h1>Test Sidebar Conferences Display</h1>
+    
+    <div class="section">
+        <h3>1. Login</h3>
+        <button onclick="login()">Login as Admin</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="section">
+        <h3>2. Get Conference Assignments</h3>
+        <button onclick="getAssignments()">Get My Assignments</button>
+        <div id="assignments-result"></div>
+    </div>
+
+    <div class="section">
+        <h3>3. Simulate Sidebar Display</h3>
+        <button onclick="simulateSidebar()">Simulate Sidebar</button>
+        <div id="sidebar-result"></div>
+    </div>
+
+    <script>
+        let token = '';
+
+        async function login() {
+            try {
+                const response = await fetch('http://localhost:4000/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@conference.vn',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.data && data.data.accessToken) {
+                    token = data.data.accessToken;
+                    document.getElementById('login-result').innerHTML = `
+                        <div class="success">
+                            <strong>✅ Login successful!</strong><br>
+                            Token: ${token.substring(0, 50)}...
+                        </div>
+                    `;
+                } else {
+                    throw new Error('No access token in response');
+                }
+            } catch (error) {
+                document.getElementById('login-result').innerHTML = `
+                    <div class="error">
+                        <strong>❌ Login failed:</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function getAssignments() {
+            if (!token) {
+                document.getElementById('assignments-result').innerHTML = `
+                    <div class="error">Please login first</div>
+                `;
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:4000/api/v1/user-conference-assignments/my-assignments', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                document.getElementById('assignments-result').innerHTML = `
+                    <div class="success">
+                        <strong>✅ Assignments retrieved!</strong><br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('assignments-result').innerHTML = `
+                    <div class="error">
+                        <strong>❌ Failed to get assignments:</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function simulateSidebar() {
+            if (!token) {
+                document.getElementById('sidebar-result').innerHTML = `
+                    <div class="error">Please login first</div>
+                `;
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:4000/api/v1/user-conference-assignments/my-assignments', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    // Simulate the same processing as useConferencePermissions hook
+                    const conferencePermissions = data.data.map(assignment => {
+                        const permissions = typeof assignment.permissions === 'string' 
+                            ? JSON.parse(assignment.permissions) 
+                            : assignment.permissions || {};
+                        
+                        return {
+                            conferenceId: assignment.conferenceId,
+                            conferenceName: assignment.conferenceName || `Hội nghị #${assignment.conferenceId}`,
+                            permissions: permissions,
+                            isActive: assignment.isActive === 1
+                        };
+                    });
+
+                    const availableConferences = conferencePermissions.filter(cp => cp.isActive);
+                    
+                    // Simulate getConferenceCategories function
+                    const getConferenceCategories = (conferenceId) => {
+                        const permissions = conferencePermissions.find(cp => cp.conferenceId === conferenceId)?.permissions || {};
+                        const categories = [];
+                        
+                        const categoryMap = {
+                            'conferences': 'Quản lý hội nghị',
+                            'attendees': 'Quản lý tham dự viên', 
+                            'checkin': 'Check-in',
+                            'networking': 'Networking',
+                            'venue': 'Địa điểm',
+                            'sessions': 'Phiên họp',
+                            'badges': 'Huy hiệu',
+                            'analytics': 'Phân tích',
+                            'mobile': 'Mobile'
+                        };
+                        
+                        Object.keys(categoryMap).forEach(key => {
+                            const permissionKey = key === 'conferences' ? 'conferences.view' : `${key}.view`;
+                            if (permissions[permissionKey]) {
+                                categories.push({
+                                    name: categoryMap[key],
+                                    permission: permissionKey
+                                });
+                            }
+                        });
+                        
+                        return categories;
+                    };
+                    
+                    document.getElementById('sidebar-result').innerHTML = `
+                        <div class="success">
+                            <strong>✅ Sidebar Simulation</strong><br>
+                            <h4>Available Conferences (${availableConferences.length}):</h4>
+                            ${availableConferences.map(conf => {
+                                const categories = getConferenceCategories(conf.conferenceId);
+                                return `
+                                    <div class="conference">
+                                        <h4>🏢 ${conf.conferenceName}</h4>
+                                        <div class="permissions">
+                                            <strong>Categories (${categories.length}):</strong><br>
+                                            ${categories.map(cat => `• ${cat.name} (${cat.permission})`).join('<br>')}
+                                        </div>
+                                        <div class="permissions">
+                                            <strong>All Permissions:</strong><br>
+                                            ${Object.keys(conf.permissions).filter(k => conf.permissions[k]).join(', ')}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                            
+                            <h4>This is how it would appear in the sidebar:</h4>
+                            <div style="border: 1px solid #ccc; padding: 10px; background-color: #f8f9fa;">
+                                <div style="font-weight: bold; margin-bottom: 10px;">Hội nghị</div>
+                                ${availableConferences.map(conf => {
+                                    const categories = getConferenceCategories(conf.conferenceId);
+                                    return `
+                                        <div style="margin: 5px 0; padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                                            <strong>🏢 ${conf.conferenceName}</strong>
+                                            <span style="float: right; font-size: 12px; color: #666;">
+                                                ${categories.length} tính năng
+                                            </span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            } catch (error) {
+                document.getElementById('sidebar-result').innerHTML = `
+                    <div class="error">
+                        <strong>❌ Failed to simulate sidebar:</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Sidebar Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .debug-section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        .code {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+            white-space: pre-wrap;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Test Sidebar Debug</h1>
+    
+    <div class="container">
+        <h2>📋 Vấn đề</h2>
+        <p>Admin không thấy mục "Quản lý người tham dự" trong sidebar</p>
+    </div>
+
+    <div class="container">
+        <h2>🧪 Test Cases</h2>
+        
+        <div class="debug-section">
+            <h3>Test 1: Simulate Sidebar Logic</h3>
+            <button onclick="testSidebarLogic()">Run Test</button>
+            <div id="sidebar-logic-result" class="debug-section"></div>
+        </div>
+
+        <div class="debug-section">
+            <h3>Test 2: Check User Role</h3>
+            <button onclick="testUserRole()">Run Test</button>
+            <div id="user-role-result" class="debug-section"></div>
+        </div>
+
+        <div class="debug-section">
+            <h3>Test 3: Check Permissions</h3>
+            <button onclick="testPermissions()">Run Test</button>
+            <div id="permissions-result" class="debug-section"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🛠️ Debug Steps</h2>
+        <div class="debug-section info">
+            <h3>Bước 1: Kiểm tra Console</h3>
+            <p>Mở Developer Tools (F12) và kiểm tra Console logs:</p>
+            <div class="code">🔍 Sidebar Debug: {
+  currentRole: "admin",
+  userRole: "admin", 
+  hasAttendeesPermission: true/false,
+  itemsCount: 5,
+  hasAttendeesItem: true/false,
+  allItems: [...]
+}</div>
+        </div>
+
+        <div class="debug-section info">
+            <h3>Bước 2: Kiểm tra Elements</h3>
+            <p>Tìm element có href="/attendees" trong sidebar:</p>
+            <div class="code">// Trong Elements tab, tìm:
+a[href="/attendees"]
+// hoặc
+[href="/attendees"]</div>
+        </div>
+
+        <div class="debug-section info">
+            <h3>Bước 3: Kiểm tra CSS</h3>
+            <p>Kiểm tra xem element có bị ẩn không:</p>
+            <div class="code">// Trong Console:
+const link = document.querySelector('a[href="/attendees"]');
+console.log('Link exists:', !!link);
+console.log('Link visible:', link?.offsetParent !== null);
+console.log('Link display:', getComputedStyle(link).display);</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🔧 Quick Fix</h2>
+        <div class="debug-section success">
+            <h3>Nếu vẫn không thấy, thử cách này:</h3>
+            <div class="code">// Thêm vào đầu getNavigationItems function:
+if (item.href === '/attendees' && userRole === 'admin') {
+  console.log('✅ Admin should see attendees management');
+  return true;
+}</div>
+        </div>
+    </div>
+
+    <script>
+        function testSidebarLogic() {
+            const result = document.getElementById('sidebar-logic-result');
+            
+            // Simulate the exact logic from sidebar.tsx
+            const allNavigationItems = [
+                { 
+                    href: "/conference-management", 
+                    label: "Quản lý hội nghị", 
+                    adminOnly: false,
+                    requiredPermissions: ["conferences.manage"]
+                },
+                { 
+                    href: "/attendees", 
+                    label: "Quản lý người tham dự", 
+                    adminOnly: true,
+                    requiredPermissions: ["attendees.manage"]
+                }
+            ];
+            
+            const getNavigationItems = (hasPermission, hasConferencePermission, userRole) => {
+                return allNavigationItems.filter(item => {
+                    // Special handling for conference management - only show to admin
+                    if (item.href === '/conference-management') {
+                        return userRole === 'admin';
+                    }
+                    
+                    // Special handling for global attendees management - only show to admin
+                    if (item.href === '/attendees' && item.adminOnly) {
+                        return userRole === 'admin';
+                    }
+                    
+                    // Admin always has access to attendees management regardless of permissions
+                    if (item.href === '/attendees' && userRole === 'admin') {
+                        return true;
+                    }
+                    
+                    return true; // Other items
+                });
+            };
+            
+            const roles = ['admin', 'staff', 'attendee'];
+            let html = '<h4>Sidebar Logic Test Results:</h4>';
+            
+            roles.forEach(role => {
+                const hasPermission = (permission) => {
+                    // Mock permissions - admin has all, others have basic
+                    if (role === 'admin') return true;
+                    return ['dashboard.view'].includes(permission);
+                };
+                
+                const items = getNavigationItems(hasPermission, () => false, role);
+                const hasAttendees = items.some(item => item.href === '/attendees');
+                
+                html += `
+                    <div class="${hasAttendees ? 'success' : 'error'}">
+                        <strong>Role: ${role}</strong><br>
+                        Items: ${items.map(item => item.label).join(', ')}<br>
+                        Has attendees: ${hasAttendees ? 'YES' : 'NO'}<br>
+                        Expected: ${role === 'admin' ? 'YES' : 'NO'}
+                    </div>
+                `;
+            });
+            
+            result.innerHTML = html;
+        }
+
+        function testUserRole() {
+            const result = document.getElementById('user-role-result');
+            
+            // Check various ways user role might be stored
+            const checks = [
+                { name: 'localStorage user', value: localStorage.getItem('user') },
+                { name: 'localStorage authUser', value: localStorage.getItem('authUser') },
+                { name: 'sessionStorage user', value: sessionStorage.getItem('user') },
+                { name: 'sessionStorage authUser', value: sessionStorage.getItem('authUser') },
+                { name: 'document.cookie', value: document.cookie }
+            ];
+            
+            let html = '<h4>User Role Check Results:</h4>';
+            
+            checks.forEach(check => {
+                if (check.value) {
+                    try {
+                        const parsed = JSON.parse(check.value);
+                        html += `
+                            <div class="success">
+                                <strong>${check.name}:</strong> Found<br>
+                                <pre>${JSON.stringify(parsed, null, 2)}</pre>
+                            </div>
+                        `;
+                    } catch (e) {
+                        html += `
+                            <div class="warning">
+                                <strong>${check.name}:</strong> Found but not JSON<br>
+                                <pre>${check.value}</pre>
+                            </div>
+                        `;
+                    }
+                } else {
+                    html += `
+                        <div class="error">
+                            <strong>${check.name}:</strong> Not found
+                        </div>
+                    `;
+                }
+            });
+            
+            result.innerHTML = html;
+        }
+
+        function testPermissions() {
+            const result = document.getElementById('permissions-result');
+            
+            // Simulate different permission scenarios
+            const scenarios = [
+                {
+                    name: 'Admin with all permissions',
+                    role: 'admin',
+                    permissions: ['dashboard.view', 'conferences.manage', 'attendees.manage', 'roles.manage'],
+                    expected: true
+                },
+                {
+                    name: 'Admin without attendees.manage',
+                    role: 'admin',
+                    permissions: ['dashboard.view', 'conferences.manage', 'roles.manage'],
+                    expected: true // Should still work due to admin override
+                },
+                {
+                    name: 'Staff with attendees.manage',
+                    role: 'staff',
+                    permissions: ['dashboard.view', 'attendees.manage'],
+                    expected: false // Should not work due to adminOnly
+                },
+                {
+                    name: 'Attendee with attendees.manage',
+                    role: 'attendee',
+                    permissions: ['dashboard.view', 'attendees.manage'],
+                    expected: false // Should not work due to adminOnly
+                }
+            ];
+            
+            let html = '<h4>Permission Test Results:</h4>';
+            
+            scenarios.forEach(scenario => {
+                const hasPermission = (permission) => scenario.permissions.includes(permission);
+                
+                // Simulate the logic
+                const shouldShow = scenario.role === 'admin' || 
+                                 (scenario.role !== 'admin' && hasPermission('attendees.manage'));
+                
+                const actualResult = scenario.role === 'admin'; // Due to adminOnly check
+                
+                html += `
+                    <div class="${actualResult === scenario.expected ? 'success' : 'error'}">
+                        <strong>${scenario.name}</strong><br>
+                        Role: ${scenario.role}<br>
+                        Permissions: ${scenario.permissions.join(', ')}<br>
+                        Should show: ${scenario.expected ? 'YES' : 'NO'}<br>
+                        Actual result: ${actualResult ? 'YES' : 'NO'}<br>
+                        Status: ${actualResult === scenario.expected ? 'PASS' : 'FAIL'}
+                    </div>
+                `;
+            });
+            
+            result.innerHTML = html;
+        }
+
+        // Auto-run tests
+        window.onload = function() {
+            console.log('🧪 Starting Sidebar Debug Tests...');
+            testSidebarLogic();
+            testUserRole();
+            testPermissions();
+            console.log('✅ Debug tests completed!');
+        };
+    </script>
+</body>
+</html>

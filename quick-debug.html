@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Debug Checkin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .log {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+            white-space: pre-wrap;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .registered { background: #e3f2fd; color: #1976d2; }
+        .checked-in { background: #e8f5e8; color: #2e7d32; }
+        .checked-out { background: #fff3e0; color: #f57c00; }
+        .cancelled { background: #ffebee; color: #d32f2f; }
+        .no-show { background: #f3e5f5; color: #7b1fa2; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Quick Debug Checkin Status</h1>
+        <p>Kiểm tra nhanh trạng thái checkin của testnew123@example.com và triung8+2@gmail.com</p>
+        
+        <button onclick="runDebug()">Chạy Debug</button>
+        <button onclick="clearLog()">Xóa Log</button>
+        
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        async function runDebug() {
+            clearLog();
+            log('🚀 Starting quick debug...');
+
+            // Kiểm tra token
+            const token = localStorage.getItem('accessToken');
+            log('🔑 Token exists: ' + !!token);
+
+            if (!token) {
+                log('❌ No access token found. Please login first.');
+                return;
+            }
+
+            // Test API calls
+            const API_BASE_URL = 'http://localhost:4000/api/v1';
+            
+            try {
+                // Test get attendees
+                log('📋 Testing attendees API...');
+                const attendeesResponse = await fetch(`${API_BASE_URL}/attendees?limit=5`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!attendeesResponse.ok) {
+                    throw new Error(`HTTP error! status: ${attendeesResponse.status}`);
+                }
+                
+                const attendees = await attendeesResponse.json();
+                log('✅ Got attendees: ' + attendees.data.length);
+                
+                // Test specific users
+                const targetEmails = ['testnew123@example.com', 'triung8+2@gmail.com'];
+                
+                for (const email of targetEmails) {
+                    log(`🔍 Testing ${email}...`);
+                    
+                    // Find attendee by email
+                    const attendeeResponse = await fetch(`${API_BASE_URL}/attendees?filters[email]=${encodeURIComponent(email)}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (!attendeeResponse.ok) {
+                        log(`❌ Error getting attendee ${email}: ${attendeeResponse.status}`);
+                        continue;
+                    }
+                    
+                    const attendeeData = await attendeeResponse.json();
+                    log(`👤 Found attendee: ${JSON.stringify(attendeeData.data[0], null, 2)}`);
+                    
+                    if (attendeeData.data.length === 0) {
+                        log(`❌ No attendee found with email ${email}`);
+                        continue;
+                    }
+                    
+                    const attendee = attendeeData.data[0];
+                    
+                    // Get registrations
+                    const registrationsResponse = await fetch(`${API_BASE_URL}/attendees/${attendee.ID}/registrations`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (!registrationsResponse.ok) {
+                        log(`❌ Error getting registrations for ${email}: ${registrationsResponse.status}`);
+                        continue;
+                    }
+                    
+                    const registrationsData = await registrationsResponse.json();
+                    log(`📋 Registrations for ${email}: ${JSON.stringify(registrationsData.data, null, 2)}`);
+                    
+                    // Calculate status
+                    const registrations = registrationsData.data;
+                    if (registrations.length === 0) {
+                        log(`📝 No registrations for ${email}`);
+                        continue;
+                    }
+                    
+                    // Find latest registration
+                    const latestRegistration = registrations.reduce((latest, current) => {
+                        const latestTime = latest.CHECKOUT_TIME || latest.CHECKIN_TIME || latest.REGISTRATION_DATE;
+                        const currentTime = current.CHECKOUT_TIME || current.CHECKIN_TIME || current.REGISTRATION_DATE;
+                        return new Date(currentTime) > new Date(latestTime) ? current : latest;
+                    });
+                    
+                    log(`🎯 Latest registration for ${email}: ${JSON.stringify(latestRegistration, null, 2)}`);
+                    
+                    // Calculate status
+                    let status = 'registered';
+                    if (latestRegistration.STATUS === 'cancelled') {
+                        status = 'cancelled';
+                    } else if (latestRegistration.STATUS === 'no-show') {
+                        status = 'no-show';
+                    } else if (latestRegistration.CHECKOUT_TIME) {
+                        status = 'checked-out';
+                    } else if (latestRegistration.CHECKIN_TIME) {
+                        status = 'checked-in';
+                    }
+                    
+                    log(`✅ Final status for ${email}: ${status}`);
+                    log(`   - Checkin time: ${latestRegistration.CHECKIN_TIME}`);
+                    log(`   - Checkout time: ${latestRegistration.CHECKOUT_TIME}`);
+                    log(`   - Registration status: ${latestRegistration.STATUS}`);
+                    log('---');
+                }
+                
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+            }
+        }
+
+        // Auto run when page loads
+        window.onload = function() {
+            runDebug();
+        };
+    </script>
+</body>
+</html>

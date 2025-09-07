@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Cải tiến Chi tiết Audit</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .demo-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .before {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+        }
+        .after {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+        }
+        .example {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        h2 {
+            color: #333;
+            margin-top: 0;
+        }
+        h3 {
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .improvement {
+            background: #e3f2fd;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Demo: Cải tiến Hiển thị Chi tiết Audit Logs</h1>
+        
+        <div class="demo-section before">
+            <h2>❌ Trước khi cải tiến</h2>
+            <h3>Ví dụ hiển thị cũ:</h3>
+            <div class="example">
+                Cập nhật attendee (ID: 3)
+            </div>
+            <div class="example">
+                Cập nhật user (ID: 11) - Các trường: name, email, status
+            </div>
+            <div class="example">
+                Tạo mới conference
+            </div>
+            <div class="example">
+                Xóa attendee (ID: 5)
+            </div>
+            
+            <div class="improvement">
+                <strong>Vấn đề:</strong> Người dùng không hiểu rõ:
+                <ul>
+                    <li>"attendee" là gì?</li>
+                    <li>Thay đổi cụ thể gì?</li>
+                    <li>Giá trị mới là gì?</li>
+                    <li>ID có ý nghĩa gì?</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="demo-section after">
+            <h2>✅ Sau khi cải tiến</h2>
+            <h3>Ví dụ hiển thị mới:</h3>
+            <div class="example">
+                Cập nhật thông tin người tham dự #3 - Thay đổi: Tên: "Nguyễn Văn A", Email: "nguyenvana@email.com"
+            </div>
+            <div class="example">
+                Cập nhật thông tin người dùng #11 - Thay đổi: Tên: "Trần Thị B", Trạng thái: "active"
+            </div>
+            <div class="example">
+                Tạo mới hội nghị "Workshop AI 2024"
+            </div>
+            <div class="example">
+                Xóa người tham dự #5
+            </div>
+            <div class="example">
+                Đăng nhập vào hệ thống với email "admin@example.com" (Google)
+            </div>
+            <div class="example">
+                Thực hiện check-in
+            </div>
+            
+            <div class="improvement">
+                <strong>Cải tiến:</strong>
+                <ul>
+                    <li>✅ <span class="highlight">Tên tiếng Việt</span>: "người tham dự" thay vì "attendee"</li>
+                    <li>✅ <span class="highlight">Thông tin cụ thể</span>: Hiển thị giá trị thực tế được thay đổi</li>
+                    <li>✅ <span class="highlight">Context rõ ràng</span>: "Thay đổi: Tên: 'Nguyễn Văn A'"</li>
+                    <li>✅ <span class="highlight">ID thân thiện</span>: "#3" thay vì "(ID: 3)"</li>
+                    <li>✅ <span class="highlight">Hành động cụ thể</span>: "check-in", "đăng nhập", "tạo mới"</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🔧 Các cải tiến chi tiết</h2>
+            
+            <h3>1. Mapping tên tài nguyên sang tiếng Việt</h3>
+            <div class="example">
+                attendee → người tham dự<br>
+                user → người dùng<br>
+                conference → hội nghị<br>
+                session → phiên họp<br>
+                registration → đăng ký
+            </div>
+
+            <h3>2. Hiển thị thay đổi cụ thể</h3>
+            <div class="example">
+                Thay vì: "Các trường: name, email"<br>
+                Thành: "Thay đổi: Tên: 'Nguyễn Văn A', Email: 'nguyenvana@email.com'"
+            </div>
+
+            <h3>3. Thông tin đăng nhập chi tiết</h3>
+            <div class="example">
+                Thay vì: "Đăng nhập"<br>
+                Thành: "Đăng nhập vào hệ thống với email 'admin@example.com' (Google)"
+            </div>
+
+            <h3>4. Hành động hệ thống thân thiện</h3>
+            <div class="example">
+                /checkin → "Thực hiện check-in"<br>
+                /upload → "Tải lên tệp tin"<br>
+                /export → "Xuất dữ liệu"<br>
+                /approve → "Phê duyệt yêu cầu"
+            </div>
+
+            <h3>5. Format ID thân thiện</h3>
+            <div class="example">
+                (ID: 3) → #3<br>
+                (ID: 11) → #11
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📊 Kết quả</h2>
+            <div class="improvement">
+                <strong>Trước:</strong> "Cập nhật attendee (ID: 3)" - Người dùng không hiểu gì<br><br>
+                <strong>Sau:</strong> "Cập nhật thông tin người tham dự #3 - Thay đổi: Tên: 'Nguyễn Văn A', Email: 'nguyenvana@email.com'" - Rõ ràng và dễ hiểu!
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Check-in API Response</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Check-in API Response Format</h1>
+        
+        <div class="test-section info">
+            <h3>API Endpoint Test</h3>
+            <p>Testing: <code>http://localhost:4000/api/v1/public/checkins/checkin</code></p>
+            <button onclick="testCheckInAPI()">Test Check-in API</button>
+            <button onclick="testManualCheckIn()">Test Manual Check-in</button>
+            <button onclick="testQRCheckIn()">Test QR Check-in</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000/api/v1';
+        
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-section ${type}`;
+            div.innerHTML = `<pre>${JSON.stringify(message, null, 2)}</pre>`;
+            results.appendChild(div);
+        }
+
+        async function testCheckInAPI() {
+            try {
+                log('Testing Check-in API...', 'info');
+                
+                const response = await fetch(`${API_BASE}/public/checkins/checkin`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        attendeeId: 1,
+                        qrCode: 'QR001',
+                        conferenceId: 1,
+                        checkInMethod: 'qr'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log({
+                        status: 'SUCCESS',
+                        statusCode: response.status,
+                        response: data
+                    }, 'success');
+                } else {
+                    log({
+                        status: 'ERROR',
+                        statusCode: response.status,
+                        response: data
+                    }, 'error');
+                }
+            } catch (error) {
+                log({
+                    status: 'NETWORK_ERROR',
+                    error: error.message
+                }, 'error');
+            }
+        }
+
+        async function testManualCheckIn() {
+            try {
+                log('Testing Manual Check-in...', 'info');
+                
+                const response = await fetch(`${API_BASE}/public/checkins/checkin`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        conferenceId: 1,
+                        checkInMethod: 'manual',
+                        attendeeInfo: {
+                            name: 'Test User',
+                            email: 'test@example.com',
+                            phone: '0123456789'
+                        },
+                        qrCode: 'MANUAL_TEST_001'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log({
+                        status: 'SUCCESS',
+                        statusCode: response.status,
+                        response: data
+                    }, 'success');
+                } else {
+                    log({
+                        status: 'ERROR',
+                        statusCode: response.status,
+                        response: data
+                    }, 'error');
+                }
+            } catch (error) {
+                log({
+                    status: 'NETWORK_ERROR',
+                    error: error.message
+                }, 'error');
+            }
+        }
+
+        async function testQRCheckIn() {
+            try {
+                log('Testing QR Check-in...', 'info');
+                
+                const response = await fetch(`${API_BASE}/public/checkins/checkin`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        qrCode: 'QR002',
+                        conferenceId: 1,
+                        checkInMethod: 'qr'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log({
+                        status: 'SUCCESS',
+                        statusCode: response.status,
+                        response: data
+                    }, 'success');
+                } else {
+                    log({
+                        status: 'ERROR',
+                        statusCode: response.status,
+                        response: data
+                    }, 'error');
+                }
+            } catch (error) {
+                log({
+                    status: 'NETWORK_ERROR',
+                    error: error.message
+                }, 'error');
+            }
+        }
+
+        // Test on page load
+        window.onload = function() {
+            log('Page loaded. Click buttons above to test API endpoints.', 'info');
+        };
+    </script>
+</body>
+</html>

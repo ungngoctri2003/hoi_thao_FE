@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Conference Fix V2</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        .warning { color: orange; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 3px; }
+        button:hover { background: #0056b3; }
+        .test-link { display: block; margin: 10px 0; padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 3px; text-decoration: none; color: #007bff; }
+        .test-link:hover { background: #e9ecef; }
+        .fix-summary { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Test Conference Fix V2</h1>
+    
+    <div class="fix-summary">
+        <h2>✅ Các thay đổi đã thực hiện:</h2>
+        <ul>
+            <li><strong>Loại bỏ vòng lặp vô hạn:</strong> Tách logic xử lý <code>urlConferenceId</code> ra khỏi dependency array chính</li>
+            <li><strong>Sửa dependency array:</strong> Chỉ phụ thuộc vào <code>user</code> và <code>isAuthenticated</code></li>
+            <li><strong>Thêm useEffect riêng:</strong> Xử lý việc cập nhật <code>currentConferenceId</code> khi <code>urlConferenceId</code> thay đổi</li>
+            <li><strong>Tránh reset permissions:</strong> Không gọi lại API khi chỉ <code>urlConferenceId</code> thay đổi</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Test Cases</h2>
+        <p>Click vào các link sau để test xem có còn bị redirect về /dashboard không:</p>
+        
+        <h3>Test 1: Conference Pages với conferenceId trong URL</h3>
+        <a href="/attendees?conferenceId=1" class="test-link" target="_blank">
+            📋 /attendees?conferenceId=1
+        </a>
+        <a href="/checkin?conferenceId=1" class="test-link" target="_blank">
+            📱 /checkin?conferenceId=1
+        </a>
+        <a href="/networking?conferenceId=1" class="test-link" target="_blank">
+            🌐 /networking?conferenceId=1
+        </a>
+        <a href="/venue?conferenceId=1" class="test-link" target="_blank">
+            📍 /venue?conferenceId=1
+        </a>
+        <a href="/sessions?conferenceId=1" class="test-link" target="_blank">
+            🎥 /sessions?conferenceId=1
+        </a>
+        <a href="/badges?conferenceId=1" class="test-link" target="_blank">
+            🏆 /badges?conferenceId=1
+        </a>
+        <a href="/analytics?conferenceId=1" class="test-link" target="_blank">
+            📊 /analytics?conferenceId=1
+        </a>
+
+        <h3>Test 2: Conference Pages với conferenceId khác</h3>
+        <a href="/attendees?conferenceId=3" class="test-link" target="_blank">
+            📋 /attendees?conferenceId=3
+        </a>
+        <a href="/checkin?conferenceId=3" class="test-link" target="_blank">
+            📱 /checkin?conferenceId=3
+        </a>
+
+        <h3>Test 3: Conference Pages không có conferenceId</h3>
+        <a href="/attendees" class="test-link" target="_blank">
+            📋 /attendees (no conferenceId)
+        </a>
+        <a href="/checkin" class="test-link" target="_blank">
+            📱 /checkin (no conferenceId)
+        </a>
+
+        <h3>Test 4: Conference Detail Page</h3>
+        <a href="/conferences/1" class="test-link" target="_blank">
+            🏢 /conferences/1
+        </a>
+        <a href="/conferences/3" class="test-link" target="_blank">
+            🏢 /conferences/3
+        </a>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Debug Information</h2>
+        <button onclick="checkCurrentState()">Check Current State</button>
+        <div id="debug-info"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 Expected Behavior</h2>
+        <ul>
+            <li class="success">✅ Các trang conference với <code>?conferenceId=X</code> sẽ load bình thường</li>
+            <li class="success">✅ Các trang conference không có conferenceId sẽ sử dụng <code>currentConferenceId</code> từ hook</li>
+            <li class="success">✅ Không còn bị redirect về <code>/dashboard</code> không mong muốn</li>
+            <li class="success">✅ Sidebar links sẽ hoạt động đúng</li>
+            <li class="success">✅ Không còn vòng lặp vô hạn trong console</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🚨 Nếu vẫn có vấn đề</h2>
+        <p>Hãy kiểm tra console logs:</p>
+        <ol>
+            <li><strong>Không còn vòng lặp:</strong> Không thấy <code>useConferencePermissions - fetchConferencePermissions called</code> lặp lại liên tục</li>
+            <li><strong>ConferenceId được set đúng:</strong> Thấy <code>using URL conferenceId: X</code> hoặc <code>using first active conference: X</code></li>
+            <li><strong>Permissions được load:</strong> Thấy <code>conferencePermissions: (2) [{…}, {…}]</code> và <code>available: (2) [{…}, {…}]</code></li>
+            <li><strong>Không có lỗi redirect:</strong> Không thấy redirect về <code>/dashboard</code> không mong muốn</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Technical Details</h2>
+        <p><strong>Vấn đề đã sửa:</strong></p>
+        <ul>
+            <li>Vòng lặp vô hạn trong <code>useConferencePermissions</code></li>
+            <li>Dependency array không đúng trong <code>useEffect</code></li>
+            <li>Reset <code>conferencePermissions</code> mỗi khi <code>urlConferenceId</code> thay đổi</li>
+        </ul>
+        
+        <p><strong>Giải pháp:</strong></p>
+        <ul>
+            <li>Tách logic xử lý <code>urlConferenceId</code> ra <code>useEffect</code> riêng</li>
+            <li>Chỉ fetch permissions khi <code>user</code> hoặc <code>isAuthenticated</code> thay đổi</li>
+            <li>Cập nhật <code>currentConferenceId</code> khi cần thiết mà không reset permissions</li>
+        </ul>
+    </div>
+
+    <script>
+        function checkCurrentState() {
+            const debugDiv = document.getElementById('debug-info');
+            debugDiv.innerHTML = '<p class="info">Checking current state...</p>';
+
+            // Check URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const conferenceId = urlParams.get('conferenceId');
+            
+            // Check cookies
+            const token = getCookie('accessToken');
+            
+            let debugInfo = `
+                <h3>Current State:</h3>
+                <pre>URL: ${window.location.href}
+Pathname: ${window.location.pathname}
+ConferenceId from URL: ${conferenceId || 'None'}
+Access Token: ${token ? 'Found' : 'Not found'}</pre>
+                
+                <h3>Expected Console Logs:</h3>
+                <ul>
+                    <li class="success">✅ useConferencePermissions - fetchConferencePermissions called (chỉ 1 lần)</li>
+                    <li class="success">✅ using URL conferenceId: X hoặc using first active conference: X</li>
+                    <li class="success">✅ conferencePermissions: (2) [{…}, {…}]</li>
+                    <li class="success">✅ available: (2) [{…}, {…}]</li>
+                    <li class="error">❌ KHÔNG thấy vòng lặp vô hạn</li>
+                </ul>
+            `;
+
+            debugDiv.innerHTML = debugInfo;
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        // Auto-check on load
+        window.onload = function() {
+            checkCurrentState();
+        };
+    </script>
+</body>
+</html>

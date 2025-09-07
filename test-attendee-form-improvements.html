@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Attendee Form Improvements</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .test-section h3 {
+            color: #333;
+            margin-top: 0;
+        }
+        .field-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .field-item {
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+        .field-item.new {
+            border-left-color: #2196F3;
+        }
+        .field-item.enhanced {
+            border-left-color: #FF9800;
+        }
+        .field-name {
+            font-weight: bold;
+            color: #333;
+        }
+        .field-description {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .status.new {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.enhanced {
+            background-color: #fff3e0;
+            color: #f57c00;
+        }
+        .status.existing {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+        }
+        .improvements {
+            background-color: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .improvements h4 {
+            color: #2e7d32;
+            margin-top: 0;
+        }
+        .improvements ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .improvements li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Cải thiện Form Tham dự viên</h1>
+            <p>Kiểm tra các trường mới được thêm vào form thêm/sửa tham dự viên</p>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Danh sách các trường trong form</h3>
+            <div class="field-list">
+                <div class="field-item existing">
+                    <div class="field-name">Họ và tên (NAME) *</div>
+                    <div class="field-description">Tên đầy đủ của tham dự viên</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+                
+                <div class="field-item existing">
+                    <div class="field-name">Email (EMAIL) *</div>
+                    <div class="field-description">Địa chỉ email liên hệ</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+                
+                <div class="field-item existing">
+                    <div class="field-name">Số điện thoại (PHONE)</div>
+                    <div class="field-description">Số điện thoại liên hệ</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+                
+                <div class="field-item existing">
+                    <div class="field-name">Công ty (COMPANY)</div>
+                    <div class="field-description">Tên công ty/tổ chức</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+                
+                <div class="field-item existing">
+                    <div class="field-name">Chức vụ (POSITION)</div>
+                    <div class="field-description">Vị trí công việc</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+                
+                <div class="field-item existing">
+                    <div class="field-name">URL Avatar (AVATAR_URL)</div>
+                    <div class="field-description">Link ảnh đại diện</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+                
+                <div class="field-item existing">
+                    <div class="field-name">Yêu cầu ăn uống (DIETARY)</div>
+                    <div class="field-description">Yêu cầu đặc biệt về ăn uống</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+                
+                <div class="field-item existing">
+                    <div class="field-name">Nhu cầu đặc biệt (SPECIAL_NEEDS)</div>
+                    <div class="field-description">Nhu cầu hỗ trợ đặc biệt</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+                
+                <div class="field-item existing">
+                    <div class="field-name">Ngày sinh (DATE_OF_BIRTH)</div>
+                    <div class="field-description">Ngày tháng năm sinh</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+                
+                <div class="field-item existing">
+                    <div class="field-name">Giới tính (GENDER)</div>
+                    <div class="field-description">Nam/Nữ/Khác</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+                
+                <div class="field-item new">
+                    <div class="field-name">Firebase UID (FIREBASE_UID) 🆕</div>
+                    <div class="field-description">ID Firebase cho Google authentication</div>
+                    <span class="status new">Mới thêm</span>
+                </div>
+                
+                <div class="field-item new">
+                    <div class="field-name">Địa chỉ (ADDRESS) 🆕</div>
+                    <div class="field-description">Địa chỉ liên hệ của tham dự viên</div>
+                    <span class="status new">Mới thêm</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Cải thiện Validation</h3>
+            <div class="field-list">
+                <div class="field-item enhanced">
+                    <div class="field-name">Validation cho Firebase UID</div>
+                    <div class="field-description">Kiểm tra format Firebase UID (chỉ cho phép chữ, số, gạch dưới, gạch ngang)</div>
+                    <span class="status enhanced">Cải thiện</span>
+                </div>
+                
+                <div class="field-item enhanced">
+                    <div class="field-name">Validation cho URL Avatar</div>
+                    <div class="field-description">Kiểm tra URL avatar phải là link ảnh hợp lệ (jpg, jpeg, png, gif, webp)</div>
+                    <span class="status enhanced">Cải thiện</span>
+                </div>
+                
+                <div class="field-item existing">
+                    <div class="field-name">Validation cho Email</div>
+                    <div class="field-description">Kiểm tra format email hợp lệ</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+                
+                <div class="field-item existing">
+                    <div class="field-name">Validation cho Số điện thoại</div>
+                    <div class="field-description">Kiểm tra format số điện thoại</div>
+                    <span class="status existing">Có sẵn</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎨 Cải thiện Giao diện</h3>
+            <div class="field-list">
+                <div class="field-item enhanced">
+                    <div class="field-name">Tổ chức lại Layout</div>
+                    <div class="field-description">Chia form thành các card: Thông tin cơ bản, Nghề nghiệp, Bổ sung</div>
+                    <span class="status enhanced">Cải thiện</span>
+                </div>
+                
+                <div class="field-item enhanced">
+                    <div class="field-name">Hiển thị Firebase UID trong System Info</div>
+                    <div class="field-description">Hiển thị Firebase UID trong chế độ xem với font monospace</div>
+                    <span class="status enhanced">Cải thiện</span>
+                </div>
+                
+                <div class="field-item enhanced">
+                    <div class="field-name">Hiển thị Địa chỉ trong System Info</div>
+                    <div class="field-description">Hiển thị địa chỉ trong chế độ xem nếu có</div>
+                    <span class="status enhanced">Cải thiện</span>
+                </div>
+                
+                <div class="field-item enhanced">
+                    <div class="field-name">Error Messages</div>
+                    <div class="field-description">Hiển thị lỗi validation cho các trường mới</div>
+                    <span class="status enhanced">Cải thiện</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="improvements">
+            <h4>✅ Tóm tắt cải thiện</h4>
+            <ul>
+                <li><strong>Thêm trường FIREBASE_UID:</strong> Hỗ trợ Google authentication</li>
+                <li><strong>Thêm trường ADDRESS:</strong> Lưu trữ địa chỉ liên hệ</li>
+                <li><strong>Cải thiện validation:</strong> Kiểm tra format cho Firebase UID và URL avatar</li>
+                <li><strong>Tổ chức lại layout:</strong> Chia form thành các phần logic hơn</li>
+                <li><strong>Hiển thị thông tin đầy đủ:</strong> Trong chế độ xem có đầy đủ thông tin</li>
+                <li><strong>Error handling:</strong> Hiển thị lỗi validation rõ ràng</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Hướng dẫn Test</h3>
+            <ol>
+                <li><strong>Test thêm tham dự viên mới:</strong>
+                    <ul>
+                        <li>Mở trang /attendees</li>
+                        <li>Click "Thêm tham dự viên"</li>
+                        <li>Kiểm tra tất cả các trường mới có hiển thị</li>
+                        <li>Test validation cho Firebase UID và URL avatar</li>
+                    </ul>
+                </li>
+                <li><strong>Test chỉnh sửa tham dự viên:</strong>
+                    <ul>
+                        <li>Click "Chỉnh sửa" trên một tham dự viên</li>
+                        <li>Kiểm tra các trường mới có thể chỉnh sửa</li>
+                        <li>Test validation khi nhập dữ liệu không hợp lệ</li>
+                    </ul>
+                </li>
+                <li><strong>Test xem chi tiết:</strong>
+                    <ul>
+                        <li>Click "Xem" trên một tham dự viên</li>
+                        <li>Kiểm tra Firebase UID và địa chỉ hiển thị trong System Info</li>
+                        <li>Kiểm tra layout mới có tổ chức tốt hơn</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>

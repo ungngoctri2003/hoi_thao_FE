@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Delete Check-in</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 3px; }
+        .checkin-record { margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .delete-btn { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Delete Check-in Feature</h1>
+        
+        <div class="test-section info">
+            <h3>🗑️ Test Delete Check-in Functionality</h3>
+            <p>Test để đảm bảo có thể xóa check-in và check-in lại.</p>
+        </div>
+
+        <div class="grid">
+            <div class="test-section">
+                <h3>1. Get Check-in Records</h3>
+                <button onclick="getCheckInRecords()">Get Records</button>
+                <div id="records-results"></div>
+            </div>
+
+            <div class="test-section">
+                <h3>2. Delete Check-in Record</h3>
+                <div id="delete-results"></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Test Results Summary</h3>
+            <div id="summary-results"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000/api/v1';
+        let checkInRecords = [];
+
+        function log(message, type = 'info', containerId = 'summary-results') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `<pre>${JSON.stringify(message, null, 2)}</pre>`;
+            container.appendChild(div);
+        }
+
+        async function getCheckInRecords() {
+            try {
+                log('Getting check-in records...', 'info', 'records-results');
+                
+                const response = await fetch(`${API_BASE}/public/checkins?conferenceId=1`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    checkInRecords = data.data || [];
+                    
+                    log({
+                        test: 'Get Check-in Records',
+                        status: 'SUCCESS',
+                        recordCount: checkInRecords.length,
+                        records: checkInRecords.map(r => ({
+                            id: r.ID || r.id,
+                            attendeeName: r.ATTENDEE_NAME || r.attendeeName,
+                            checkInTime: r.CHECKIN_TIME || r.checkInTime,
+                            status: r.STATUS || r.status
+                        }))
+                    }, 'success', 'records-results');
+                    
+                    // Display records with delete buttons
+                    displayRecordsWithDeleteButtons();
+                } else {
+                    log({
+                        test: 'Get Check-in Records',
+                        status: 'ERROR',
+                        statusCode: response.status,
+                        response: data
+                    }, 'error', 'records-results');
+                }
+            } catch (error) {
+                log({
+                    test: 'Get Check-in Records',
+                    status: 'NETWORK_ERROR',
+                    error: error.message
+                }, 'error', 'records-results');
+            }
+        }
+
+        function displayRecordsWithDeleteButtons() {
+            const container = document.getElementById('records-results');
+            
+            if (checkInRecords.length === 0) {
+                container.innerHTML += '<p>No check-in records found.</p>';
+                return;
+            }
+            
+            checkInRecords.forEach(record => {
+                const recordDiv = document.createElement('div');
+                recordDiv.className = 'checkin-record';
+                recordDiv.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>${record.ATTENDEE_NAME || record.attendeeName || 'N/A'}</strong><br>
+                            <small>Time: ${record.CHECKIN_TIME || record.checkInTime || 'N/A'}</small><br>
+                            <small>Status: ${record.STATUS || record.status || 'N/A'}</small>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <input type="text" id="qr-input-${record.ID || record.id}" placeholder="Nhập QR code của người này để xóa" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 250px;">
+                            <button class="delete-btn" onclick="deleteCheckInRecord(${record.ID || record.id}, document.getElementById('qr-input-${record.ID || record.id}').value)">
+                                Delete với QR
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(recordDiv);
+            });
+        }
+
+        async function deleteCheckInRecord(recordId, qrCode) {
+            try {
+                log(`Deleting check-in record ${recordId} with QR code: ${qrCode}...`, 'info', 'delete-results');
+                
+                const response = await fetch(`${API_BASE}/public/checkins/${recordId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ qrCode })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log({
+                        test: 'Delete Check-in Record',
+                        status: 'SUCCESS',
+                        recordId: recordId,
+                        qrCode: qrCode,
+                        response: data
+                    }, 'success', 'delete-results');
+                    
+                    // Refresh records
+                    document.getElementById('records-results').innerHTML = '';
+                    await getCheckInRecords();
+                } else {
+                    log({
+                        test: 'Delete Check-in Record',
+                        status: 'ERROR',
+                        recordId: recordId,
+                        qrCode: qrCode,
+                        statusCode: response.status,
+                        response: data
+                    }, 'error', 'delete-results');
+                }
+            } catch (error) {
+                log({
+                    test: 'Delete Check-in Record',
+                    status: 'NETWORK_ERROR',
+                    recordId: recordId,
+                    qrCode: qrCode,
+                    error: error.message
+                }, 'error', 'delete-results');
+            }
+        }
+
+        // Test on page load
+        window.onload = function() {
+            log('Page loaded. Click "Get Records" to start testing delete functionality.', 'info');
+        };
+    </script>
+</body>
+</html>

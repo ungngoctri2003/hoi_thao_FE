@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Conference Display Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        .warning { color: #ffc107; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .user-info {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Conference Display Fix</h1>
+    
+    <div class="container">
+        <h2>Thông tin User hiện tại</h2>
+        <div id="userInfo" class="user-info">Đang tải...</div>
+        <button onclick="loadUserInfo()">Tải lại thông tin user</button>
+    </div>
+
+    <div class="container">
+        <h2>Test API My Assignments</h2>
+        <div class="test-section">
+            <h3>1. Test API /user-conference-assignments/my-assignments</h3>
+            <button onclick="testMyAssignments()">Test My Assignments API</button>
+            <div id="myAssignmentsResult"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Test Conference Permissions Hook</h2>
+        <div class="test-section">
+            <h3>2. Test useConferencePermissions Hook</h3>
+            <button onclick="testConferencePermissions()">Test Conference Permissions</button>
+            <div id="conferencePermissionsResult"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Test Conference Selector</h2>
+        <div class="test-section">
+            <h3>3. Test Conference Selector Component</h3>
+            <button onclick="testConferenceSelector()">Test Conference Selector</button>
+            <div id="conferenceSelectorResult"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Test Full Flow</h2>
+        <div class="test-section">
+            <h3>4. Test Complete Flow</h3>
+            <button onclick="testFullFlow()">Test Complete Flow</button>
+            <div id="fullFlowResult"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001/api';
+        let authToken = null;
+
+        // Load user info
+        async function loadUserInfo() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                document.getElementById('userInfo').innerHTML = `
+                    <strong>ID:</strong> ${data.data.id}<br>
+                    <strong>Email:</strong> ${data.data.email}<br>
+                    <strong>Name:</strong> ${data.data.name}<br>
+                    <strong>Role:</strong> ${data.data.role}<br>
+                    <strong>Avatar:</strong> ${data.data.avatar || 'Không có'}
+                `;
+            } catch (error) {
+                document.getElementById('userInfo').innerHTML = `<span class="error">Lỗi: ${error.message}</span>`;
+            }
+        }
+
+        // Test My Assignments API
+        async function testMyAssignments() {
+            const resultDiv = document.getElementById('myAssignmentsResult');
+            resultDiv.innerHTML = '<span class="info">Đang test...</span>';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/user-conference-assignments/my-assignments`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ API thành công!</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        <p><strong>Số lượng assignments:</strong> ${data.data.length}</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">❌ API lỗi: ${data.message || 'Unknown error'}</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Lỗi: ${error.message}</div>`;
+            }
+        }
+
+        // Test Conference Permissions Hook (simulate)
+        async function testConferencePermissions() {
+            const resultDiv = document.getElementById('conferencePermissionsResult');
+            resultDiv.innerHTML = '<span class="info">Đang test...</span>';
+
+            try {
+                // Simulate the hook logic
+                const response = await fetch(`${API_BASE_URL}/user-conference-assignments/my-assignments`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const assignments = data.data;
+                    const permissions = assignments.map(assignment => ({
+                        conferenceId: assignment.conferenceId,
+                        conferenceName: assignment.conferenceName || `Hội nghị #${assignment.conferenceId}`,
+                        permissions: typeof assignment.permissions === 'string' 
+                            ? JSON.parse(assignment.permissions) 
+                            : assignment.permissions || {},
+                        isActive: assignment.isActive === 1
+                    }));
+
+                    // Get user info to check role
+                    const userResponse = await fetch(`${API_BASE_URL}/auth/me`, {
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    const userData = await userResponse.json();
+                    const userRole = userData.data.role;
+
+                    // For admin/staff, if no conference assignments, create a dummy conference
+                    if ((userRole === 'admin' || userRole === 'staff') && permissions.length === 0) {
+                        const dummyConference = {
+                            conferenceId: 0,
+                            conferenceName: 'Tất cả hội nghị',
+                            permissions: {
+                                'conferences.view': true,
+                                'conferences.create': true,
+                                'conferences.update': true,
+                                'conferences.delete': true,
+                                'attendees.view': true,
+                                'attendees.manage': true,
+                                'checkin.manage': true,
+                                'networking.view': true,
+                                'venue.view': true,
+                                'sessions.view': true,
+                                'badges.view': true,
+                                'analytics.view': true,
+                                'my-events.view': true,
+                            },
+                            isActive: true
+                        };
+                        permissions.push(dummyConference);
+                    }
+
+                    const availableConferences = permissions.filter(p => p.isActive);
+
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ Hook logic thành công!</div>
+                        <p><strong>User Role:</strong> ${userRole}</p>
+                        <p><strong>Tổng số permissions:</strong> ${permissions.length}</p>
+                        <p><strong>Số hội nghị có sẵn:</strong> ${availableConferences.length}</p>
+                        <h4>Danh sách hội nghị:</h4>
+                        <pre>${JSON.stringify(availableConferences, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">❌ Lỗi API: ${data.message || 'Unknown error'}</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Lỗi: ${error.message}</div>`;
+            }
+        }
+
+        // Test Conference Selector (simulate)
+        async function testConferenceSelector() {
+            const resultDiv = document.getElementById('conferenceSelectorResult');
+            resultDiv.innerHTML = '<span class="info">Đang test...</span>';
+
+            try {
+                // Get conference permissions first
+                const response = await fetch(`${API_BASE_URL}/user-conference-assignments/my-assignments`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const assignments = data.data;
+                    const permissions = assignments.map(assignment => ({
+                        conferenceId: assignment.conferenceId,
+                        conferenceName: assignment.conferenceName || `Hội nghị #${assignment.conferenceId}`,
+                        permissions: typeof assignment.permissions === 'string' 
+                            ? JSON.parse(assignment.permissions) 
+                            : assignment.permissions || {},
+                        isActive: assignment.isActive === 1
+                    }));
+
+                    // Get user info to check role
+                    const userResponse = await fetch(`${API_BASE_URL}/auth/me`, {
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    const userData = await userResponse.json();
+                    const userRole = userData.data.role;
+
+                    // For admin/staff, if no conference assignments, create a dummy conference
+                    if ((userRole === 'admin' || userRole === 'staff') && permissions.length === 0) {
+                        const dummyConference = {
+                            conferenceId: 0,
+                            conferenceName: 'Tất cả hội nghị',
+                            permissions: {
+                                'conferences.view': true,
+                                'conferences.create': true,
+                                'conferences.update': true,
+                                'conferences.delete': true,
+                                'attendees.view': true,
+                                'attendees.manage': true,
+                                'checkin.manage': true,
+                                'networking.view': true,
+                                'venue.view': true,
+                                'sessions.view': true,
+                                'badges.view': true,
+                                'analytics.view': true,
+                                'my-events.view': true,
+                            },
+                            isActive: true
+                        };
+                        permissions.push(dummyConference);
+                    }
+
+                    const availableConferences = permissions.filter(p => p.isActive);
+
+                    // Simulate Conference Selector behavior
+                    if (availableConferences.length === 0) {
+                        resultDiv.innerHTML = `
+                            <div class="warning">⚠️ Conference Selector sẽ hiển thị: "Không có hội nghị"</div>
+                            <p>Đây là vấn đề cần sửa!</p>
+                        `;
+                    } else if (availableConferences.length === 1) {
+                        const conference = availableConferences[0];
+                        resultDiv.innerHTML = `
+                            <div class="success">✅ Conference Selector sẽ hiển thị: "${conference.conferenceName}"</div>
+                            <p><strong>Conference ID:</strong> ${conference.conferenceId}</p>
+                            <p><strong>Số quyền:</strong> ${Object.values(conference.permissions).filter(Boolean).length}</p>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="success">✅ Conference Selector sẽ hiển thị dropdown với ${availableConferences.length} hội nghị:</div>
+                            <ul>
+                                ${availableConferences.map(conf => `<li>${conf.conferenceName} (ID: ${conf.conferenceId})</li>`).join('')}
+                            </ul>
+                        `;
+                    }
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">❌ Lỗi API: ${data.message || 'Unknown error'}</div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Lỗi: ${error.message}</div>`;
+            }
+        }
+
+        // Test Full Flow
+        async function testFullFlow() {
+            const resultDiv = document.getElementById('fullFlowResult');
+            resultDiv.innerHTML = '<span class="info">Đang test toàn bộ flow...</span>';
+
+            try {
+                // Step 1: Get user info
+                const userResponse = await fetch(`${API_BASE_URL}/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!userResponse.ok) {
+                    throw new Error(`User API failed: ${userResponse.status}`);
+                }
+
+                const userData = await userResponse.json();
+                const userRole = userData.data.role;
+
+                // Step 2: Get assignments
+                const assignmentsResponse = await fetch(`${API_BASE_URL}/user-conference-assignments/my-assignments`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!assignmentsResponse.ok) {
+                    throw new Error(`Assignments API failed: ${assignmentsResponse.status}`);
+                }
+
+                const assignmentsData = await assignmentsResponse.json();
+                const assignments = assignmentsData.data;
+
+                // Step 3: Process permissions
+                const permissions = assignments.map(assignment => ({
+                    conferenceId: assignment.conferenceId,
+                    conferenceName: assignment.conferenceName || `Hội nghị #${assignment.conferenceId}`,
+                    permissions: typeof assignment.permissions === 'string' 
+                        ? JSON.parse(assignment.permissions) 
+                        : assignment.permissions || {},
+                    isActive: assignment.isActive === 1
+                }));
+
+                // Step 4: Apply admin/staff logic
+                if ((userRole === 'admin' || userRole === 'staff') && permissions.length === 0) {
+                    const dummyConference = {
+                        conferenceId: 0,
+                        conferenceName: 'Tất cả hội nghị',
+                        permissions: {
+                            'conferences.view': true,
+                            'conferences.create': true,
+                            'conferences.update': true,
+                            'conferences.delete': true,
+                            'attendees.view': true,
+                            'attendees.manage': true,
+                            'checkin.manage': true,
+                            'networking.view': true,
+                            'venue.view': true,
+                            'sessions.view': true,
+                            'badges.view': true,
+                            'analytics.view': true,
+                            'my-events.view': true,
+                        },
+                        isActive: true
+                    };
+                    permissions.push(dummyConference);
+                }
+
+                const availableConferences = permissions.filter(p => p.isActive);
+
+                // Step 5: Determine navbar display
+                let navbarStatus = '';
+                if (availableConferences.length === 0) {
+                    navbarStatus = '❌ Navbar sẽ hiển thị "Không có hội nghị" - VẤN ĐỀ!';
+                } else if (availableConferences.length === 1) {
+                    navbarStatus = `✅ Navbar sẽ hiển thị "${availableConferences[0].conferenceName}"`;
+                } else {
+                    navbarStatus = `✅ Navbar sẽ hiển thị dropdown với ${availableConferences.length} hội nghị`;
+                }
+
+                resultDiv.innerHTML = `
+                    <div class="success">✅ Test hoàn tất!</div>
+                    <h4>Kết quả:</h4>
+                    <p><strong>User Role:</strong> ${userRole}</p>
+                    <p><strong>Raw Assignments:</strong> ${assignments.length}</p>
+                    <p><strong>Processed Permissions:</strong> ${permissions.length}</p>
+                    <p><strong>Available Conferences:</strong> ${availableConferences.length}</p>
+                    <p><strong>Navbar Status:</strong> ${navbarStatus}</p>
+                    
+                    <h4>Chi tiết hội nghị:</h4>
+                    <pre>${JSON.stringify(availableConferences, null, 2)}</pre>
+                `;
+
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Lỗi: ${error.message}</div>`;
+            }
+        }
+
+        // Login function
+        async function login() {
+            const email = prompt('Nhập email:');
+            const password = prompt('Nhập password:');
+            
+            if (!email || !password) {
+                alert('Email và password không được để trống!');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.data.accessToken;
+                    alert('Đăng nhập thành công!');
+                    loadUserInfo();
+                } else {
+                    alert(`Đăng nhập thất bại: ${data.message}`);
+                }
+            } catch (error) {
+                alert(`Lỗi: ${error.message}`);
+            }
+        }
+
+        // Check if already logged in
+        function checkAuth() {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                authToken = token;
+                loadUserInfo();
+            } else {
+                document.getElementById('userInfo').innerHTML = `
+                    <button onclick="login()">Đăng nhập để test</button>
+                `;
+            }
+        }
+
+        // Initialize
+        checkAuth();
+    </script>
+</body>
+</html>

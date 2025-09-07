@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Registration Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Test Registration Fix</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Check API Endpoints</h2>
+        <button onclick="testEndpoints()">Test Endpoints</button>
+        <div id="endpoint-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Test Registration Flow</h2>
+        <button onclick="testRegistration()">Test Registration</button>
+        <div id="registration-results"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000/api/v1';
+        
+        async function testEndpoints() {
+            const results = document.getElementById('endpoint-results');
+            results.innerHTML = '<p>Testing endpoints...</p>';
+            
+            try {
+                // Test public auth endpoints
+                const authResponse = await fetch(`${API_BASE_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'test@example.com',
+                        name: 'Test User',
+                        password: 'testpass123'
+                    })
+                });
+                
+                const authData = await authResponse.json();
+                
+                results.innerHTML = `
+                    <div class="success">
+                        <h3>✅ Auth Endpoint Test</h3>
+                        <p>Status: ${authResponse.status}</p>
+                        <pre>${JSON.stringify(authData, null, 2)}</pre>
+                    </div>
+                `;
+                
+            } catch (error) {
+                results.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Endpoint Test Failed</h3>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        async function testRegistration() {
+            const results = document.getElementById('registration-results');
+            results.innerHTML = '<p>Testing registration flow...</p>';
+            
+            try {
+                const testEmail = `test${Date.now()}@example.com`;
+                const testPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
+                
+                // Step 1: Register user
+                const registerResponse = await fetch(`${API_BASE_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: testEmail,
+                        name: 'Test Attendee',
+                        password: testPassword
+                    })
+                });
+                
+                if (!registerResponse.ok) {
+                    throw new Error(`Registration failed: ${registerResponse.status}`);
+                }
+                
+                // Step 2: Login
+                const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: testEmail,
+                        password: testPassword
+                    })
+                });
+                
+                if (!loginResponse.ok) {
+                    throw new Error(`Login failed: ${loginResponse.status}`);
+                }
+                
+                const loginData = await loginResponse.json();
+                const token = loginData.accessToken;
+                
+                // Step 3: Create attendee
+                const attendeeResponse = await fetch(`${API_BASE_URL}/attendees`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        name: 'Test Attendee',
+                        email: testEmail,
+                        phone: '0901234567',
+                        company: 'Test Company',
+                        position: 'Test Position'
+                    })
+                });
+                
+                if (!attendeeResponse.ok) {
+                    throw new Error(`Attendee creation failed: ${attendeeResponse.status}`);
+                }
+                
+                const attendeeData = await attendeeResponse.json();
+                
+                results.innerHTML = `
+                    <div class="success">
+                        <h3>✅ Registration Flow Test Successful</h3>
+                        <p><strong>Email:</strong> ${testEmail}</p>
+                        <p><strong>Password:</strong> ${testPassword}</p>
+                        <p><strong>Attendee ID:</strong> ${attendeeData.id}</p>
+                        <pre>${JSON.stringify(attendeeData, null, 2)}</pre>
+                    </div>
+                `;
+                
+            } catch (error) {
+                results.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Registration Flow Test Failed</h3>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

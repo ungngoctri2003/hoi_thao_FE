@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Checkin Logic Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-case {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .registered { background: #e3f2fd; color: #1976d2; }
+        .checked-in { background: #e8f5e8; color: #2e7d32; }
+        .checked-out { background: #fff3e0; color: #f57c00; }
+        .cancelled { background: #ffebee; color: #d32f2f; }
+        .no-show { background: #f3e5f5; color: #7b1fa2; }
+        .log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Checkin Logic Fix</h1>
+        <p>Kiểm tra logic tính toán trạng thái checkin với dữ liệu mock</p>
+        
+        <button onclick="runTests()">Chạy Tests</button>
+        <button onclick="clearLog()">Xóa Log</button>
+        
+        <div id="log" class="log"></div>
+    </div>
+
+    <div class="container">
+        <h2>Test Results</h2>
+        <div id="testResults"></div>
+    </div>
+
+    <script>
+        function log(message, data = null) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            let logMessage = `[${timestamp}] ${message}`;
+            
+            if (data) {
+                logMessage += `\n${JSON.stringify(data, null, 2)}`;
+            }
+            
+            logElement.textContent += logMessage + '\n\n';
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        // Mock data để test
+        const mockData = [
+            {
+                name: "testnew123@example.com",
+                registrations: [
+                    {
+                        ID: 1,
+                        CONFERENCE_ID: 1,
+                        ATTENDEE_ID: 1,
+                        STATUS: "registered",
+                        REGISTRATION_DATE: "2024-01-15T10:00:00Z",
+                        CHECKIN_TIME: "2024-01-16T09:00:00Z",
+                        CHECKOUT_TIME: null
+                    }
+                ]
+            },
+            {
+                name: "triung8+2@gmail.com",
+                registrations: [
+                    {
+                        ID: 2,
+                        CONFERENCE_ID: 1,
+                        ATTENDEE_ID: 2,
+                        STATUS: "registered",
+                        REGISTRATION_DATE: "2024-01-15T10:00:00Z",
+                        CHECKIN_TIME: "2024-01-16T09:30:00Z",
+                        CHECKOUT_TIME: null
+                    }
+                ]
+            },
+            {
+                name: "user3@example.com",
+                registrations: [
+                    {
+                        ID: 3,
+                        CONFERENCE_ID: 1,
+                        ATTENDEE_ID: 3,
+                        STATUS: "registered",
+                        REGISTRATION_DATE: "2024-01-15T10:00:00Z",
+                        CHECKIN_TIME: "2024-01-16T09:00:00Z",
+                        CHECKOUT_TIME: "2024-01-16T17:00:00Z"
+                    }
+                ]
+            },
+            {
+                name: "user4@example.com",
+                registrations: [
+                    {
+                        ID: 4,
+                        CONFERENCE_ID: 1,
+                        ATTENDEE_ID: 4,
+                        STATUS: "cancelled",
+                        REGISTRATION_DATE: "2024-01-15T10:00:00Z",
+                        CHECKIN_TIME: null,
+                        CHECKOUT_TIME: null
+                    }
+                ]
+            }
+        ];
+
+        // Logic tính toán trạng thái (copy từ hook)
+        function calculateOverallStatus(registrations) {
+            if (registrations.length === 0) {
+                return 'registered';
+            }
+
+            // Lấy registration mới nhất dựa trên thời gian checkin/checkout hoặc registration date
+            const latestRegistration = registrations.reduce((latest, current) => {
+                const latestTime = latest.CHECKOUT_TIME || latest.CHECKIN_TIME || latest.REGISTRATION_DATE;
+                const currentTime = current.CHECKOUT_TIME || current.CHECKIN_TIME || current.REGISTRATION_DATE;
+                
+                // Debug logging
+                log('🔄 Comparing registrations:', {
+                    latest: {
+                        id: latest.ID,
+                        time: latestTime,
+                        checkin: latest.CHECKIN_TIME,
+                        checkout: latest.CHECKOUT_TIME
+                    },
+                    current: {
+                        id: current.ID,
+                        time: currentTime,
+                        checkin: current.CHECKIN_TIME,
+                        checkout: current.CHECKOUT_TIME
+                    }
+                });
+                
+                const latestDate = new Date(latestTime);
+                const currentDate = new Date(currentTime);
+                
+                log('🕐 Date comparison:', {
+                    latestDate: latestDate.toISOString(),
+                    currentDate: currentDate.toISOString(),
+                    isCurrentNewer: currentDate > latestDate
+                });
+                
+                return currentDate > latestDate ? current : latest;
+            });
+
+            log('🔍 Calculating status for registration:', {
+                id: latestRegistration.ID,
+                status: latestRegistration.STATUS,
+                checkinTime: latestRegistration.CHECKIN_TIME,
+                checkoutTime: latestRegistration.CHECKOUT_TIME,
+                registrationDate: latestRegistration.REGISTRATION_DATE
+            });
+
+            // Kiểm tra trạng thái theo thứ tự ưu tiên
+            // 1. Cancelled - cao nhất
+            if (latestRegistration.STATUS === 'cancelled') {
+                log('✅ Status: cancelled');
+                return 'cancelled';
+            }
+
+            // 2. No-show
+            if (latestRegistration.STATUS === 'no-show') {
+                log('✅ Status: no-show');
+                return 'no-show';
+            }
+
+            // 3. Checked-out - nếu có checkout time
+            if (latestRegistration.CHECKOUT_TIME) {
+                log('✅ Status: checked-out');
+                return 'checked-out';
+            }
+
+            // 4. Checked-in - nếu có checkin time nhưng chưa checkout
+            if (latestRegistration.CHECKIN_TIME) {
+                log('✅ Status: checked-in');
+                return 'checked-in';
+            }
+
+            // 5. Registered - mặc định
+            log('✅ Status: registered (default)');
+            return 'registered';
+        }
+
+        function runTests() {
+            clearLog();
+            log('🚀 Starting tests...');
+            
+            const testResults = document.getElementById('testResults');
+            testResults.innerHTML = '';
+
+            mockData.forEach((user, index) => {
+                log(`🔍 Testing user: ${user.name}`);
+                
+                const overallStatus = calculateOverallStatus(user.registrations);
+                
+                const testCase = document.createElement('div');
+                testCase.className = 'test-case';
+                
+                let statusClass = 'registered';
+                if (overallStatus === 'checked-in') statusClass = 'checked-in';
+                else if (overallStatus === 'checked-out') statusClass = 'checked-out';
+                else if (overallStatus === 'cancelled') statusClass = 'cancelled';
+                else if (overallStatus === 'no-show') statusClass = 'no-show';
+                
+                testCase.innerHTML = `
+                    <h3>Test Case ${index + 1}: ${user.name}</h3>
+                    <p><strong>Registrations:</strong> ${user.registrations.length}</p>
+                    <div class="status ${statusClass}">${overallStatus}</div>
+                    <h4>Chi tiết Registrations:</h4>
+                    <pre>${JSON.stringify(user.registrations, null, 2)}</pre>
+                `;
+                
+                testResults.appendChild(testCase);
+                
+                log(`✅ Final status for ${user.name}: ${overallStatus}`);
+                log('---');
+            });
+
+            log('✅ All tests completed!');
+        }
+
+        // Auto run when page loads
+        window.onload = function() {
+            runTests();
+        };
+    </script>
+</body>
+</html>

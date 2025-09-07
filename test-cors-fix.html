@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Test - Conference Management System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .info {
+            color: blue;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 CORS Test - Conference Management System</h1>
+        <p class="info">Testing CORS configuration after fixes</p>
+        
+        <div class="test-section">
+            <h3>1. Health Check (No Auth Required)</h3>
+            <button onclick="testHealthCheck()">Test Health Check</button>
+            <div id="health-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Login Test</h3>
+            <button onclick="testLogin()">Test Login</button>
+            <div id="login-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Profile Test (With Auth)</h3>
+            <button onclick="testProfile()">Test Profile</button>
+            <div id="profile-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. CORS Preflight Test</h3>
+            <button onclick="testPreflight()">Test OPTIONS Request</button>
+            <div id="preflight-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. All Tests</h3>
+            <button onclick="runAllTests()">Run All Tests</button>
+            <div id="all-results"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000/api/v1';
+        let authToken = null;
+
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            element.innerHTML += `<div class="${className}">${new Date().toLocaleTimeString()}: ${message}</div>`;
+        }
+
+        function clearLog(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+
+        async function testHealthCheck() {
+            clearLog('health-result');
+            log('health-result', 'Testing health check endpoint...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/../healthz`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('health-result', `✅ Health check successful: ${JSON.stringify(data)}`, 'success');
+                } else {
+                    log('health-result', `❌ Health check failed: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log('health-result', `❌ CORS Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLogin() {
+            clearLog('login-result');
+            log('login-result', 'Testing login endpoint...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.data.accessToken;
+                    log('login-result', `✅ Login successful: ${JSON.stringify(data)}`, 'success');
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    log('login-result', `❌ Login failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`, 'error');
+                }
+            } catch (error) {
+                log('login-result', `❌ CORS Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testProfile() {
+            clearLog('profile-result');
+            log('profile-result', 'Testing profile endpoint...', 'info');
+            
+            if (!authToken) {
+                log('profile-result', '❌ No auth token available. Please login first.', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/profile`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('profile-result', `✅ Profile request successful: ${JSON.stringify(data)}`, 'success');
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    log('profile-result', `❌ Profile request failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`, 'error');
+                }
+            } catch (error) {
+                log('profile-result', `❌ CORS Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPreflight() {
+            clearLog('preflight-result');
+            log('preflight-result', 'Testing CORS preflight (OPTIONS) request...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type'
+                    }
+                });
+                
+                if (response.ok) {
+                    log('preflight-result', `✅ Preflight request successful: ${response.status}`, 'success');
+                    log('preflight-result', `CORS Headers: ${JSON.stringify({
+                        'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                        'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                        'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
+                        'Access-Control-Allow-Credentials': response.headers.get('Access-Control-Allow-Credentials')
+                    })}`, 'info');
+                } else {
+                    log('preflight-result', `❌ Preflight request failed: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log('preflight-result', `❌ CORS Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function runAllTests() {
+            clearLog('all-results');
+            log('all-results', 'Running all CORS tests...', 'info');
+            
+            await testHealthCheck();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testLogin();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testProfile();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testPreflight();
+            
+            log('all-results', 'All tests completed!', 'info');
+        }
+
+        // Auto-run health check on page load
+        window.onload = function() {
+            log('all-results', 'Page loaded. Ready to test CORS configuration.', 'info');
+        };
+    </script>
+</body>
+</html>

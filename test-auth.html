@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Authentication</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Test Authentication Flow</h1>
+    
+    <div class="test-section info">
+        <h3>Test Steps:</h3>
+        <ol>
+            <li>Click "Test Login" to test the login API</li>
+            <li>Check if token is saved in cookies</li>
+            <li>Test getting user profile</li>
+            <li>Test logout</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h3>Test Login</h3>
+        <button onclick="testLogin()">Test Login (admin@conference.vn)</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test Get User Profile</h3>
+        <button onclick="testGetProfile()">Get Current User</button>
+        <div id="profile-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test Logout</h3>
+        <button onclick="testLogout()">Logout</button>
+        <div id="logout-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Check Cookies</h3>
+        <button onclick="checkCookies()">Check Cookies</button>
+        <div id="cookies-result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000/api/v1';
+        
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            element.parentElement.className = `test-section ${isError ? 'error' : 'success'}`;
+        }
+
+        async function testLogin() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@conference.vn',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('login-result', data);
+                } else {
+                    showResult('login-result', data, true);
+                }
+            } catch (error) {
+                showResult('login-result', { error: error.message }, true);
+            }
+        }
+
+        async function testGetProfile() {
+            try {
+                const token = getCookie('accessToken');
+                if (!token) {
+                    showResult('profile-result', { error: 'No token found' }, true);
+                    return;
+                }
+
+                // Test both endpoints
+                const [profileResponse, meResponse] = await Promise.all([
+                    fetch(`${API_BASE_URL}/profile`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        }
+                    }),
+                    fetch(`${API_BASE_URL}/users/me`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                ]);
+
+                const profileData = await profileResponse.json();
+                const meData = await meResponse.json();
+                
+                const result = {
+                    profile: profileData,
+                    me: meData,
+                    success: profileResponse.ok && meResponse.ok
+                };
+                
+                if (result.success) {
+                    showResult('profile-result', result);
+                } else {
+                    showResult('profile-result', result, true);
+                }
+            } catch (error) {
+                showResult('profile-result', { error: error.message }, true);
+            }
+        }
+
+        async function testLogout() {
+            try {
+                // Simulate logout by clearing cookies
+                document.cookie = 'accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                document.cookie = 'refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                
+                showResult('logout-result', { 
+                    message: 'Tokens cleared locally (no backend logout endpoint)',
+                    cookiesCleared: true 
+                });
+            } catch (error) {
+                showResult('logout-result', { error: error.message }, true);
+            }
+        }
+
+        function checkCookies() {
+            const cookies = document.cookie;
+            const cookieObj = {};
+            
+            cookies.split(';').forEach(cookie => {
+                const [name, value] = cookie.trim().split('=');
+                if (name && value) {
+                    cookieObj[name] = value;
+                }
+            });
+            
+            showResult('cookies-result', cookieObj);
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+    </script>
+</body>
+</html>

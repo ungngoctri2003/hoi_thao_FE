@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Google Redirect Flow</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #ffd700;
+        }
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .success {
+            border-left: 4px solid #2ecc71;
+            background: rgba(46, 204, 113, 0.1);
+        }
+        .error {
+            border-left: 4px solid #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+        }
+        .info {
+            border-left: 4px solid #3498db;
+            background: rgba(52, 152, 219, 0.1);
+        }
+        .debug-info {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Test Google Redirect Flow</h1>
+        
+        <div class="test-section">
+            <h3>📋 Current Status</h3>
+            <div id="currentStatus" class="debug-info">
+                Loading...
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Test Actions</h3>
+            <button onclick="testGoogleRedirect()">Test Google Redirect</button>
+            <button onclick="checkRedirectResult()">Check Redirect Result</button>
+            <button onclick="clearStorage()">Clear Storage</button>
+            <div id="testResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Debug Information</h3>
+            <div id="debugInfo" class="debug-info">
+                No debug info available
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div id="testResults" class="result info">
+                Ready to test Google redirect flow...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+            console.log(logMessage);
+            
+            const resultDiv = document.getElementById('testResults');
+            resultDiv.textContent += logMessage + '\n';
+            resultDiv.scrollTop = resultDiv.scrollHeight;
+        }
+
+        function showResult(elementId, content, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.textContent = content;
+            element.className = `result ${type}`;
+        }
+
+        function updateStatus() {
+            const statusDiv = document.getElementById('currentStatus');
+            const debugDiv = document.getElementById('debugInfo');
+            
+            const status = {
+                url: window.location.href,
+                pathname: window.location.pathname,
+                hasAccessToken: !!localStorage.getItem('accessToken'),
+                hasRefreshToken: !!localStorage.getItem('refreshToken'),
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString()
+            };
+            
+            statusDiv.innerHTML = `
+                <strong>Current URL:</strong> ${status.url}<br>
+                <strong>Pathname:</strong> ${status.pathname}<br>
+                <strong>Access Token:</strong> ${status.hasAccessToken ? '✅ Present' : '❌ Missing'}<br>
+                <strong>Refresh Token:</strong> ${status.hasRefreshToken ? '✅ Present' : '❌ Missing'}<br>
+                <strong>Timestamp:</strong> ${status.timestamp}
+            `;
+            
+            debugDiv.textContent = JSON.stringify(status, null, 2);
+        }
+
+        function testGoogleRedirect() {
+            log('Testing Google redirect flow...');
+            
+            // Simulate the redirect flow
+            const redirectUrl = `${window.location.origin}/auth/google/callback`;
+            log(`Redirect URL: ${redirectUrl}`);
+            
+            // Check if we're on the callback page
+            if (window.location.pathname === '/auth/google/callback') {
+                log('✅ Currently on callback page');
+                showResult('testResult', '✅ Successfully redirected to callback page!\n\nThis means the Google redirect flow is working correctly.', 'success');
+            } else {
+                log('ℹ️ Not on callback page, simulating redirect...');
+                showResult('testResult', `ℹ️ To test the full flow:\n1. Go to your app's login page\n2. Click "Đăng nhập với Google"\n3. You should be redirected to Google\n4. After authentication, you'll be redirected to: ${redirectUrl}`, 'info');
+            }
+        }
+
+        function checkRedirectResult() {
+            log('Checking redirect result...');
+            
+            // Check URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            
+            const result = {
+                urlParams: Object.fromEntries(urlParams.entries()),
+                hashParams: Object.fromEntries(hashParams.entries()),
+                hasTokens: !!localStorage.getItem('accessToken'),
+                currentPath: window.location.pathname
+            };
+            
+            if (Object.keys(result.urlParams).length > 0 || Object.keys(result.hashParams).length > 0) {
+                log('✅ Found URL parameters from redirect');
+                showResult('testResult', `✅ Redirect result found:\n${JSON.stringify(result, null, 2)}`, 'success');
+            } else {
+                log('ℹ️ No redirect parameters found');
+                showResult('testResult', `ℹ️ No redirect parameters found:\n${JSON.stringify(result, null, 2)}`, 'info');
+            }
+        }
+
+        function clearStorage() {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            log('Storage cleared');
+            updateStatus();
+        }
+
+        // Auto-update status
+        setInterval(updateStatus, 1000);
+        updateStatus();
+
+        // Log initial state
+        log('🚀 Google Redirect Flow Test initialized');
+        log(`Current URL: ${window.location.href}`);
+        log(`Current Path: ${window.location.pathname}`);
+    </script>
+</body>
+</html>

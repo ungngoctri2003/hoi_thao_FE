@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Account Disabled</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        button.danger {
+            background-color: #dc3545;
+        }
+        button.danger:hover {
+            background-color: #c82333;
+        }
+        button.success {
+            background-color: #28a745;
+        }
+        button.success:hover {
+            background-color: #218838;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .result.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .result.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .result.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .result.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.inactive {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status.suspended {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .user-info {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .user-info h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .user-info .field {
+            margin: 5px 0;
+        }
+        .user-info .field strong {
+            color: #495057;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .actions {
+            margin-top: 15px;
+        }
+        .actions button {
+            margin-right: 10px;
+        }
+        .user-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            background-color: #f8f9fa;
+        }
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .user-item:last-child {
+            border-bottom: none;
+        }
+        .user-details {
+            flex: 1;
+        }
+        .user-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .user-actions button {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Account Disabled Error</h1>
+        <p>Khắc phục lỗi "Account is disabled" bằng cách kiểm tra và sửa trạng thái tài khoản</p>
+        
+        <div class="test-section">
+            <h3>📋 Danh sách tài khoản</h3>
+            <p>Xem tất cả tài khoản và trạng thái của chúng</p>
+            <button onclick="loadAllUsers()">Tải danh sách tài khoản</button>
+            <div id="userList" class="user-list" style="display: none;"></div>
+            <div id="loadResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Kiểm tra tài khoản cụ thể</h3>
+            <p>Kiểm tra trạng thái của một tài khoản cụ thể</p>
+            <input type="email" id="checkEmail" placeholder="Email" value="admin@example.com">
+            <button onclick="checkSpecificUser()">Kiểm tra tài khoản</button>
+            <div id="checkResult" class="result" style="display: none;"></div>
+            <div id="userInfo" class="user-info" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔐 Test đăng nhập</h3>
+            <p>Test đăng nhập để xác nhận lỗi</p>
+            <input type="email" id="loginEmail" placeholder="Email" value="admin@example.com">
+            <input type="password" id="loginPassword" placeholder="Password" value="admin123">
+            <button onclick="testLogin()">Test đăng nhập</button>
+            <div id="loginResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>⚙️ Sửa trạng thái tài khoản</h3>
+            <p>Thay đổi trạng thái tài khoản để khắc phục lỗi</p>
+            <div id="fixActions" style="display: none;">
+                <button onclick="fixAllDisabledAccounts()" class="success">Sửa tất cả tài khoản bị khóa</button>
+                <button onclick="fixSpecificAccount()" class="success">Sửa tài khoản được chọn</button>
+            </div>
+            <div id="fixResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Log</h3>
+            <button onclick="clearLog()">Xóa log</button>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001/api';
+        let allUsers = [];
+        let selectedUser = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span style="color: #666;">[${timestamp}]</span> <span style="color: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#007bff'};">${message}</span>`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function getStatusClass(status) {
+            switch (status) {
+                case 'active': return 'active';
+                case 'inactive': return 'inactive';
+                case 'suspended': return 'suspended';
+                default: return 'inactive';
+            }
+        }
+
+        function getStatusText(status) {
+            switch (status) {
+                case 'active': return 'Hoạt động';
+                case 'inactive': return 'Không hoạt động';
+                case 'suspended': return 'Bị đình chỉ';
+                default: return 'Không xác định';
+            }
+        }
+
+        async function loadAllUsers() {
+            const resultDiv = document.getElementById('loadResult');
+            const userListDiv = document.getElementById('userList');
+            const fixActionsDiv = document.getElementById('fixActions');
+            
+            try {
+                log('Đang tải danh sách tài khoản...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/users?page=1&limit=100`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                allUsers = data.data || [];
+                
+                if (allUsers.length === 0) {
+                    resultDiv.className = 'result warning';
+                    resultDiv.textContent = 'Không tìm thấy tài khoản nào';
+                    resultDiv.style.display = 'block';
+                    return;
+                }
+
+                // Display users
+                userListDiv.innerHTML = '';
+                allUsers.forEach(user => {
+                    const userItem = document.createElement('div');
+                    userItem.className = 'user-item';
+                    userItem.innerHTML = `
+                        <div class="user-details">
+                            <strong>${user.name}</strong> (${user.email})<br>
+                            <small>Vai trò: ${user.role} | Trạng thái: <span class="status ${getStatusClass(user.status)}">${getStatusText(user.status)}</span></small>
+                        </div>
+                        <div class="user-actions">
+                            <button onclick="selectUser('${user.id}')" class="success">Chọn</button>
+                            <button onclick="fixUserStatus('${user.id}', 'active')" class="success">Kích hoạt</button>
+                        </div>
+                    `;
+                    userListDiv.appendChild(userItem);
+                });
+
+                userListDiv.style.display = 'block';
+                fixActionsDiv.style.display = 'block';
+
+                const disabledCount = allUsers.filter(u => u.status !== 'active').length;
+                
+                resultDiv.className = 'result info';
+                resultDiv.textContent = `Đã tải ${allUsers.length} tài khoản\nTài khoản bị khóa: ${disabledCount}\nTài khoản hoạt động: ${allUsers.length - disabledCount}`;
+                resultDiv.style.display = 'block';
+                
+                log(`Đã tải ${allUsers.length} tài khoản, trong đó ${disabledCount} tài khoản bị khóa`, 'info');
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Lỗi: ${error.message}`;
+                resultDiv.style.display = 'block';
+                log(`Lỗi tải danh sách tài khoản: ${error.message}`, 'error');
+            }
+        }
+
+        function selectUser(userId) {
+            selectedUser = allUsers.find(u => u.id === userId);
+            if (selectedUser) {
+                log(`Đã chọn tài khoản: ${selectedUser.name} (${selectedUser.email})`, 'info');
+                // Update the check email field
+                document.getElementById('checkEmail').value = selectedUser.email;
+            }
+        }
+
+        async function checkSpecificUser() {
+            const email = document.getElementById('checkEmail').value;
+            const resultDiv = document.getElementById('checkResult');
+            const userInfoDiv = document.getElementById('userInfo');
+            
+            if (!email) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = 'Vui lòng nhập email';
+                resultDiv.style.display = 'block';
+                return;
+            }
+
+            const user = allUsers.find(u => u.email === email);
+            if (!user) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Không tìm thấy tài khoản với email: ${email}`;
+                resultDiv.style.display = 'block';
+                return;
+            }
+
+            selectedUser = user;
+
+            // Display user info
+            userInfoDiv.innerHTML = `
+                <h4>📊 Thông tin tài khoản</h4>
+                <div class="field"><strong>ID:</strong> ${user.id}</div>
+                <div class="field"><strong>Tên:</strong> ${user.name}</div>
+                <div class="field"><strong>Email:</strong> ${user.email}</div>
+                <div class="field"><strong>Vai trò:</strong> ${user.role}</div>
+                <div class="field"><strong>Trạng thái:</strong> <span class="status ${getStatusClass(user.status)}">${getStatusText(user.status)}</span></div>
+                <div class="field"><strong>Lần đăng nhập cuối:</strong> ${user.lastLogin}</div>
+                <div class="field"><strong>Ngày tạo:</strong> ${user.createdAt}</div>
+            `;
+            userInfoDiv.style.display = 'block';
+
+            resultDiv.className = 'result info';
+            resultDiv.textContent = `Tài khoản: ${user.name}\nTrạng thái: ${user.status}\n${user.status !== 'active' ? '⚠️ Tài khoản bị khóa - đây là nguyên nhân gây lỗi "Account is disabled"' : '✅ Tài khoản hoạt động bình thường'}`;
+            resultDiv.style.display = 'block';
+            
+            log(`Kiểm tra tài khoản: ${user.name} - Trạng thái: ${user.status}`, user.status !== 'active' ? 'warning' : 'success');
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const resultDiv = document.getElementById('loginResult');
+            
+            if (!email || !password) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = 'Vui lòng nhập email và password';
+                resultDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                log(`Đang test đăng nhập: ${email}`, 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `Đăng nhập thất bại:\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.style.display = 'block';
+                    
+                    if (data.error && data.error.code === 'ACCOUNT_DISABLED') {
+                        log(`❌ Lỗi "Account is disabled" - Tài khoản bị vô hiệu hóa`, 'error');
+                    } else {
+                        log(`❌ Đăng nhập thất bại: ${data.message || data.error?.message || 'Unknown error'}`, 'error');
+                    }
+                    return;
+                }
+
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `Đăng nhập thành công!\nAccess Token: ${data.data?.accessToken ? 'Có' : 'Không'}\nRefresh Token: ${data.data?.refreshToken ? 'Có' : 'Không'}`;
+                resultDiv.style.display = 'block';
+                log(`✅ Đăng nhập thành công!`, 'success');
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Lỗi: ${error.message}`;
+                resultDiv.style.display = 'block';
+                log(`❌ Lỗi đăng nhập: ${error.message}`, 'error');
+            }
+        }
+
+        async function fixUserStatus(userId, newStatus) {
+            try {
+                log(`Đang sửa trạng thái tài khoản ${userId} thành: ${newStatus}`, 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: newStatus }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                log(`✅ Đã sửa trạng thái tài khoản ${userId} thành: ${newStatus}`, 'success');
+                
+                // Refresh user list
+                loadAllUsers();
+                
+            } catch (error) {
+                log(`❌ Lỗi sửa trạng thái tài khoản: ${error.message}`, 'error');
+            }
+        }
+
+        async function fixAllDisabledAccounts() {
+            const resultDiv = document.getElementById('fixResult');
+            const disabledUsers = allUsers.filter(u => u.status !== 'active');
+            
+            if (disabledUsers.length === 0) {
+                resultDiv.className = 'result info';
+                resultDiv.textContent = 'Không có tài khoản nào bị khóa';
+                resultDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                log(`Đang sửa ${disabledUsers.length} tài khoản bị khóa...`, 'info');
+                
+                let successCount = 0;
+                let errorCount = 0;
+                
+                for (const user of disabledUsers) {
+                    try {
+                        await fixUserStatus(user.id, 'active');
+                        successCount++;
+                    } catch (error) {
+                        errorCount++;
+                        log(`❌ Lỗi sửa tài khoản ${user.email}: ${error.message}`, 'error');
+                    }
+                }
+                
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `Đã sửa ${successCount}/${disabledUsers.length} tài khoản\nThành công: ${successCount}\nLỗi: ${errorCount}`;
+                resultDiv.style.display = 'block';
+                
+                log(`✅ Hoàn thành sửa tài khoản: ${successCount} thành công, ${errorCount} lỗi`, 'success');
+                
+                // Refresh user list
+                setTimeout(() => loadAllUsers(), 1000);
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Lỗi: ${error.message}`;
+                resultDiv.style.display = 'block';
+                log(`❌ Lỗi sửa tài khoản: ${error.message}`, 'error');
+            }
+        }
+
+        async function fixSpecificAccount() {
+            if (!selectedUser) {
+                log('❌ Vui lòng chọn một tài khoản trước', 'error');
+                return;
+            }
+
+            const resultDiv = document.getElementById('fixResult');
+            
+            try {
+                log(`Đang sửa tài khoản: ${selectedUser.name} (${selectedUser.email})`, 'info');
+                
+                await fixUserStatus(selectedUser.id, 'active');
+                
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `Đã sửa tài khoản ${selectedUser.name} thành công!`;
+                resultDiv.style.display = 'block';
+                
+                // Refresh user info
+                setTimeout(() => checkSpecificUser(), 1000);
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Lỗi: ${error.message}`;
+                resultDiv.style.display = 'block';
+                log(`❌ Lỗi sửa tài khoản: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize
+        log('Trang sửa lỗi "Account is disabled" đã sẵn sàng', 'info');
+        log('Hướng dẫn: 1) Tải danh sách tài khoản 2) Kiểm tra tài khoản bị khóa 3) Sửa trạng thái', 'info');
+    </script>
+</body>
+</html>

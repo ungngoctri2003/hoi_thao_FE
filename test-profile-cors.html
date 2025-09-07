@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Profile Update CORS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .warning {
+            color: orange;
+            font-weight: bold;
+        }
+        .info {
+            background-color: #e7f3ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .log {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .user-info {
+            background-color: #f0f8ff;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            margin: 10px 0;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Test Profile Update CORS</h1>
+        <p>Kiểm tra lỗi CORS khi cập nhật thông tin profile và các giải pháp fallback.</p>
+        
+        <div id="status" class="info">
+            Đang khởi tạo test...
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>1. Đăng nhập</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" value="admin@conference.vn" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Mật khẩu:</label>
+                <input type="password" id="password" name="password" value="admin123" required>
+            </div>
+            <button type="button" onclick="login()">Đăng nhập</button>
+            <button type="button" onclick="getCurrentUser()">Lấy thông tin hiện tại</button>
+        </form>
+        <div id="loginResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>2. Thông tin người dùng hiện tại</h2>
+        <div id="currentUser"></div>
+    </div>
+
+    <div class="container">
+        <h2>3. Test Profile Update</h2>
+        <form id="updateForm">
+            <div class="form-group">
+                <label for="updateName">Tên mới:</label>
+                <input type="text" id="updateName" name="name" placeholder="Nhập tên mới">
+            </div>
+            <div class="form-group">
+                <label for="updateEmail">Email mới:</label>
+                <input type="email" id="updateEmail" name="email" placeholder="Nhập email mới">
+            </div>
+            <div class="form-group">
+                <label for="updateAvatar">Avatar URL:</label>
+                <input type="url" id="updateAvatar" name="avatar" placeholder="Nhập URL ảnh đại diện">
+            </div>
+        </form>
+        
+        <div class="test-section">
+            <h3>🧪 Test Actions</h3>
+            <button onclick="testPATCHMethod()" id="patchBtn">Test PATCH Method</button>
+            <button onclick="testPOSTFallback()" id="postBtn">Test POST Fallback</button>
+            <button onclick="testCORSHeaders()" id="corsBtn">Test CORS Headers</button>
+            <button onclick="testProfileUpdate()" id="updateBtn" disabled>Update Profile</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+        
+        <div id="updateResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>4. Test Log</h2>
+        <div id="log" class="log">Ready to test...</div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000/api/v1';
+        let currentUser = null;
+        let currentToken = null;
+        
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = type;
+        }
+        
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            logEl.textContent += logEntry + '\n';
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(logEntry);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').textContent = 'Log cleared...\n';
+        }
+        
+        function showResult(elementId, message, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="${isError ? 'error' : 'success'}">${message}</div>`;
+        }
+        
+        function showUserInfo(elementId, userInfo) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `
+                <div class="user-info">
+                    <h3>Thông tin người dùng:</h3>
+                    <p><strong>ID:</strong> ${userInfo.id}</p>
+                    <p><strong>Tên:</strong> ${userInfo.name}</p>
+                    <p><strong>Email:</strong> ${userInfo.email}</p>
+                    <p><strong>Role:</strong> ${userInfo.role}</p>
+                    <p><strong>Avatar:</strong> ${userInfo.avatar || 'Không có'}</p>
+                </div>
+            `;
+        }
+        
+        async function getCurrentToken() {
+            const cookies = document.cookie.split(';');
+            const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('accessToken='));
+            if (tokenCookie) {
+                return tokenCookie.split('=')[1];
+            }
+            return localStorage.getItem('accessToken');
+        }
+        
+        // Đăng nhập
+        async function login() {
+            const formData = new FormData(document.getElementById('loginForm'));
+            const data = {
+                email: formData.get('email'),
+                password: formData.get('password')
+            };
+            
+            log(`Đang đăng nhập: ${data.email}`);
+            updateStatus('Đang đăng nhập...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    log(`Đăng nhập thành công: ${JSON.stringify(result)}`);
+                    
+                    // Lưu token
+                    if (result.data.accessToken) {
+                        localStorage.setItem('accessToken', result.data.accessToken);
+                        localStorage.setItem('refreshToken', result.data.refreshToken);
+                        currentToken = result.data.accessToken;
+                        log('Token đã được lưu');
+                    }
+                    
+                    showResult('loginResult', 'Đăng nhập thành công!');
+                    updateStatus('Đăng nhập thành công', 'success');
+                    
+                    // Tự động lấy thông tin người dùng
+                    setTimeout(() => {
+                        getCurrentUser();
+                    }, 1000);
+                } else {
+                    log(`Đăng nhập thất bại: ${result.message}`);
+                    showResult('loginResult', `Lỗi: ${result.message}`, true);
+                    updateStatus('Đăng nhập thất bại', 'error');
+                }
+            } catch (error) {
+                log(`Lỗi đăng nhập: ${error.message}`);
+                showResult('loginResult', `Lỗi: ${error.message}`, true);
+                updateStatus('Đăng nhập thất bại', 'error');
+            }
+        }
+        
+        // Lấy thông tin người dùng hiện tại
+        async function getCurrentUser() {
+            const token = await getCurrentToken();
+            
+            if (!token) {
+                showResult('currentUser', 'Chưa đăng nhập', true);
+                return;
+            }
+            
+            log('Đang lấy thông tin người dùng...');
+            
+            try {
+                // Lấy thông tin profile
+                const profileResponse = await fetch(`${API_BASE_URL}/profile`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                // Lấy permissions
+                const meResponse = await fetch(`${API_BASE_URL}/users/me`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (profileResponse.ok && meResponse.ok) {
+                    const profileData = await profileResponse.json();
+                    const meData = await meResponse.json();
+                    
+                    log(`Thông tin profile: ${JSON.stringify(profileData)}`);
+                    log(`Thông tin permissions: ${JSON.stringify(meData)}`);
+                    
+                    const userData = profileData.data.user;
+                    const attendeeData = profileData.data.attendee;
+                    const permissions = meData.data.permissions || [];
+                    
+                    // Xác định role
+                    let role = 'attendee';
+                    if (permissions.includes('roles.admin')) {
+                        role = 'admin';
+                    } else if (permissions.includes('conferences.create') || permissions.includes('conferences.update')) {
+                        role = 'staff';
+                    }
+                    
+                    currentUser = {
+                        id: userData.ID,
+                        email: userData.EMAIL,
+                        name: userData.NAME,
+                        role: role,
+                        avatar: userData.AVATAR_URL || attendeeData?.AVATAR_URL || null
+                    };
+                    
+                    log(`Thông tin người dùng: ${JSON.stringify(currentUser)}`);
+                    showUserInfo('currentUser', currentUser);
+                    
+                    // Enable update button
+                    document.getElementById('updateBtn').disabled = false;
+                    
+                    // Fill form with current data
+                    document.getElementById('updateName').value = currentUser.name;
+                    document.getElementById('updateEmail').value = currentUser.email;
+                    document.getElementById('updateAvatar').value = currentUser.avatar || '';
+                    
+                } else {
+                    log(`Lỗi lấy thông tin: Profile=${profileResponse.status}, Me=${meResponse.status}`);
+                    showResult('currentUser', 'Lỗi lấy thông tin người dùng', true);
+                }
+            } catch (error) {
+                log(`Lỗi lấy thông tin người dùng: ${error.message}`);
+                showResult('currentUser', `Lỗi: ${error.message}`, true);
+            }
+        }
+        
+        // Test PATCH method
+        async function testPATCHMethod() {
+            log('🔍 Testing PATCH method...');
+            
+            try {
+                const token = await getCurrentToken();
+                if (!token) {
+                    log('❌ No token found', 'error');
+                    return;
+                }
+                
+                // Test preflight request
+                const preflightResponse = await fetch(`${API_BASE_URL}/users/me`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'PATCH',
+                        'Access-Control-Request-Headers': 'Content-Type,Authorization'
+                    }
+                });
+                
+                const allowMethods = preflightResponse.headers.get('Access-Control-Allow-Methods');
+                const allowOrigin = preflightResponse.headers.get('Access-Control-Allow-Origin');
+                
+                log(`Preflight response: ${preflightResponse.status}`);
+                log(`Allow-Methods: ${allowMethods}`);
+                log(`Allow-Origin: ${allowOrigin}`);
+                
+                if (allowMethods && allowMethods.includes('PATCH')) {
+                    log('✅ PATCH method is allowed by CORS', 'success');
+                    
+                    // Test actual PATCH request
+                    const patchResponse = await fetch(`${API_BASE_URL}/users/me`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            name: 'Test PATCH Update'
+                        })
+                    });
+                    
+                    if (patchResponse.ok) {
+                        log('✅ PATCH request successful', 'success');
+                        updateStatus('✅ PATCH method works!', 'success');
+                    } else {
+                        log(`⚠️ PATCH request failed: ${patchResponse.status}`, 'warning');
+                        updateStatus('⚠️ PATCH allowed but request failed', 'warning');
+                    }
+                } else {
+                    log('❌ PATCH method is NOT allowed by CORS', 'error');
+                    updateStatus('❌ CORS Error: PATCH method not allowed', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ PATCH test failed: ${error.message}`, 'error');
+                if (error.message.includes('CORS') || error.message.includes('PATCH')) {
+                    updateStatus('❌ CORS Error: PATCH method blocked', 'error');
+                } else {
+                    updateStatus(`❌ PATCH test failed: ${error.message}`, 'error');
+                }
+            }
+        }
+        
+        // Test POST fallback
+        async function testPOSTFallback() {
+            log('🔍 Testing POST fallback...');
+            
+            try {
+                const token = await getCurrentToken();
+                if (!token) {
+                    log('❌ No token found', 'error');
+                    return;
+                }
+                
+                // Test POST with _method override
+                const postResponse = await fetch(`${API_BASE_URL}/users/me`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        _method: 'PATCH',
+                        name: 'Test POST Fallback'
+                    })
+                });
+                
+                if (postResponse.ok) {
+                    log('✅ POST fallback successful', 'success');
+                    updateStatus('✅ POST fallback works!', 'success');
+                } else {
+                    log(`⚠️ POST fallback failed: ${postResponse.status}`, 'warning');
+                    updateStatus('⚠️ POST fallback failed', 'warning');
+                }
+                
+            } catch (error) {
+                log(`❌ POST fallback test failed: ${error.message}`, 'error');
+                updateStatus(`❌ POST fallback failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Test CORS headers
+        async function testCORSHeaders() {
+            log('🔍 Testing CORS headers...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/users/me`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'PATCH',
+                        'Access-Control-Request-Headers': 'Content-Type,Authorization'
+                    }
+                });
+                
+                const headers = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
+                    'Access-Control-Allow-Credentials': response.headers.get('Access-Control-Allow-Credentials')
+                };
+                
+                log('CORS Headers:');
+                Object.entries(headers).forEach(([key, value]) => {
+                    log(`  ${key}: ${value}`);
+                });
+                
+                updateStatus('✅ CORS headers retrieved', 'success');
+                
+            } catch (error) {
+                log(`❌ CORS headers test failed: ${error.message}`, 'error');
+                updateStatus(`❌ CORS headers test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Test profile update
+        async function testProfileUpdate() {
+            const formData = new FormData(document.getElementById('updateForm'));
+            const updateData = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                avatar: formData.get('avatar')
+            };
+            
+            // Remove empty fields
+            Object.keys(updateData).forEach(key => {
+                if (!updateData[key]) {
+                    delete updateData[key];
+                }
+            });
+            
+            if (Object.keys(updateData).length === 0) {
+                showResult('updateResult', 'Vui lòng nhập ít nhất một trường để cập nhật', true);
+                return;
+            }
+            
+            log(`Đang cập nhật profile: ${JSON.stringify(updateData)}`);
+            updateStatus('Đang cập nhật profile...', 'info');
+            
+            try {
+                const token = await getCurrentToken();
+                if (!token) {
+                    showResult('updateResult', 'Chưa đăng nhập', true);
+                    return;
+                }
+                
+                // Try PATCH first
+                let response;
+                try {
+                    response = await fetch(`${API_BASE_URL}/users/me`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(updateData)
+                    });
+                    
+                    if (response.ok) {
+                        log('✅ PATCH method successful', 'success');
+                    } else {
+                        throw new Error(`PATCH failed: ${response.status}`);
+                    }
+                    
+                } catch (patchError) {
+                    const errorMessage = patchError.message;
+                    if (errorMessage.includes('CORS') || errorMessage.includes('PATCH')) {
+                        log('⚠️ PATCH blocked by CORS, trying POST fallback...', 'warning');
+                        
+                        // Fallback to POST
+                        response = await fetch(`${API_BASE_URL}/users/me`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ ...updateData, _method: 'PATCH' })
+                        });
+                        
+                        if (response.ok) {
+                            log('✅ POST fallback successful', 'success');
+                        } else {
+                            throw new Error(`POST fallback failed: ${response.status}`);
+                        }
+                    } else {
+                        throw patchError;
+                    }
+                }
+                
+                const result = await response.json();
+                log(`Update result: ${JSON.stringify(result)}`);
+                
+                showResult('updateResult', 'Cập nhật profile thành công!');
+                updateStatus('✅ Profile updated successfully', 'success');
+                
+                // Refresh user info
+                setTimeout(() => {
+                    getCurrentUser();
+                }, 1000);
+                
+            } catch (error) {
+                log(`❌ Profile update failed: ${error.message}`, 'error');
+                showResult('updateResult', `Lỗi cập nhật: ${error.message}`, true);
+                updateStatus('❌ Profile update failed', 'error');
+            }
+        }
+        
+        // Initialize
+        window.addEventListener('load', () => {
+            updateStatus('✅ Profile CORS test ready', 'success');
+            log('🚀 Profile CORS test initialized');
+            log('📋 Tests available:');
+            log('  1. PATCH method test');
+            log('  2. POST fallback test');
+            log('  3. CORS headers test');
+            log('  4. Profile update test');
+            
+            // Check if already logged in
+            getCurrentToken().then(token => {
+                if (token) {
+                    log('Token found, getting user info...');
+                    getCurrentUser();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
