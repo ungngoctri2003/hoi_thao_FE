@@ -13,36 +13,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Search, MoreHorizontal, Edit, Trash2, Shield, Users, Key, Settings, Eye, UserPlus, Plus, Calendar } from "lucide-react"
 import { UserRoleDialog } from "./user-role-dialog"
 import { UserDetailDialog } from "./user-detail-dialog"
-import { PermissionMatrix } from "./permission-matrix"
 import { CreateRoleDialog } from "./create-role-dialog"
 import { EditRoleDialog } from "./edit-role-dialog"
 import { ConferenceAssignmentDialog } from "./conference-assignment-dialog"
 import { ConferenceAssignmentsList } from "./conference-assignments-list"
 import { UserConferenceList } from "./user-conference-list"
 import { AuthErrorHandler } from "../auth/auth-error-handler"
-import { apiClient, Role, Permission as ApiPermission, User, CreateUserRequest, UpdateUserRequest } from "@/lib/api"
+import { apiClient, Role, User, CreateUserRequest, UpdateUserRequest } from "@/lib/api"
 import { toast } from "sonner"
 
-// Role permissions mapping - will be loaded from API
-let rolePermissionsCache: Record<string, string[]> = {}
-
-// Load role permissions from API
-const loadRolePermissions = async (roles: Role[]) => {
-  const rolePermissions: Record<string, string[]> = {}
-  
-  for (const role of roles) {
-    try {
-      const response = await apiClient.getRolePermissions(role.id)
-      rolePermissions[role.code] = response.data.map(p => p.id.toString())
-    } catch (error) {
-      console.error(`Error loading permissions for role ${role.code}:`, error)
-      rolePermissions[role.code] = []
-    }
-  }
-  
-  rolePermissionsCache = rolePermissions
-  return rolePermissions
-}
 
 const roleColors = {
   admin: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
@@ -71,8 +50,6 @@ const statusLabels = {
 export function RoleManagement() {
   const [users, setUsers] = useState<User[]>([])
   const [roles, setRoles] = useState<Role[]>([])
-  const [permissions, setPermissions] = useState<ApiPermission[]>([])
-  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
@@ -135,6 +112,15 @@ export function RoleManagement() {
       // For now, we'll load all users and do client-side filtering
       // In a real app, you'd want to implement server-side filtering
       const usersResponse = await apiClient.getUsers(1, 1000) // Load more users for filtering
+      
+      // Debug: Log user data to check avatar field
+      console.log('Users data from API:', usersResponse.data.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        avatar: u.avatar
+      })))
+      
       setAllUsers(usersResponse.data)
       
       // Apply client-side filtering
@@ -163,17 +149,9 @@ export function RoleManagement() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [rolesResponse, permissionsResponse] = await Promise.all([
-        apiClient.getRoles(),
-        apiClient.getPermissions()
-      ])
+      const rolesResponse = await apiClient.getRoles()
       
       setRoles(rolesResponse.data)
-      setPermissions(permissionsResponse.data)
-      
-      // Load role permissions
-      const rolePerms = await loadRolePermissions(rolesResponse.data)
-      setRolePermissions(rolePerms)
       
       // Load users separately with filtering
       await loadUsers()
@@ -185,23 +163,17 @@ export function RoleManagement() {
         toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.')
         // Set empty data instead of showing error
         setRoles([])
-        setPermissions([])
         setUsers([])
-        setRolePermissions({})
       } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
         toast.error('Bạn không có quyền truy cập tính năng này. Vui lòng liên hệ quản trị viên.')
         // Set empty data instead of showing error
         setRoles([])
-        setPermissions([])
         setUsers([])
-        setRolePermissions({})
       } else {
         toast.error(`Lỗi tải dữ liệu: ${errorMessage}`)
         // Set empty data on error
         setRoles([])
-        setPermissions([])
         setUsers([])
-        setRolePermissions({})
       }
     } finally {
       setLoading(false)
@@ -378,49 +350,20 @@ export function RoleManagement() {
     }
   }
 
-  const handlePermissionChange = async (roleId: number, permissionId: number, checked: boolean) => {
-    try {
-      if (checked) {
-        await apiClient.assignPermissionToRole(roleId, { permissionId })
-        toast.success('Đã gán quyền thành công')
-      } else {
-        await apiClient.removePermissionFromRole(roleId, permissionId)
-        toast.success('Đã gỡ quyền thành công')
-      }
-      
-      // Reload role permissions to reflect changes
-      const rolePerms = await loadRolePermissions(roles)
-      setRolePermissions(rolePerms)
-      
-      // Also refresh user permissions if this affects current user
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
-      if (currentUser.role) {
-        // Trigger permission refresh for current user
-        window.dispatchEvent(new CustomEvent('permissions-changed', {
-          detail: { roleId, permissionId, checked }
-        }))
-      }
-    } catch (error: any) {
-      console.error('Error updating permission:', error)
-      const errorMessage = error?.message || 'Không thể cập nhật quyền'
-      toast.error(errorMessage)
-      
-      // If it's an auth error, suggest login
-      if (errorMessage.includes('quyền truy cập') || errorMessage.includes('Unauthorized')) {
-        toast.error('Vui lòng đăng nhập lại để tiếp tục')
-      }
-      
-      // Re-throw error so permission matrix can handle it
-      throw error
-    }
-  }
 
   const getInitials = (name: string) => {
+    if (!name || name.trim() === '') {
+      return 'U'
+    }
+    
     return name
+      .trim()
       .split(" ")
+      .filter(n => n.length > 0)
       .map((n) => n[0])
       .join("")
       .toUpperCase()
+      .slice(0, 2) // Giới hạn tối đa 2 ký tự
   }
 
   const getRoleStats = () => {
@@ -449,7 +392,7 @@ export function RoleManagement() {
   }
 
   // Show message if no data and not loading (likely auth issue)
-  if (!loading && roles.length === 0 && permissions.length === 0) {
+  if (!loading && roles.length === 0) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -514,7 +457,7 @@ export function RoleManagement() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tổng vai trò</CardTitle>
@@ -522,15 +465,6 @@ export function RoleManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{roles.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tổng quyền</CardTitle>
-            <Key className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{permissions.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -566,7 +500,6 @@ export function RoleManagement() {
         <TabsList>
           <TabsTrigger value="roles">Vai trò</TabsTrigger>
           <TabsTrigger value="users">Người dùng</TabsTrigger>
-          <TabsTrigger value="permissions">Phân quyền</TabsTrigger>
           <TabsTrigger value="conference-assignments">Giao hội nghị</TabsTrigger>
         </TabsList>
 
@@ -616,11 +549,6 @@ export function RoleManagement() {
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
-                        </div>
-                        <div className="mt-3">
-                          <p className="text-sm text-muted-foreground">
-                            Quyền: {rolePermissions[role.code]?.length || 0} quyền
-                          </p>
                         </div>
                       </Card>
                     ))}
@@ -704,8 +632,13 @@ export function RoleManagement() {
                         <TableCell>
                           <div className="flex items-center space-x-3">
                             <Avatar>
-                              <AvatarImage src={user.avatar || "/placeholder.svg"} />
-                              <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                              <AvatarImage 
+                                src={user.avatar && user.avatar.trim() !== '' ? user.avatar : undefined} 
+                                alt={`${user.name} avatar`}
+                              />
+                              <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                                {getInitials(user.name)}
+                              </AvatarFallback>
                             </Avatar>
                             <div>
                               <div className="font-medium">{user.name}</div>
@@ -831,58 +764,6 @@ export function RoleManagement() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="permissions" className="space-y-4">
-          {/* Permissions List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Danh sách quyền</CardTitle>
-              <CardDescription>
-                Hiển thị {permissions.length} quyền từ hệ thống
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {permissions.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Key className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">Chưa có quyền nào trong hệ thống</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {permissions.map((permission) => (
-                      <Card key={permission.id} className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="font-semibold">{permission.name}</h3>
-                            <p className="text-sm text-muted-foreground">ID: {permission.id}</p>
-                            {permission.description && (
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {permission.description}
-                              </p>
-                            )}
-                          </div>
-                          {permission.category && (
-                            <Badge variant="outline">
-                              {permission.category}
-                            </Badge>
-                          )}
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Permission Matrix */}
-          <PermissionMatrix 
-            permissions={permissions} 
-            rolePermissions={rolePermissions}
-            roles={roles}
-            onPermissionChange={handlePermissionChange}
-          />
-        </TabsContent>
 
         <TabsContent value="conference-assignments" className="space-y-4">
           {/* Conference Assignments Management */}

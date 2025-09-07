@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Search, MoreHorizontal, Edit, Trash2, Eye, Calendar, Users, Settings, Plus, RotateCcw, AlertTriangle } from "lucide-react"
@@ -260,7 +261,7 @@ export function ConferenceAssignmentsList({
           email: 'admin@example.com',
           name: 'Nguyễn Văn Admin',
           role: 'admin',
-          avatar: '',
+          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=32&h=32&fit=crop&crop=face',
           createdAt: new Date().toISOString(),
           status: 'active',
           lastLogin: new Date().toISOString()
@@ -270,7 +271,7 @@ export function ConferenceAssignmentsList({
           email: 'staff@example.com',
           name: 'Trần Thị Staff',
           role: 'staff',
-          avatar: '',
+          avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=32&h=32&fit=crop&crop=face',
           createdAt: new Date().toISOString(),
           status: 'active',
           lastLogin: new Date().toISOString()
@@ -280,7 +281,7 @@ export function ConferenceAssignmentsList({
           email: 'manager@example.com',
           name: 'Lê Văn Manager',
           role: 'staff',
-          avatar: '',
+          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=32&h=32&fit=crop&crop=face',
           createdAt: new Date().toISOString(),
           status: 'active',
           lastLogin: new Date().toISOString()
@@ -290,7 +291,7 @@ export function ConferenceAssignmentsList({
           email: 'attendee@example.com',
           name: 'Phạm Thị Attendee',
           role: 'attendee',
-          avatar: '',
+          avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=32&h=32&fit=crop&crop=face',
           createdAt: new Date().toISOString(),
           status: 'active',
           lastLogin: new Date().toISOString()
@@ -454,6 +455,21 @@ export function ConferenceAssignmentsList({
     return user?.email || ''
   }
 
+  const getInitials = (name: string) => {
+    if (!name || name.trim() === '') {
+      return 'U'
+    }
+    
+    return name
+      .trim()
+      .split(" ")
+      .filter(n => n.length > 0)
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) // Giới hạn tối đa 2 ký tự
+  }
+
   // Dialog handlers
   const handleCreateNew = () => {
     if (onCreateNew) {
@@ -611,13 +627,22 @@ export function ConferenceAssignmentsList({
                     const latestAssignment = group.assignments
                       .sort((a, b) => new Date(b.assignedAt || 0).getTime() - new Date(a.assignedAt || 0).getTime())[0]
 
+                    // Find user object to get avatar
+                    const user = users.find(u => Number(u.id) === group.userId)
+
                     return (
                       <TableRow key={group.userId}>
                         <TableCell>
                           <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                              <Users className="h-4 w-4 text-primary" />
-                            </div>
+                            <Avatar>
+                              <AvatarImage 
+                                src={user?.avatar && user.avatar.trim() !== '' ? user.avatar : undefined} 
+                                alt={`${group.userName} avatar`}
+                              />
+                              <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                                {getInitials(group.userName)}
+                              </AvatarFallback>
+                            </Avatar>
                             <div>
                               <div className="font-medium">{group.userName}</div>
                               <div className="text-sm text-muted-foreground">{group.userEmail}</div>
