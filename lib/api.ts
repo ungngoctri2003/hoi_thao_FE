@@ -1435,6 +1435,27 @@ class ApiClient {
     return { data: mapped, meta: response.meta };
   }
 
+  // Get all users (APP_USERS + ATTENDEES)
+  async getAllUsers(page: number = 1, limit: number = 50): Promise<{ data: any[], meta: any }> {
+    const response = await this.request<{ data: any[], meta: any }>(`/users/all?page=${page}&limit=${limit}`, {
+      method: 'GET',
+    });
+
+    const mapped = (Array.isArray(response.data) ? response.data : []).map((row: any) => ({
+      id: String(row.ID ?? row.id),
+      name: row.NAME ?? row.name,
+      email: row.EMAIL ?? row.email,
+      role: (row.ROLE_CODE ?? row.role_code) || 'attendee',
+      status: (row.STATUS ?? row.status) || 'active',
+      lastLogin: row.LAST_LOGIN ? new Date(row.LAST_LOGIN).toLocaleString('vi-VN') : 'Chưa đăng nhập',
+      createdAt: row.CREATED_AT ? new Date(row.CREATED_AT).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+      avatar: row.AVATAR_URL ?? row.avatar_url,
+      userType: (row.USER_TYPE ?? row.userType) || 'app_user',
+    }));
+
+    return { data: mapped, meta: response.meta };
+  }
+
   async createUser(userData: CreateUserRequest): Promise<{ data: User }> {
     const response = await this.request<any>('/users', {
       method: 'POST',

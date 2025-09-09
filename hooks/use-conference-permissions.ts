@@ -57,6 +57,7 @@ export function useConferencePermissions() {
               'sessions.manage': true,
               'analytics.view': true,
               'networking.view': true,
+              'messaging.view': true,
               'venue.view': true,
               'badges.view': true,
               'mobile.view': true
@@ -255,6 +256,7 @@ export function useConferencePermissions() {
             'sessions.manage': true,
             'analytics.view': true,
             'networking.view': true,
+            'messaging.view': true,
             'venue.view': true,
             'badges.view': true,
             'mobile.view': true

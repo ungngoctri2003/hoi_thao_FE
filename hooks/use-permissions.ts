@@ -28,6 +28,7 @@ export function usePermissions() {
         setIsLoading(true);
         // Get user's current permissions from the API
         const userInfo = await apiClient.getCurrentUser();
+        console.log('API User Info:', userInfo);
         
         // Use permissions from backend if available, otherwise fallback to role-based
         if (userInfo.permissions && userInfo.permissions.length > 0) {
@@ -38,16 +39,19 @@ export function usePermissions() {
             name: getPermissionName(code),
             description: getPermissionDescription(code)
           }));
+          console.log('Using API permissions:', permissionObjects);
           setPermissions(permissionObjects);
         } else {
           // Fallback to role-based permissions
           const roleBasedPermissions = getRoleBasedPermissions(user.role as "admin" | "staff" | "attendee");
+          console.log('Using role-based permissions:', roleBasedPermissions);
           setPermissions(roleBasedPermissions);
         }
       } catch (error) {
         console.error('Failed to fetch permissions:', error);
         // Fallback to role-based permissions
         const roleBasedPermissions = getRoleBasedPermissions(user.role as "admin" | "staff" | "attendee");
+        console.log('Using fallback permissions:', roleBasedPermissions);
         setPermissions(roleBasedPermissions);
       } finally {
         setIsLoading(false);
@@ -69,7 +73,9 @@ export function usePermissions() {
   }, [user, isAuthenticated]);
 
   const hasPermission = (permissionCode: string): boolean => {
-    return permissions.some(permission => permission.code === permissionCode);
+    const hasPermission = permissions.some(permission => permission.code === permissionCode);
+    console.log(`Checking permission ${permissionCode}:`, { hasPermission, permissions: permissions.map(p => p.code) });
+    return hasPermission;
   };
 
   const hasAnyPermission = (permissionCodes: string[]): boolean => {
@@ -122,6 +128,7 @@ function getPermissionName(code: string): string {
     'settings.manage': 'Quản lý Cài đặt',
     'analytics.view': 'Xem Phân tích',
     'networking.view': 'Xem Kết nối mạng',
+    'messaging.view': 'Xem Tin nhắn',
     'venue.view': 'Xem Bản đồ',
     'sessions.view': 'Xem Phiên trực tiếp',
     'badges.view': 'Xem Huy hiệu',
@@ -152,6 +159,7 @@ function getPermissionDescription(code: string): string {
     'settings.manage': 'Quản lý cài đặt',
     'analytics.view': 'Xem báo cáo phân tích',
     'networking.view': 'Xem kết nối mạng',
+    'messaging.view': 'Xem tin nhắn',
     'venue.view': 'Xem bản đồ địa điểm',
     'sessions.view': 'Xem phiên trực tiếp',
     'badges.view': 'Xem huy hiệu',
@@ -183,11 +191,12 @@ function getRoleBasedPermissions(role: "admin" | "staff" | "attendee"): Permissi
     'settings.manage': { id: 17, code: 'settings.manage', name: 'Quản lý Cài đặt' },
     'analytics.view': { id: 18, code: 'analytics.view', name: 'Xem Phân tích' },
     'networking.view': { id: 19, code: 'networking.view', name: 'Xem Kết nối mạng' },
-    'venue.view': { id: 20, code: 'venue.view', name: 'Xem Bản đồ' },
-    'sessions.view': { id: 21, code: 'sessions.view', name: 'Xem Phiên trực tiếp' },
-    'badges.view': { id: 22, code: 'badges.view', name: 'Xem Huy hiệu' },
-    'mobile.view': { id: 23, code: 'mobile.view', name: 'Xem Ứng dụng di động' },
-    'my-events.view': { id: 24, code: 'my-events.view', name: 'Xem Sự kiện của tôi' },
+    'messaging.view': { id: 20, code: 'messaging.view', name: 'Xem Tin nhắn' },
+    'venue.view': { id: 21, code: 'venue.view', name: 'Xem Bản đồ' },
+    'sessions.view': { id: 22, code: 'sessions.view', name: 'Xem Phiên trực tiếp' },
+    'badges.view': { id: 23, code: 'badges.view', name: 'Xem Huy hiệu' },
+    'mobile.view': { id: 24, code: 'mobile.view', name: 'Xem Ứng dụng di động' },
+    'my-events.view': { id: 25, code: 'my-events.view', name: 'Xem Sự kiện của tôi' },
   };
 
   switch (role) {
@@ -207,6 +216,7 @@ function getRoleBasedPermissions(role: "admin" | "staff" | "attendee"): Permissi
         basePermissions['attendees.manage'],
         basePermissions['checkin.manage'],
         basePermissions['networking.view'],
+        basePermissions['messaging.view'],
         basePermissions['venue.view'],
         basePermissions['sessions.view'],
         basePermissions['badges.view'],
@@ -219,6 +229,7 @@ function getRoleBasedPermissions(role: "admin" | "staff" | "attendee"): Permissi
         basePermissions['conferences.view'],
         basePermissions['conferences.export'],
         basePermissions['networking.view'],
+        basePermissions['messaging.view'],
         basePermissions['venue.view'],
         basePermissions['sessions.view'],
         basePermissions['badges.view'],

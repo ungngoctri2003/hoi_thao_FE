@@ -30,6 +30,7 @@ import {
   Building,
   ChevronRight,
   ChevronDown,
+  MessageCircle,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -89,6 +90,13 @@ const allNavigationItems = [
     description: "Xem các sự kiện đã đăng ký"
   },
   { 
+    href: "/messaging", 
+    icon: MessageCircle, 
+    label: "Tin nhắn", 
+    requiredPermissions: ["messaging.view"],
+    description: "Nhắn tin với những người tham dự hội nghị"
+  },
+  { 
     href: "/profile", 
     icon: UserCheck, 
     label: "Thông tin cá nhân", 
@@ -104,6 +112,11 @@ const getNavigationItems = (
   userRole: string
 ) => {
   return allNavigationItems.filter(item => {
+    console.log(`Checking item: ${item.href}`, {
+      requiredPermissions: item.requiredPermissions,
+      hasBasicPermission: item.requiredPermissions.every(permission => hasPermission(permission))
+    });
+    
     // Special handling for conference management - only show to admin
     if (item.href === '/conference-management') {
       return userRole === 'admin';
@@ -122,11 +135,19 @@ const getNavigationItems = (
     // Check if user has basic role-based permission
     const hasBasicPermission = item.requiredPermissions.every(permission => hasPermission(permission));
     
+    // Special handling for messaging - it's a general feature, not conference-specific
+    if (item.href === '/messaging') {
+      console.log('Messaging item check:', { hasBasicPermission, userRole });
+      // All roles (admin, staff, attendee) should have messaging.view permission
+      // If permission check fails, still show it as it's a core feature
+      return true;
+    }
+    
     // For admin and staff, show all basic permissions even without conference assignments
     if (userRole === 'admin' || userRole === 'staff') {
       // For conference-specific features, check if user has basic permission OR conference permission
       const conferenceSpecificFeatures = [
-        '/checkin', '/networking', 
+        '/checkin', '/networking',
         '/venue', '/sessions', '/badges', '/analytics', '/my-events'
       ];
       
@@ -140,7 +161,7 @@ const getNavigationItems = (
     
     // For attendees, require both basic and conference permissions for conference features
     const conferenceSpecificFeatures = [
-      '/checkin', '/networking', 
+      '/checkin', '/networking',
       '/venue', '/sessions', '/badges', '/analytics', '/my-events'
     ];
     
@@ -169,7 +190,7 @@ export function Sidebar({ userRole }: SidebarProps) {
   const [expandedConferences, setExpandedConferences] = useState<Set<number>>(new Set());
   const pathname = usePathname();
   const { user } = useAuth();
-  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const { hasPermission, isLoading: permissionsLoading, permissions } = usePermissions();
   const { 
     hasConferencePermission, 
     isLoading: conferencePermissionsLoading,
@@ -183,6 +204,22 @@ export function Sidebar({ userRole }: SidebarProps) {
   
   // Get navigation items based on user permissions and conference permissions
   const items = getNavigationItems(hasPermission, hasConferencePermission, currentRole);
+  
+  // Debug logging for messaging permission
+  console.log('Sidebar Debug:', {
+    currentRole,
+    hasMessagingPermission: hasPermission('messaging.view'),
+    allPermissions: permissions.map(p => p.code),
+    permissionsLoading,
+    conferencePermissionsLoading,
+    items: items.map(item => ({ href: item.href, label: item.label })),
+    messagingItem: allNavigationItems.find(item => item.href === '/messaging'),
+    groupedItems: {
+      main: items.filter(item => ["/dashboard", "/profile"].includes(item.href)),
+      management: items.filter(item => ["/conference-management", "/attendees", "/roles", "/audit", "/settings"].includes(item.href)),
+      features: items.filter(item => ["/my-events", "/messaging"].includes(item.href))
+    }
+  });
   
   // Get available conferences - admin sees all conferences, staff/attendees see only assigned ones
   const availableConferences = getAvailableConferences();
@@ -234,12 +271,20 @@ export function Sidebar({ userRole }: SidebarProps) {
       ["/conference-management", "/attendees", "/roles", "/audit", "/settings"].includes(item.href)
     ),
     features: items.filter(item => 
-      ["/my-events"].includes(item.href)
+      ["/my-events", "/messaging"].includes(item.href)
     ),
   };
+  
+  console.log('Grouped items:', groupedItems);
+  console.log('Features section check:', { 
+    featuresLength: groupedItems.features.length, 
+    features: groupedItems.features,
+    shouldShow: groupedItems.features.length > 0 
+  });
 
   // Show loading state while permissions are being fetched
   if (permissionsLoading || conferencePermissionsLoading) {
+    console.log('Sidebar loading state:', { permissionsLoading, conferencePermissionsLoading });
     return (
       <div
         className={cn(
