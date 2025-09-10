@@ -1,40 +1,36 @@
-// Test script for messaging API
+// Test script for messaging API with real token
 const API_BASE_URL = "http://localhost:4000/api/v1";
 
-async function testMessagingAPI() {
+// This script should be run in browser console to get the token from localStorage
+// Then copy the token here
+const TOKEN = "YOUR_TOKEN_HERE"; // Replace with actual token from browser
+
+async function testMessagingAPIWithToken() {
+  if (TOKEN === "YOUR_TOKEN_HERE") {
+    console.log(
+      "Please get a token from browser localStorage and replace TOKEN variable"
+    );
+    console.log("To get token:");
+    console.log("1. Open browser and go to http://localhost:3000");
+    console.log("2. Login to the app");
+    console.log("3. Open browser console (F12)");
+    console.log('4. Run: localStorage.getItem("accessToken")');
+    console.log("5. Copy the token and replace TOKEN variable in this script");
+    return;
+  }
+
   try {
-    console.log("Testing messaging API endpoints...");
-
-    // Test database connection
-    console.log("\n1. Testing database connection...");
-    const dbResponse = await fetch(`${API_BASE_URL}/users/test-db`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer YOUR_TOKEN_HERE", // Replace with actual token
-      },
-    });
-
-    if (dbResponse.ok) {
-      const dbData = await dbResponse.json();
-      console.log("✅ Database connection test:", dbData);
-    } else {
-      console.log(
-        "❌ Database connection test failed:",
-        dbResponse.status,
-        dbResponse.statusText
-      );
-    }
+    console.log("Testing messaging API endpoints with token...");
 
     // Test users with messages endpoint
-    console.log("\n2. Testing users with messages endpoint...");
+    console.log("\n1. Testing users with messages endpoint...");
     const messagesResponse = await fetch(
       `${API_BASE_URL}/users/with-messages`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer YOUR_TOKEN_HERE", // Replace with actual token
+          Authorization: `Bearer ${TOKEN}`,
         },
       }
     );
@@ -53,12 +49,12 @@ async function testMessagingAPI() {
     }
 
     // Test available users endpoint
-    console.log("\n3. Testing available users endpoint...");
+    console.log("\n2. Testing available users endpoint...");
     const availableResponse = await fetch(`${API_BASE_URL}/users/available`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer YOUR_TOKEN_HERE", // Replace with actual token
+        Authorization: `Bearer ${TOKEN}`,
       },
     });
 
@@ -80,4 +76,4 @@ async function testMessagingAPI() {
 }
 
 // Run the test
-testMessagingAPI();
+testMessagingAPIWithToken();

@@ -39,136 +39,158 @@ interface SidebarProps {
 
 // Define all possible navigation items with their permission requirements
 const allNavigationItems = [
-  { 
-    href: "/dashboard", 
-    icon: LayoutDashboard, 
-    label: "Tổng quan", 
+  {
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    label: "Tổng quan",
     requiredPermissions: ["dashboard.view"],
-    description: "Trang chủ và tổng quan hệ thống"
+    description: "Trang chủ và tổng quan hệ thống",
   },
-  { 
-    href: "/conference-management", 
-    icon: Building, 
-    label: "Quản lý hội nghị", 
-    requiredPermissions: ["conferences.manage", "conferences.create", "conferences.edit", "conferences.delete"],
-    description: "Tạo, chỉnh sửa và quản lý các hội nghị"
+  {
+    href: "/conference-management",
+    icon: Building,
+    label: "Quản lý hội nghị",
+    requiredPermissions: [
+      "conferences.manage",
+      "conferences.create",
+      "conferences.edit",
+      "conferences.delete",
+    ],
+    description: "Tạo, chỉnh sửa và quản lý các hội nghị",
   },
-  { 
-    href: "/attendees", 
-    icon: Users, 
-    label: "Danh sách tham dự", 
+  {
+    href: "/attendees",
+    icon: Users,
+    label: "Danh sách tham dự",
     requiredPermissions: ["attendees.manage"],
     description: "Quản lý danh sách người tham dự toàn bộ hội nghị",
-    adminOnly: true
+    adminOnly: true,
   },
-  { 
-    href: "/roles", 
-    icon: Shield, 
-    label: "Phân quyền", 
+  {
+    href: "/roles",
+    icon: Shield,
+    label: "Phân quyền",
     requiredPermissions: ["roles.manage"],
-    description: "Quản lý quyền và vai trò người dùng"
+    description: "Quản lý quyền và vai trò người dùng",
   },
-  { 
-    href: "/audit", 
-    icon: FileText, 
-    label: "Nhật ký hệ thống", 
+  {
+    href: "/audit",
+    icon: FileText,
+    label: "Nhật ký hệ thống",
     requiredPermissions: ["audit.view"],
-    description: "Xem nhật ký hoạt động hệ thống"
+    description: "Xem nhật ký hoạt động hệ thống",
   },
-  { 
-    href: "/settings", 
-    icon: Settings, 
-    label: "Cài đặt", 
+  {
+    href: "/settings",
+    icon: Settings,
+    label: "Cài đặt",
     requiredPermissions: ["settings.manage"],
-    description: "Cài đặt hệ thống"
+    description: "Cài đặt hệ thống",
   },
-  { 
-    href: "/my-events", 
-    icon: Calendar, 
-    label: "Sự kiện của tôi", 
+  {
+    href: "/my-events",
+    icon: Calendar,
+    label: "Sự kiện của tôi",
     requiredPermissions: ["my-events.view"],
-    description: "Xem các sự kiện đã đăng ký"
+    description: "Xem các sự kiện đã đăng ký",
   },
-  { 
-    href: "/messaging", 
-    icon: MessageCircle, 
-    label: "Tin nhắn", 
+  {
+    href: "/messaging",
+    icon: MessageCircle,
+    label: "Tin nhắn",
     requiredPermissions: ["messaging.view"],
-    description: "Nhắn tin với những người tham dự hội nghị"
+    description: "Nhắn tin với những người tham dự hội nghị",
   },
-  { 
-    href: "/profile", 
-    icon: UserCheck, 
-    label: "Thông tin cá nhân", 
+  {
+    href: "/profile",
+    icon: UserCheck,
+    label: "Thông tin cá nhân",
     requiredPermissions: ["profile.view"],
-    description: "Xem và chỉnh sửa thông tin cá nhân"
+    description: "Xem và chỉnh sửa thông tin cá nhân",
   },
 ];
 
 // Function to get navigation items based on user permissions and conference permissions
 const getNavigationItems = (
-  hasPermission: (code: string) => boolean, 
+  hasPermission: (code: string) => boolean,
   hasConferencePermission: (code: string) => boolean,
   userRole: string
 ) => {
-  return allNavigationItems.filter(item => {
-    console.log(`Checking item: ${item.href}`, {
-      requiredPermissions: item.requiredPermissions,
-      hasBasicPermission: item.requiredPermissions.every(permission => hasPermission(permission))
-    });
-    
+  return allNavigationItems.filter((item) => {
     // Special handling for conference management - only show to admin
-    if (item.href === '/conference-management') {
-      return userRole === 'admin';
+    if (item.href === "/conference-management") {
+      return userRole === "admin";
     }
-    
+
     // Special handling for global attendees management - only show to admin
-    if (item.href === '/attendees' && item.adminOnly) {
-      return userRole === 'admin';
+    if (item.href === "/attendees" && item.adminOnly) {
+      return userRole === "admin";
     }
-    
+
     // Admin always has access to attendees management regardless of permissions
-    if (item.href === '/attendees' && userRole === 'admin') {
+    if (item.href === "/attendees" && userRole === "admin") {
       return true;
     }
-    
+
     // Check if user has basic role-based permission
-    const hasBasicPermission = item.requiredPermissions.every(permission => hasPermission(permission));
-    
+    const hasBasicPermission = item.requiredPermissions.every((permission) =>
+      hasPermission(permission)
+    );
+
     // Special handling for messaging - it's a general feature, not conference-specific
-    if (item.href === '/messaging') {
-      console.log('Messaging item check:', { hasBasicPermission, userRole });
+    if (item.href === "/messaging") {
+      console.log("Messaging item check:", { hasBasicPermission, userRole });
       // All roles (admin, staff, attendee) should have messaging.view permission
       // If permission check fails, still show it as it's a core feature
       return true;
     }
-    
+
     // For admin and staff, show all basic permissions even without conference assignments
-    if (userRole === 'admin' || userRole === 'staff') {
+    if (userRole === "admin" || userRole === "staff") {
       // For conference-specific features, check if user has basic permission OR conference permission
       const conferenceSpecificFeatures = [
-        '/checkin', '/networking',
-        '/venue', '/sessions', '/badges', '/analytics', '/my-events'
+        "/checkin",
+        "/networking",
+        "/venue",
+        "/sessions",
+        "/badges",
+        "/analytics",
+        "/my-events",
       ];
-      
+
       if (conferenceSpecificFeatures.includes(item.href)) {
         // Admin/staff can access if they have basic permission OR conference permission
-        return hasBasicPermission || item.requiredPermissions.some(permission => hasConferencePermission(permission));
+        return (
+          hasBasicPermission ||
+          item.requiredPermissions.some((permission) =>
+            hasConferencePermission(permission)
+          )
+        );
       }
-      
+
       return hasBasicPermission;
     }
-    
+
     // For attendees, require both basic and conference permissions for conference features
     const conferenceSpecificFeatures = [
-      '/checkin', '/networking',
-      '/venue', '/sessions', '/badges', '/analytics', '/my-events'
+      "/checkin",
+      "/networking",
+      "/venue",
+      "/sessions",
+      "/badges",
+      "/analytics",
+      "/my-events",
     ];
-    
+
     if (conferenceSpecificFeatures.includes(item.href)) {
-      return hasBasicPermission && item.requiredPermissions.some(permission => hasConferencePermission(permission));
+      return (
+        hasBasicPermission &&
+        item.requiredPermissions.some((permission) =>
+          hasConferencePermission(permission)
+        )
+      );
     }
-    
+
     return hasBasicPermission;
   });
 };
@@ -187,43 +209,38 @@ const roleColors = {
 
 export function Sidebar({ userRole }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [expandedConferences, setExpandedConferences] = useState<Set<number>>(new Set());
+  const [expandedConferences, setExpandedConferences] = useState<Set<number>>(
+    new Set()
+  );
   const pathname = usePathname();
   const { user } = useAuth();
-  const { hasPermission, isLoading: permissionsLoading, permissions } = usePermissions();
-  const { 
-    hasConferencePermission, 
+  const {
+    hasPermission,
+    isLoading: permissionsLoading,
+    permissions,
+  } = usePermissions();
+  const {
+    hasConferencePermission,
     isLoading: conferencePermissionsLoading,
     getAvailableConferences,
     getConferencePermissions,
-    getConferenceName
+    getConferenceName,
   } = useConferencePermissions();
-  
+
   // Use role from auth state if available, fallback to prop
-  const currentRole = (user?.role as "admin" | "staff" | "attendee") || userRole || "attendee";
-  
+  const currentRole =
+    (user?.role as "admin" | "staff" | "attendee") || userRole || "attendee";
+
   // Get navigation items based on user permissions and conference permissions
-  const items = getNavigationItems(hasPermission, hasConferencePermission, currentRole);
-  
-  // Debug logging for messaging permission
-  console.log('Sidebar Debug:', {
-    currentRole,
-    hasMessagingPermission: hasPermission('messaging.view'),
-    allPermissions: permissions.map(p => p.code),
-    permissionsLoading,
-    conferencePermissionsLoading,
-    items: items.map(item => ({ href: item.href, label: item.label })),
-    messagingItem: allNavigationItems.find(item => item.href === '/messaging'),
-    groupedItems: {
-      main: items.filter(item => ["/dashboard", "/profile"].includes(item.href)),
-      management: items.filter(item => ["/conference-management", "/attendees", "/roles", "/audit", "/settings"].includes(item.href)),
-      features: items.filter(item => ["/my-events", "/messaging"].includes(item.href))
-    }
-  });
-  
+  const items = getNavigationItems(
+    hasPermission,
+    hasConferencePermission,
+    currentRole
+  );
+
   // Get available conferences - admin sees all conferences, staff/attendees see only assigned ones
   const availableConferences = getAvailableConferences();
-  
+
   // Category configuration
   const categoryConfig = {
     attendees: { icon: Users, label: "Danh sách tham dự", href: "/attendees" },
@@ -250,41 +267,52 @@ export function Sidebar({ userRole }: SidebarProps) {
   // Get conference categories based on permissions
   const getConferenceCategories = (conferenceId: number) => {
     const permissions = getConferencePermissions(conferenceId);
-    return Object.entries(categoryConfig).filter(([key, config]) => {
-      const permissionKey = `${key}.view`;
-      return permissions[permissionKey] === true;
-    }).map(([key, config]) => ({
-      key,
-      config: { 
-        ...config, 
-        href: `/${key}?conferenceId=${conferenceId}` 
-      }
-    }));
+    return Object.entries(categoryConfig)
+      .filter(([key, config]) => {
+        const permissionKey = `${key}.view`;
+        return permissions[permissionKey] === true;
+      })
+      .map(([key, config]) => ({
+        key,
+        config: {
+          ...config,
+          href: `/${key}?conferenceId=${conferenceId}`,
+        },
+      }));
   };
-  
+
   // Group items by category for better organization
   const groupedItems = {
-    main: items.filter(item => 
+    main: items.filter((item) =>
       ["/dashboard", "/profile"].includes(item.href)
     ),
-    management: items.filter(item => 
-      ["/conference-management", "/attendees", "/roles", "/audit", "/settings"].includes(item.href)
+    management: items.filter((item) =>
+      [
+        "/conference-management",
+        "/attendees",
+        "/roles",
+        "/audit",
+        "/settings",
+      ].includes(item.href)
     ),
-    features: items.filter(item => 
+    features: items.filter((item) =>
       ["/my-events", "/messaging"].includes(item.href)
     ),
   };
-  
-  console.log('Grouped items:', groupedItems);
-  console.log('Features section check:', { 
-    featuresLength: groupedItems.features.length, 
+
+  console.log("Grouped items:", groupedItems);
+  console.log("Features section check:", {
+    featuresLength: groupedItems.features.length,
     features: groupedItems.features,
-    shouldShow: groupedItems.features.length > 0 
+    shouldShow: groupedItems.features.length > 0,
   });
 
   // Show loading state while permissions are being fetched
   if (permissionsLoading || conferencePermissionsLoading) {
-    console.log('Sidebar loading state:', { permissionsLoading, conferencePermissionsLoading });
+    console.log("Sidebar loading state:", {
+      permissionsLoading,
+      conferencePermissionsLoading,
+    });
     return (
       <div
         className={cn(
@@ -313,7 +341,9 @@ export function Sidebar({ userRole }: SidebarProps) {
             <h1 className="font-serif font-bold text-lg text-sidebar-foreground">
               ConferenceMS
             </h1>
-            <Badge className={cn("text-xs mt-1 w-fit", roleColors[currentRole])}>
+            <Badge
+              className={cn("text-xs mt-1 w-fit", roleColors[currentRole])}
+            >
               {roleLabels[currentRole]}
             </Badge>
           </div>
@@ -345,9 +375,13 @@ export function Sidebar({ userRole }: SidebarProps) {
               </div>
             )}
             {availableConferences.map((conference) => {
-              const isExpanded = expandedConferences.has(conference.conferenceId);
-              const categories = getConferenceCategories(conference.conferenceId);
-              
+              const isExpanded = expandedConferences.has(
+                conference.conferenceId
+              );
+              const categories = getConferenceCategories(
+                conference.conferenceId
+              );
+
               return (
                 <div key={conference.conferenceId} className="space-y-1">
                   {/* Conference Header */}
@@ -359,7 +393,12 @@ export function Sidebar({ userRole }: SidebarProps) {
                     )}
                     onClick={() => toggleConference(conference.conferenceId)}
                   >
-                    <Building className={cn("h-4 w-4 flex-shrink-0", !isCollapsed && "mr-3")} />
+                    <Building
+                      className={cn(
+                        "h-4 w-4 flex-shrink-0",
+                        !isCollapsed && "mr-3"
+                      )}
+                    />
                     {isCollapsed ? (
                       <SidebarTooltip
                         content={conference.conferenceName}
@@ -384,11 +423,12 @@ export function Sidebar({ userRole }: SidebarProps) {
                           </SidebarTooltip>
                         </div>
                         <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
-                          <Badge 
-                            variant="outline" 
+                          <Badge
+                            variant="outline"
                             className={cn(
                               "text-xs whitespace-nowrap",
-                              categories.length > 5 && "bg-primary/10 text-primary border-primary/20"
+                              categories.length > 5 &&
+                                "bg-primary/10 text-primary border-primary/20"
                             )}
                           >
                             {categories.length}
@@ -409,18 +449,21 @@ export function Sidebar({ userRole }: SidebarProps) {
                       {categories.map(({ key: categoryKey, config }) => {
                         const isActive = pathname === config.href;
                         const IconComponent = config.icon;
-                        
+
                         return (
                           <Link key={categoryKey} href={config.href}>
                             <Button
                               variant={isActive ? "secondary" : "ghost"}
                               className={cn(
                                 "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent p-2 h-auto",
-                                isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
+                                isActive &&
+                                  "bg-sidebar-accent text-sidebar-accent-foreground"
                               )}
                             >
                               <IconComponent className="h-4 w-4 mr-3" />
-                              <span className="flex-1 text-left">{config.label}</span>
+                              <span className="flex-1 text-left">
+                                {config.label}
+                              </span>
                             </Button>
                           </Link>
                         );
@@ -430,9 +473,12 @@ export function Sidebar({ userRole }: SidebarProps) {
                 </div>
               );
             })}
-            {!isCollapsed && (groupedItems.main.length > 0 || groupedItems.management.length > 0 || groupedItems.features.length > 0) && (
-              <div className="border-t border-sidebar-border my-2"></div>
-            )}
+            {!isCollapsed &&
+              (groupedItems.main.length > 0 ||
+                groupedItems.management.length > 0 ||
+                groupedItems.features.length > 0) && (
+                <div className="border-t border-sidebar-border my-2"></div>
+              )}
           </>
         )}
 
@@ -448,10 +494,13 @@ export function Sidebar({ userRole }: SidebarProps) {
                     className={cn(
                       "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent",
                       isCollapsed && "px-2",
-                      isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
+                      isActive &&
+                        "bg-sidebar-accent text-sidebar-accent-foreground"
                     )}
                   >
-                    <item.icon className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
+                    <item.icon
+                      className={cn("h-4 w-4", !isCollapsed && "mr-3")}
+                    />
                     {!isCollapsed && item.label}
                   </Button>
                 </Link>
@@ -466,11 +515,15 @@ export function Sidebar({ userRole }: SidebarProps) {
                 >
                   {button}
                 </SidebarTooltip>
-              ) : button;
+              ) : (
+                button
+              );
             })}
-            {!isCollapsed && (groupedItems.management.length > 0 || groupedItems.features.length > 0) && (
-              <div className="border-t border-sidebar-border my-2"></div>
-            )}
+            {!isCollapsed &&
+              (groupedItems.management.length > 0 ||
+                groupedItems.features.length > 0) && (
+                <div className="border-t border-sidebar-border my-2"></div>
+              )}
           </>
         )}
 
@@ -493,10 +546,13 @@ export function Sidebar({ userRole }: SidebarProps) {
                     className={cn(
                       "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent",
                       isCollapsed && "px-2",
-                      isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
+                      isActive &&
+                        "bg-sidebar-accent text-sidebar-accent-foreground"
                     )}
                   >
-                    <item.icon className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
+                    <item.icon
+                      className={cn("h-4 w-4", !isCollapsed && "mr-3")}
+                    />
                     {!isCollapsed && item.label}
                   </Button>
                 </Link>
@@ -511,7 +567,9 @@ export function Sidebar({ userRole }: SidebarProps) {
                 >
                   {button}
                 </SidebarTooltip>
-              ) : button;
+              ) : (
+                button
+              );
             })}
             {!isCollapsed && groupedItems.features.length > 0 && (
               <div className="border-t border-sidebar-border my-2"></div>
@@ -538,10 +596,13 @@ export function Sidebar({ userRole }: SidebarProps) {
                     className={cn(
                       "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent",
                       isCollapsed && "px-2",
-                      isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
+                      isActive &&
+                        "bg-sidebar-accent text-sidebar-accent-foreground"
                     )}
                   >
-                    <item.icon className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
+                    <item.icon
+                      className={cn("h-4 w-4", !isCollapsed && "mr-3")}
+                    />
                     {!isCollapsed && item.label}
                   </Button>
                 </Link>
@@ -556,7 +617,9 @@ export function Sidebar({ userRole }: SidebarProps) {
                 >
                   {button}
                 </SidebarTooltip>
-              ) : button;
+              ) : (
+                button
+              );
             })}
           </>
         )}
@@ -566,9 +629,11 @@ export function Sidebar({ userRole }: SidebarProps) {
       {!isCollapsed && (
         <div className="p-4 border-t border-sidebar-border space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-sidebar-foreground/60">Phiên bản 1.0.0</p>
-            <Badge 
-              variant="outline" 
+            <p className="text-xs text-sidebar-foreground/60">
+              Phiên bản 1.0.0
+            </p>
+            <Badge
+              variant="outline"
               className={cn("text-xs", roleColors[currentRole])}
             >
               {currentRole}

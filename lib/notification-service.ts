@@ -1,11 +1,15 @@
 "use client";
 
-import { create } from 'zustand';
-import { notificationAPI, Notification as APINotification, NotificationStats } from './notification-api';
+import { create } from "zustand";
+import {
+  notificationAPI,
+  Notification as APINotification,
+  NotificationStats,
+} from "./notification-api";
 
 export interface Notification {
   id: number;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: "info" | "success" | "warning" | "error";
   title: string;
   message: string;
   timestamp: Date;
@@ -22,9 +26,11 @@ interface NotificationState {
   isOpen: boolean;
   isLoading: boolean;
   stats: NotificationStats | null;
-  
+
   // Actions
-  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
+  addNotification: (
+    notification: Omit<Notification, "id" | "timestamp" | "read">
+  ) => void;
   markAsRead: (id: number) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   removeNotification: (id: number) => Promise<void>;
@@ -32,7 +38,7 @@ interface NotificationState {
   clearAll: () => void;
   togglePanel: () => void;
   setPanelOpen: (open: boolean) => void;
-  
+
   // API Actions
   loadNotifications: (filters?: any) => Promise<void>;
   loadStats: () => Promise<void>;
@@ -60,7 +66,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     }));
 
     // Auto remove after 10 seconds for non-error notifications
-    if (notification.type !== 'error') {
+    if (notification.type !== "error") {
       setTimeout(() => {
         get().removeNotification(newNotification.id);
       }, 10000);
@@ -77,7 +83,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         unreadCount: Math.max(0, state.unreadCount - 1),
       }));
     } catch (error) {
-      console.error('Failed to mark notification as read:', error);
+      console.error("Failed to mark notification as read:", error);
     }
   },
 
@@ -85,28 +91,54 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     try {
       await notificationAPI.markAllAsRead();
       set((state) => ({
-        notifications: state.notifications.map((notif) => ({ ...notif, read: true })),
+        notifications: state.notifications.map((notif) => ({
+          ...notif,
+          read: true,
+        })),
         unreadCount: 0,
       }));
     } catch (error) {
-      console.error('Failed to mark all notifications as read:', error);
+      console.error("Failed to mark all notifications as read:", error);
     }
   },
 
   removeNotification: async (id) => {
     try {
-      await notificationAPI.delete(id);
+      // Check if this is a local notification (created with Date.now())
+      // Local notifications have very large IDs (timestamps), while DB notifications have smaller auto-increment IDs
+      // Timestamps are typically 13 digits (e.g., 1757409450085), while DB IDs are much smaller
+      const isLocalNotification = id > 1000000000000;
+
+      if (!isLocalNotification) {
+        // Only try to delete from API if it's a database notification
+        await notificationAPI.delete(id);
+      }
+
       set((state) => {
         const notification = state.notifications.find((n) => n.id === id);
         const wasUnread = notification && !notification.read;
-        
+
         return {
           notifications: state.notifications.filter((n) => n.id !== id),
-          unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount,
+          unreadCount: wasUnread
+            ? Math.max(0, state.unreadCount - 1)
+            : state.unreadCount,
         };
       });
     } catch (error) {
-      console.error('Failed to delete notification:', error);
+      console.error("Failed to delete notification:", error);
+      // Even if API call fails, remove from local state
+      set((state) => {
+        const notification = state.notifications.find((n) => n.id === id);
+        const wasUnread = notification && !notification.read;
+
+        return {
+          notifications: state.notifications.filter((n) => n.id !== id),
+          unreadCount: wasUnread
+            ? Math.max(0, state.unreadCount - 1)
+            : state.unreadCount,
+        };
+      });
     }
   },
 
@@ -119,7 +151,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         ),
       }));
     } catch (error) {
-      console.error('Failed to archive notification:', error);
+      console.error("Failed to archive notification:", error);
     }
   },
 
@@ -142,18 +174,20 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await notificationAPI.getNotifications(filters);
-      const notifications = response.notifications.map((notif: APINotification) => ({
-        id: notif.id,
-        type: notif.type,
-        title: notif.title,
-        message: notif.message,
-        timestamp: new Date(notif.created_at),
-        read: notif.is_read,
-        data: notif.data,
-        category: notif.category,
-        is_archived: notif.is_archived,
-        expires_at: notif.expires_at ? new Date(notif.expires_at) : undefined,
-      }));
+      const notifications = response.notifications.map(
+        (notif: APINotification) => ({
+          id: notif.id,
+          type: notif.type,
+          title: notif.title,
+          message: notif.message,
+          timestamp: new Date(notif.created_at),
+          read: notif.is_read,
+          data: notif.data,
+          category: notif.category,
+          is_archived: notif.is_archived,
+          expires_at: notif.expires_at ? new Date(notif.expires_at) : undefined,
+        })
+      );
 
       set({
         notifications,
@@ -162,7 +196,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      console.error('Failed to load notifications:', error);
+      console.error("Failed to load notifications:", error);
       set({ isLoading: false });
     }
   },
@@ -172,15 +206,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const stats = await notificationAPI.getStats();
       set({ stats, unreadCount: stats.unread_count });
     } catch (error) {
-      console.error('Failed to load notification stats:', error);
+      console.error("Failed to load notification stats:", error);
     }
   },
 
   syncWithAPI: async () => {
-    await Promise.all([
-      get().loadNotifications(),
-      get().loadStats(),
-    ]);
+    await Promise.all([get().loadNotifications(), get().loadStats()]);
   },
 }));
 
@@ -188,7 +219,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 export const notificationService = {
   info: (title: string, message: string, data?: any) => {
     useNotificationStore.getState().addNotification({
-      type: 'info',
+      type: "info",
       title,
       message,
       data,
@@ -197,7 +228,7 @@ export const notificationService = {
 
   success: (title: string, message: string, data?: any) => {
     useNotificationStore.getState().addNotification({
-      type: 'success',
+      type: "success",
       title,
       message,
       data,
@@ -206,7 +237,7 @@ export const notificationService = {
 
   warning: (title: string, message: string, data?: any) => {
     useNotificationStore.getState().addNotification({
-      type: 'warning',
+      type: "warning",
       title,
       message,
       data,
@@ -215,7 +246,7 @@ export const notificationService = {
 
   error: (title: string, message: string, data?: any) => {
     useNotificationStore.getState().addNotification({
-      type: 'error',
+      type: "error",
       title,
       message,
       data,
@@ -225,25 +256,25 @@ export const notificationService = {
   // Permission change notifications
   permissionChanged: (oldRole?: string, newRole?: string) => {
     const title = newRole ? "Role đã được cập nhật" : "Quyền đã được cập nhật";
-    const message = newRole 
+    const message = newRole
       ? `Role của bạn đã thay đổi từ "${oldRole}" thành "${newRole}"`
       : "Một số quyền của bạn đã được thay đổi";
-    
+
     useNotificationStore.getState().addNotification({
-      type: 'success',
+      type: "success",
       title,
       message,
-      data: { type: 'permission_change', oldRole, newRole },
+      data: { type: "permission_change", oldRole, newRole },
     });
   },
 
   // System notifications
   systemMessage: (title: string, message: string) => {
     useNotificationStore.getState().addNotification({
-      type: 'info',
+      type: "info",
       title,
       message,
-      data: { type: 'system' },
+      data: { type: "system" },
     });
   },
 };

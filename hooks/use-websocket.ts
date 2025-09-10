@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useEffect, useRef, useState } from "react";
+import { io, Socket } from "socket.io-client";
 
 interface UseWebSocketOptions {
   url?: string;
@@ -11,11 +11,11 @@ interface UseWebSocketOptions {
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const {
-    url = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000',
+    url = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:4000",
     autoConnect = true,
     onConnect,
     onDisconnect,
-    onError
+    onError,
   } = options;
 
   const [isConnected, setIsConnected] = useState(false);
@@ -25,26 +25,33 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   useEffect(() => {
     if (!autoConnect) return;
 
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("accessToken")
+        : null;
+
     const socket = io(url, {
-      path: '/ws',
-      transports: ['websocket', 'polling'],
-      autoConnect: true
+      path: "/ws",
+      auth: token ? { token } : {},
+      extraHeaders: token ? { Authorization: `Bearer ${token}` } : {},
+      transports: ["websocket", "polling"],
+      autoConnect: true,
     });
 
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    socket.on("connect", () => {
       setIsConnected(true);
       setError(null);
       onConnect?.();
     });
 
-    socket.on('disconnect', () => {
+    socket.on("disconnect", () => {
       setIsConnected(false);
       onDisconnect?.();
     });
 
-    socket.on('connect_error', (err) => {
+    socket.on("connect_error", (err) => {
       setError(err);
       onError?.(err);
     });
@@ -86,11 +93,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   };
 
   const joinRoom = (room: string) => {
-    emit('join', room);
+    emit("join", room);
   };
 
   const leaveRoom = (room: string) => {
-    emit('leave', room);
+    emit("leave", room);
   };
 
   return {
@@ -103,6 +110,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     on,
     off,
     joinRoom,
-    leaveRoom
+    leaveRoom,
   };
 }

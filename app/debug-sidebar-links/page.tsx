@@ -3,21 +3,28 @@
 import { useConferencePermissions } from "@/hooks/use-conference-permissions";
 import { useConferenceId } from "@/hooks/use-conference-id";
 import { useSearchParams } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { Suspense } from "react";
 
-export default function DebugSidebarLinksPage() {
-  const { 
-    conferencePermissions, 
-    currentConferenceId, 
+function DebugSidebarLinksContent() {
+  const {
+    conferencePermissions,
+    currentConferenceId,
     getAvailableConferences,
     getConferencePermissions,
     hasConferencePermission,
-    isLoading 
+    isLoading,
   } = useConferencePermissions();
-  
+
   const urlConferenceId = useConferenceId();
   const searchParams = useSearchParams();
 
@@ -33,7 +40,11 @@ export default function DebugSidebarLinksPage() {
 
   // Category configuration (same as sidebar)
   const categoryConfig = {
-    conferences: { icon: "📅", label: "Quản lý hội nghị", href: "/conferences" },
+    conferences: {
+      icon: "📅",
+      label: "Quản lý hội nghị",
+      href: "/conferences",
+    },
     attendees: { icon: "👥", label: "Danh sách tham dự", href: "/attendees" },
     checkin: { icon: "📱", label: "Check-in QR", href: "/checkin" },
     networking: { icon: "🌐", label: "Kết nối mạng", href: "/networking" },
@@ -47,16 +58,22 @@ export default function DebugSidebarLinksPage() {
   // Get conference categories based on permissions
   const getConferenceCategories = (conferenceId: number) => {
     const permissions = getConferencePermissions(conferenceId);
-    return Object.entries(categoryConfig).filter(([key, config]) => {
-      const permissionKey = key === 'conferences' ? 'conferences.view' : `${key}.view`;
-      return permissions[permissionKey] === true;
-    }).map(([key, config]) => [
-      key, 
-      { 
-        ...config, 
-        href: key === 'conferences' ? `/conferences/${conferenceId}` : `/${key}?conferenceId=${conferenceId}` 
-      }
-    ]);
+    return Object.entries(categoryConfig)
+      .filter(([key, config]) => {
+        const permissionKey =
+          key === "conferences" ? "conferences.view" : `${key}.view`;
+        return permissions[permissionKey] === true;
+      })
+      .map(([key, config]) => ({
+        key,
+        config: {
+          ...config,
+          href:
+            key === "conferences"
+              ? `/conferences/${conferenceId}`
+              : `/${key}?conferenceId=${conferenceId}`,
+        },
+      }));
   };
 
   return (
@@ -74,16 +91,20 @@ export default function DebugSidebarLinksPage() {
             <h3 className="font-semibold mb-2">Current State:</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <strong>Current Conference ID:</strong> {currentConferenceId || 'null'}
+                <strong>Current Conference ID:</strong>{" "}
+                {currentConferenceId || "null"}
               </div>
               <div>
-                <strong>URL Conference ID:</strong> {urlConferenceId || 'null'}
+                <strong>URL Conference ID:</strong>{" "}
+                {urlConferenceId?.conferenceId || "null"}
               </div>
               <div>
-                <strong>Search Params:</strong> {searchParams.toString() || 'empty'}
+                <strong>Search Params:</strong>{" "}
+                {searchParams.toString() || "empty"}
               </div>
               <div>
-                <strong>Available Conferences:</strong> {availableConferences.length}
+                <strong>Available Conferences:</strong>{" "}
+                {availableConferences.length.toString()}
               </div>
             </div>
           </div>
@@ -93,25 +114,38 @@ export default function DebugSidebarLinksPage() {
             <h3 className="font-semibold mb-2">Available Conferences:</h3>
             <div className="space-y-2">
               {availableConferences.map((conference) => {
-                const categories = getConferenceCategories(conference.conferenceId);
+                const categories = getConferenceCategories(
+                  conference.conferenceId
+                );
                 return (
                   <Card key={conference.conferenceId} className="p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium">{conference.conferenceName}</h4>
-                      <Badge variant="outline">ID: {conference.conferenceId}</Badge>
+                      <h4 className="font-medium">
+                        {conference.conferenceName}
+                      </h4>
+                      <Badge variant="outline">
+                        ID: {conference.conferenceId}
+                      </Badge>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">
                         Categories ({categories.length}):
                       </p>
                       <div className="grid grid-cols-2 gap-2">
-                        {categories.map(([key, config]) => (
-                          <div key={key} className="flex items-center space-x-2 p-2 border rounded">
+                        {categories.map(({ key, config }) => (
+                          <div
+                            key={key}
+                            className="flex items-center space-x-2 p-2 border rounded"
+                          >
                             <span>{config.icon}</span>
                             <div className="flex-1">
-                              <div className="text-sm font-medium">{config.label}</div>
-                              <div className="text-xs text-muted-foreground">{config.href}</div>
+                              <div className="text-sm font-medium">
+                                {config.label}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {config.href}
+                              </div>
                             </div>
                             <Link href={config.href}>
                               <Button size="sm" variant="outline">
@@ -157,5 +191,19 @@ export default function DebugSidebarLinksPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function DebugSidebarLinksPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      }
+    >
+      <DebugSidebarLinksContent />
+    </Suspense>
   );
 }

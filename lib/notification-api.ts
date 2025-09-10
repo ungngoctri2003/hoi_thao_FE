@@ -1,14 +1,20 @@
 "use client";
 
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from "@/hooks/use-auth";
 
 export interface Notification {
   id: number;
   user_id: number;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
-  category: 'system' | 'permission' | 'conference' | 'session' | 'registration' | 'general';
+  type: "info" | "success" | "warning" | "error";
+  category:
+    | "system"
+    | "permission"
+    | "conference"
+    | "session"
+    | "registration"
+    | "general";
   is_read: boolean;
   is_archived: boolean;
   data?: Record<string, unknown>;
@@ -30,8 +36,8 @@ export interface NotificationFilters {
   is_archived?: boolean;
   limit?: number;
   offset?: number;
-  sort_by?: 'created_at' | 'updated_at';
-  sort_order?: 'ASC' | 'DESC';
+  sort_by?: "created_at" | "updated_at";
+  sort_order?: "ASC" | "DESC";
 }
 
 export interface NotificationPreferences {
@@ -48,26 +54,29 @@ export interface NotificationPreferences {
 }
 
 class NotificationAPI {
-  private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  private baseUrl =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
 
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const token = localStorage.getItem('access_token');
-    
-    const response = await fetch(`${this.baseUrl}/api/notifications${endpoint}`, {
+    const token = localStorage.getItem("accessToken");
+
+    const response = await fetch(`${this.baseUrl}/notifications${endpoint}`, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
         ...options.headers,
       },
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Network error' }));
-      throw new Error(error.message || 'Request failed');
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Network error" }));
+      throw new Error(error.message || "Request failed");
     }
 
     const data = await response.json();
@@ -85,7 +94,7 @@ class NotificationAPI {
     };
   }> {
     const params = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         params.append(key, String(value));
@@ -98,46 +107,48 @@ class NotificationAPI {
 
   // Get notification statistics
   async getStats(): Promise<NotificationStats> {
-    return this.request('/stats');
+    return this.request("/stats");
   }
 
   // Mark notification as read
   async markAsRead(notificationId: number): Promise<void> {
     return this.request(`/${notificationId}/read`, {
-      method: 'PATCH',
+      method: "PATCH",
     });
   }
 
   // Mark all notifications as read
   async markAllAsRead(): Promise<{ updatedCount: number }> {
-    return this.request('/read-all', {
-      method: 'PATCH',
+    return this.request("/read-all", {
+      method: "PATCH",
     });
   }
 
   // Archive notification
   async archive(notificationId: number): Promise<void> {
     return this.request(`/${notificationId}/archive`, {
-      method: 'PATCH',
+      method: "PATCH",
     });
   }
 
   // Delete notification
   async delete(notificationId: number): Promise<void> {
     return this.request(`/${notificationId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
   // Get notification preferences
   async getPreferences(): Promise<NotificationPreferences> {
-    return this.request('/preferences');
+    return this.request("/preferences");
   }
 
   // Update notification preferences
-  async updatePreferences(preferences: Partial<NotificationPreferences>): Promise<NotificationPreferences> {
-    return this.request('/preferences', {
-      method: 'PATCH',
+  async updatePreferences(
+    preferences: Partial<NotificationPreferences>
+  ): Promise<NotificationPreferences> {
+    return this.request("/preferences", {
+      method: "PATCH",
       body: JSON.stringify(preferences),
     });
   }
@@ -148,14 +159,20 @@ class NotificationAPI {
     data: {
       title: string;
       message: string;
-      type?: 'info' | 'success' | 'warning' | 'error';
-      category?: 'system' | 'permission' | 'conference' | 'session' | 'registration' | 'general';
+      type?: "info" | "success" | "warning" | "error";
+      category?:
+        | "system"
+        | "permission"
+        | "conference"
+        | "session"
+        | "registration"
+        | "general";
       data?: Record<string, unknown>;
       expires_at?: string;
     }
   ): Promise<Notification> {
     return this.request(`/send/${userId}`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
@@ -171,7 +188,7 @@ class NotificationAPI {
     }
   ): Promise<Notification> {
     return this.request(`/send-template/${userId}`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
@@ -180,13 +197,19 @@ class NotificationAPI {
   async broadcast(data: {
     title: string;
     message: string;
-    type?: 'info' | 'success' | 'warning' | 'error';
-    category?: 'system' | 'permission' | 'conference' | 'session' | 'registration' | 'general';
+    type?: "info" | "success" | "warning" | "error";
+    category?:
+      | "system"
+      | "permission"
+      | "conference"
+      | "session"
+      | "registration"
+      | "general";
     data?: Record<string, unknown>;
     expires_at?: string;
   }): Promise<{ createdCount: number; totalUsers: number }> {
-    return this.request('/broadcast', {
-      method: 'POST',
+    return this.request("/broadcast", {
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
@@ -198,16 +221,16 @@ class NotificationAPI {
     data?: Record<string, unknown>;
     expires_at?: string;
   }): Promise<{ createdCount: number; totalUsers: number }> {
-    return this.request('/broadcast-template', {
-      method: 'POST',
+    return this.request("/broadcast-template", {
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
 
   // Cleanup expired notifications (Admin only)
   async cleanup(): Promise<{ deletedCount: number }> {
-    return this.request('/cleanup', {
-      method: 'POST',
+    return this.request("/cleanup", {
+      method: "POST",
     });
   }
 }
