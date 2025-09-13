@@ -158,7 +158,6 @@ const getNavigationItems = (
 
     // Special handling for messaging - it's a general feature, not conference-specific
     if (item.href === "/messaging") {
-      console.log("Messaging item check:", { hasBasicPermission, userRole });
       // All roles (admin, staff, attendee) should have messaging.view permission
       // If permission check fails, still show it as it's a core feature
       return true;
@@ -166,7 +165,6 @@ const getNavigationItems = (
 
     // Special handling for my-events - it's a general feature, not conference-specific
     if (item.href === "/my-events") {
-      console.log("My Events item check:", { hasBasicPermission, userRole });
       // All roles (admin, staff, attendee) should have my-events.view permission
       // If permission check fails, still show it as it's a core feature
       return true;
@@ -324,19 +322,8 @@ export function Sidebar({ userRole }: SidebarProps) {
     ),
   };
 
-  console.log("Grouped items:", groupedItems);
-  console.log("Features section check:", {
-    featuresLength: groupedItems.features.length,
-    features: groupedItems.features,
-    shouldShow: groupedItems.features.length > 0,
-  });
-
   // Show loading state while permissions are being fetched
   if (permissionsLoading || conferencePermissionsLoading) {
-    console.log("Sidebar loading state:", {
-      permissionsLoading,
-      conferencePermissionsLoading,
-    });
     return (
       <div
         className={cn(

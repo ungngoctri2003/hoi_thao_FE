@@ -28,7 +28,6 @@ export function usePermissions() {
         setIsLoading(true);
         // Get user's current permissions from the API
         const userInfo = await apiClient.getCurrentUser();
-        console.log("API User Info:", userInfo);
 
         // Use permissions from backend if available, otherwise fallback to role-based
         if (userInfo.permissions && userInfo.permissions.length > 0) {

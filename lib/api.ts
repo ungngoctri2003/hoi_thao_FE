@@ -1079,14 +1079,7 @@ class ApiClient {
             "my-events.view",
           ];
         }
-        console.log("Generated permissions for role", role, ":", permissions);
       }
-
-      console.log("Final role determination:", {
-        userData: userData,
-        permissions: permissions,
-        determinedRole: role,
-      });
 
       return {
         id: userData.ID || userData.id || 0,
