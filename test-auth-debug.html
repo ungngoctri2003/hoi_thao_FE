@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auth Debug Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      .success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+      }
+      .error {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+      }
+      .info {
+        background-color: #d1ecf1;
+        border-color: #bee5eb;
+      }
+      pre {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 3px;
+        overflow-x: auto;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      input {
+        padding: 8px;
+        margin: 5px;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔐 Auth Debug Test</h1>
+
+    <div class="test-section info">
+      <h3>Current Auth State</h3>
+      <p><strong>Access Token:</strong> <span id="accessToken"></span></p>
+      <p><strong>Refresh Token:</strong> <span id="refreshToken"></span></p>
+      <p><strong>User Data:</strong> <span id="userData"></span></p>
+      <p><strong>Cookies:</strong> <span id="cookies"></span></p>
+    </div>
+
+    <div class="test-section">
+      <h3>Test Login</h3>
+      <input
+        type="email"
+        id="email"
+        placeholder="Email"
+        value="admin@example.com"
+      />
+      <input
+        type="password"
+        id="password"
+        placeholder="Password"
+        value="admin123"
+      />
+      <button onclick="testLogin()">Test Login</button>
+    </div>
+
+    <div class="test-section">
+      <h3>Test API with Token</h3>
+      <button onclick="testAttendeesWithToken()">Test Attendees API</button>
+      <button onclick="testConferencesWithToken()">Test Conferences API</button>
+      <button onclick="testProfileWithToken()">Test Profile API</button>
+    </div>
+
+    <div class="test-section">
+      <h3>Clear Auth</h3>
+      <button onclick="clearAuth()">Clear All Auth Data</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+      const API_BASE_URL = "http://localhost:4000/api/v1";
+
+      function updateAuthState() {
+        const accessToken = localStorage.getItem("accessToken");
+        const refreshToken = localStorage.getItem("refreshToken");
+        const userData = localStorage.getItem("user");
+        const cookies = document.cookie;
+
+        document.getElementById("accessToken").textContent = accessToken
+          ? "Found"
+          : "Not found";
+        document.getElementById("refreshToken").textContent = refreshToken
+          ? "Found"
+          : "Not found";
+        document.getElementById("userData").textContent = userData
+          ? "Found"
+          : "Not found";
+        document.getElementById("cookies").textContent =
+          cookies || "No cookies";
+      }
+
+      function addResult(title, content, type = "info") {
+        const resultsDiv = document.getElementById("results");
+        const section = document.createElement("div");
+        section.className = `test-section ${type}`;
+        section.innerHTML = `
+                <h3>${title}</h3>
+                <pre>${content}</pre>
+            `;
+        resultsDiv.appendChild(section);
+      }
+
+      function clearResults() {
+        document.getElementById("results").innerHTML = "";
+      }
+
+      async function testLogin() {
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+
+        if (!email || !password) {
+          addResult(
+            "❌ Login Failed",
+            "Please enter email and password",
+            "error"
+          );
+          return;
+        }
+
+        try {
+          addResult("🔐 Testing Login", `Email: ${email}`, "info");
+
+          const response = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ email, password }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            addResult(
+              "✅ Login Success",
+              `Response: ${JSON.stringify(data, null, 2)}`,
+              "success"
+            );
+
+            // Store tokens
+            if (data.data && data.data.accessToken) {
+              localStorage.setItem("accessToken", data.data.accessToken);
+              localStorage.setItem("refreshToken", data.data.refreshToken);
+              addResult(
+                "💾 Tokens Stored",
+                "Access and refresh tokens stored in localStorage",
+                "success"
+              );
+            }
+
+            updateAuthState();
+          } else {
+            addResult(
+              "❌ Login Failed",
+              `Status: ${response.status}\nResponse: ${JSON.stringify(
+                data,
+                null,
+                2
+              )}`,
+              "error"
+            );
+          }
+        } catch (error) {
+          addResult("❌ Login Error", `Error: ${error.message}`, "error");
+        }
+      }
+
+      async function testAttendeesWithToken() {
+        const token = localStorage.getItem("accessToken");
+        if (!token) {
+          addResult(
+            "❌ No Token",
+            "Please login first to get a token",
+            "error"
+          );
+          return;
+        }
+
+        try {
+          addResult(
+            "👥 Testing Attendees API",
+            "Using stored token...",
+            "info"
+          );
+
+          const response = await fetch(`${API_BASE_URL}/attendees`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            addResult(
+              "✅ Attendees API Success",
+              `Status: ${response.status}\nData: ${JSON.stringify(
+                data,
+                null,
+                2
+              )}`,
+              "success"
+            );
+          } else {
+            addResult(
+              "❌ Attendees API Failed",
+              `Status: ${response.status}\nResponse: ${JSON.stringify(
+                data,
+                null,
+                2
+              )}`,
+              "error"
+            );
+          }
+        } catch (error) {
+          addResult(
+            "❌ Attendees API Error",
+            `Error: ${error.message}`,
+            "error"
+          );
+        }
+      }
+
+      async function testConferencesWithToken() {
+        const token = localStorage.getItem("accessToken");
+        if (!token) {
+          addResult(
+            "❌ No Token",
+            "Please login first to get a token",
+            "error"
+          );
+          return;
+        }
+
+        try {
+          addResult(
+            "🏛️ Testing Conferences API",
+            "Using stored token...",
+            "info"
+          );
+
+          const response = await fetch(`${API_BASE_URL}/conferences`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            addResult(
+              "✅ Conferences API Success",
+              `Status: ${response.status}\nData: ${JSON.stringify(
+                data,
+                null,
+                2
+              )}`,
+              "success"
+            );
+          } else {
+            addResult(
+              "❌ Conferences API Failed",
+              `Status: ${response.status}\nResponse: ${JSON.stringify(
+                data,
+                null,
+                2
+              )}`,
+              "error"
+            );
+          }
+        } catch (error) {
+          addResult(
+            "❌ Conferences API Error",
+            `Error: ${error.message}`,
+            "error"
+          );
+        }
+      }
+
+      async function testProfileWithToken() {
+        const token = localStorage.getItem("accessToken");
+        if (!token) {
+          addResult(
+            "❌ No Token",
+            "Please login first to get a token",
+            "error"
+          );
+          return;
+        }
+
+        try {
+          addResult("👤 Testing Profile API", "Using stored token...", "info");
+
+          const response = await fetch(`${API_BASE_URL}/profile`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            addResult(
+              "✅ Profile API Success",
+              `Status: ${response.status}\nData: ${JSON.stringify(
+                data,
+                null,
+                2
+              )}`,
+              "success"
+            );
+          } else {
+            addResult(
+              "❌ Profile API Failed",
+              `Status: ${response.status}\nResponse: ${JSON.stringify(
+                data,
+                null,
+                2
+              )}`,
+              "error"
+            );
+          }
+        } catch (error) {
+          addResult("❌ Profile API Error", `Error: ${error.message}`, "error");
+        }
+      }
+
+      function clearAuth() {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+        localStorage.removeItem("authState");
+
+        // Clear cookies
+        document.cookie =
+          "accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax";
+        document.cookie =
+          "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax";
+
+        updateAuthState();
+        addResult(
+          "🧹 Auth Cleared",
+          "All authentication data has been cleared",
+          "success"
+        );
+      }
+
+      // Update auth state on load
+      window.onload = function () {
+        updateAuthState();
+      };
+    </script>
+  </body>
+</html>

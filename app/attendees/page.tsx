@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useConferencePermissions } from "@/hooks/use-conference-permissions";
 import { ConferencePermissionGuard } from "@/components/auth/conference-permission-guard";
@@ -9,11 +9,17 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAttendeeConferences } from "@/hooks/use-attendee-conferences";
 import { AttendeeDialog } from "@/components/attendees/attendee-dialog";
 import { DeleteAttendeeDialog } from "@/components/attendees/delete-attendee-dialog";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
+import {
   Table,
   TableBody,
   TableCell,
@@ -21,14 +27,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { 
-  Users, 
-  Search, 
-  Filter, 
-  Download, 
-  Plus, 
-  Edit, 
-  Trash2, 
+import {
+  Users,
+  Search,
+  Filter,
+  Download,
+  Plus,
+  Edit,
+  Trash2,
   UserCheck,
   Mail,
   Phone,
@@ -47,31 +53,33 @@ import {
   Award,
   Trophy,
   Medal,
-  Crown
+  Crown,
 } from "lucide-react";
 
 // Using the API types instead of local interface
 
 export default function AttendeesPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { currentConferenceId, hasConferencePermission } = useConferencePermissions();
+  const { currentConferenceId, hasConferencePermission } =
+    useConferencePermissions();
   const searchParams = useSearchParams();
-  
+
   // Get conferenceId from URL parameter
-  const conferenceIdParam = searchParams.get('conferenceId');
+  const conferenceIdParam = searchParams.get("conferenceId");
   const conferenceId = conferenceIdParam ? parseInt(conferenceIdParam) : null;
-  
+
   // Determine if this is a specific conference page or global admin page
   const isGlobalAdminPage = !conferenceId;
   const isConferenceSpecificPage = !!conferenceId;
-  
+
   // State for filters and UI
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterGender, setFilterGender] = useState<string>("all");
   const [filterConference, setFilterConference] = useState<string>("all");
   const [filterCheckinStatus, setFilterCheckinStatus] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'cards'>('list');
+  const [viewMode, setViewMode] = useState<"grid" | "list" | "cards">("list");
   const [sortBy, setSortBy] = useState<string>("name");
   const [selectedAttendee, setSelectedAttendee] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -81,7 +89,9 @@ export default function AttendeesPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [dialogMode, setDialogMode] = useState<'view' | 'edit' | 'create'>('view');
+  const [dialogMode, setDialogMode] = useState<"view" | "edit" | "create">(
+    "view"
+  );
   const [showAttendeeDialog, setShowAttendeeDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [attendeeToDelete, setAttendeeToDelete] = useState<any>(null);
@@ -89,36 +99,70 @@ export default function AttendeesPage() {
   // State for all conferences
   const [allConferences, setAllConferences] = useState<any[]>([]);
   const [conferencesLoading, setConferencesLoading] = useState(false);
-  
+
   // State for specific conference (when conferenceId is provided)
   const [currentConference, setCurrentConference] = useState<any>(null);
   const [conferenceLoading, setConferenceLoading] = useState(false);
 
-  // Use the hook to fetch attendees with their conferences
-  const {
-    attendeesWithConferences,
-    isLoading,
-    error,
-    pagination,
-    refetch
-  } = useAttendeeConferences({
-    page: currentPage,
-    limit: pageSize,
-    filters: {
-      name: searchTerm || undefined,
+  // Debounce search term
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // 500ms delay
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm]);
+
+  // Memoize filters to prevent unnecessary re-renders
+  const filters = useMemo(
+    () => ({
+      name: debouncedSearchTerm || undefined,
       gender: filterGender !== "all" ? filterGender : undefined,
-    },
-    search: searchTerm || undefined,
-    autoFetch: true,
-    conferenceId: conferenceId || undefined
-  });
+    }),
+    [debouncedSearchTerm, filterGender]
+  );
+
+  // Use the hook to fetch attendees with their conferences
+  const { attendeesWithConferences, isLoading, error, pagination, refetch } =
+    useAttendeeConferences({
+      page: currentPage,
+      limit: pageSize,
+      filters,
+      search: debouncedSearchTerm || undefined,
+      autoFetch: true,
+      conferenceId: conferenceId || undefined,
+    });
+
+  // Enhanced error handling
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
+
+  const handleRetry = useCallback(async () => {
+    if (retryCount < maxRetries) {
+      setRetryCount((prev) => prev + 1);
+      console.log(
+        `🔄 Retrying fetch (attempt ${retryCount + 1}/${maxRetries})`
+      );
+      await refetch();
+    }
+  }, [retryCount, refetch, maxRetries]);
 
   // Extract attendees and conferences from the combined data
-  const attendees = attendeesWithConferences.map(item => ({
+  const attendees = attendeesWithConferences.map((item) => ({
     ...item,
     // Remove conferences and registrations from the base attendee object
     conferences: undefined,
-    registrations: undefined
+    registrations: undefined,
   }));
 
   // Fetch all conferences from database
@@ -126,21 +170,26 @@ export default function AttendeesPage() {
     const fetchAllConferences = async () => {
       try {
         setConferencesLoading(true);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/conferences`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        const response = await fetch(
+          `${
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1"
+          }/conferences`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+            },
           }
-        });
-        
+        );
+
         if (response.ok) {
           const data = await response.json();
           setAllConferences(data.data || []);
-          console.log('🏛️ Fetched all conferences:', data.data?.length || 0);
+          console.log("🏛️ Fetched all conferences:", data.data?.length || 0);
         } else {
-          console.error('Failed to fetch conferences:', response.statusText);
+          console.error("Failed to fetch conferences:", response.statusText);
         }
       } catch (error) {
-        console.error('Error fetching conferences:', error);
+        console.error("Error fetching conferences:", error);
       } finally {
         setConferencesLoading(false);
       }
@@ -159,22 +208,30 @@ export default function AttendeesPage() {
 
       try {
         setConferenceLoading(true);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/conferences/${conferenceId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        const response = await fetch(
+          `${
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1"
+          }/conferences/${conferenceId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+            },
           }
-        });
-        
+        );
+
         if (response.ok) {
           const data = await response.json();
           setCurrentConference(data.data);
-          console.log('🏛️ Fetched current conference:', data.data?.NAME);
+          console.log("🏛️ Fetched current conference:", data.data?.NAME);
         } else {
-          console.error('Failed to fetch current conference:', response.statusText);
+          console.error(
+            "Failed to fetch current conference:",
+            response.statusText
+          );
           setCurrentConference(null);
         }
       } catch (error) {
-        console.error('Error fetching current conference:', error);
+        console.error("Error fetching current conference:", error);
         setCurrentConference(null);
       } finally {
         setConferenceLoading(false);
@@ -186,116 +243,139 @@ export default function AttendeesPage() {
 
   // Filter attendees based on current filters - memoized to prevent unnecessary re-renders
   const filteredAttendees = useMemo(() => {
-    console.log('🔍 Filtering attendees:', { 
-      total: attendees.length, 
-      searchTerm, 
-      filterGender, 
+    console.log("🔍 Filtering attendees:", {
+      total: attendees.length,
+      searchTerm,
+      filterGender,
       filterConference,
-      sortBy 
+      sortBy,
     });
-    
-    const filtered = attendees.filter(attendee => {
-      const matchesSearch = searchTerm === "" || 
-                           attendee.NAME.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           attendee.EMAIL.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (attendee.COMPANY && attendee.COMPANY.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesGender = filterGender === "all" || attendee.GENDER === filterGender;
-      
-      // Filter by conference (only for global admin page)
-      let matchesConference = true;
-      if (isGlobalAdminPage && filterConference !== "all") {
-        const attendeeWithConferences = attendeesWithConferences.find(a => a.ID === attendee.ID);
-        const attendeeConferences = attendeeWithConferences?.conferences || [];
-        const filterConferenceId = parseInt(filterConference);
-        matchesConference = attendeeConferences.some(conf => conf.ID === filterConferenceId);
-      }
-      
-      // Filter by checkin status
-      let matchesCheckinStatus = true;
-      if (filterCheckinStatus !== "all") {
-        const attendeeWithConferences = attendeesWithConferences.find(a => a.ID === attendee.ID);
-        const overallStatus = attendeeWithConferences?.overallStatus || 'registered';
-        
-        console.log('🔍 Filtering by checkin status:', {
-          attendeeId: attendee.ID,
-          attendeeName: attendee.NAME,
-          overallStatus,
-          filterCheckinStatus,
-          matches: overallStatus === filterCheckinStatus
-        });
-        
-        matchesCheckinStatus = overallStatus === filterCheckinStatus;
-      }
-      
-      return matchesSearch && matchesGender && matchesConference && matchesCheckinStatus;
-    }).sort((a, b) => {
-      switch (sortBy) {
-        case "name":
-          return a.NAME.localeCompare(b.NAME);
-        case "company":
-          return (a.COMPANY || "").localeCompare(b.COMPANY || "");
-        case "createdAt":
-          return new Date(b.CREATED_AT).getTime() - new Date(a.CREATED_AT).getTime();
-        case "email":
-          return a.EMAIL.localeCompare(b.EMAIL);
-        default:
-          return 0;
-      }
-    });
-    
-    console.log('🔍 Filtered result:', filtered.length);
-    return filtered;
-  }, [attendees, attendeesWithConferences, searchTerm, filterGender, filterConference, filterCheckinStatus, sortBy, isGlobalAdminPage]);
 
-  // Debug logs
-  console.log('📊 Attendees data:', { 
-    attendeesCount: attendees.length, 
-    conferencesCount: allConferences.length,
-    isLoading,
-    error,
-    pagination 
-  });
-  
-  console.log('📊 Conferences data:', allConferences);
-  console.log('📊 Filtered attendees:', filteredAttendees.length);
-  console.log('📊 Conferences loading:', conferencesLoading);
-  
+    const filtered = attendees
+      .filter((attendee) => {
+        const matchesSearch =
+          searchTerm === "" ||
+          attendee.NAME.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          attendee.EMAIL.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (attendee.COMPANY &&
+            attendee.COMPANY.toLowerCase().includes(searchTerm.toLowerCase()));
+
+        const matchesGender =
+          filterGender === "all" || attendee.GENDER === filterGender;
+
+        // Filter by conference (only for global admin page)
+        let matchesConference = true;
+        if (isGlobalAdminPage && filterConference !== "all") {
+          const attendeeWithConferences = attendeesWithConferences.find(
+            (a) => a.ID === attendee.ID
+          );
+          const attendeeConferences =
+            attendeeWithConferences?.conferences || [];
+          const filterConferenceId = parseInt(filterConference);
+          matchesConference = attendeeConferences.some(
+            (conf) => conf.ID === filterConferenceId
+          );
+        }
+
+        // Filter by checkin status
+        let matchesCheckinStatus = true;
+        if (filterCheckinStatus !== "all") {
+          const attendeeWithConferences = attendeesWithConferences.find(
+            (a) => a.ID === attendee.ID
+          );
+          const overallStatus =
+            attendeeWithConferences?.overallStatus || "registered";
+
+          console.log("🔍 Filtering by checkin status:", {
+            attendeeId: attendee.ID,
+            attendeeName: attendee.NAME,
+            overallStatus,
+            filterCheckinStatus,
+            matches: overallStatus === filterCheckinStatus,
+          });
+
+          matchesCheckinStatus = overallStatus === filterCheckinStatus;
+        }
+
+        return (
+          matchesSearch &&
+          matchesGender &&
+          matchesConference &&
+          matchesCheckinStatus
+        );
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case "name":
+            return a.NAME.localeCompare(b.NAME);
+          case "company":
+            return (a.COMPANY || "").localeCompare(b.COMPANY || "");
+          case "createdAt":
+            return (
+              new Date(b.CREATED_AT).getTime() -
+              new Date(a.CREATED_AT).getTime()
+            );
+          case "email":
+            return a.EMAIL.localeCompare(b.EMAIL);
+          default:
+            return 0;
+        }
+      });
+
+    console.log("🔍 Filtered result:", filtered.length);
+    return filtered;
+  }, [
+    attendees,
+    attendeesWithConferences,
+    searchTerm,
+    filterGender,
+    filterConference,
+    filterCheckinStatus,
+    sortBy,
+    isGlobalAdminPage,
+  ]);
+
   // Check if data is loading
   if (isLoading) {
-    console.log('⏳ Still loading...');
+    console.log("⏳ Still loading...");
   }
-  
+
   if (error) {
-    console.log('❌ Error:', error);
+    console.log("❌ Error:", error);
   }
-  
+
   // Debug: Check if we have data but it's not showing
   if (attendees.length > 0 && filteredAttendees.length === 0) {
-    console.log('⚠️ Data exists but filtered out:', { 
-      attendees: attendees.length, 
+    console.log("⚠️ Data exists but filtered out:", {
+      attendees: attendees.length,
       filtered: filteredAttendees.length,
       searchTerm,
       filterGender,
       filterConference,
-      filterCheckinStatus
+      filterCheckinStatus,
     });
   }
-  
+
   // Debug: Check if we have conferences but they're not showing
   if (allConferences.length > 0) {
-    console.log('🏛️ Conferences available:', allConferences.map(c => c.NAME));
+    console.log(
+      "🏛️ Conferences available:",
+      allConferences.map((c) => c.NAME)
+    );
   } else if (!conferencesLoading) {
-    console.log('🏛️ No conferences available');
+    console.log("🏛️ No conferences available");
   } else {
-    console.log('🏛️ Loading conferences...');
+    console.log("🏛️ Loading conferences...");
   }
-  
+
   // Debug: Check if we have attendees but they're not showing
   if (attendees.length > 0) {
-    console.log('👥 Attendees available:', attendees.map(a => a.NAME));
+    console.log(
+      "👥 Attendees available:",
+      attendees.map((a) => a.NAME)
+    );
   } else {
-    console.log('👥 No attendees available');
+    console.log("👥 No attendees available");
   }
 
   const getGenderBadge = (gender: string | null) => {
@@ -303,38 +383,82 @@ export default function AttendeesPage() {
     const genderConfig = {
       male: { label: "Nam", color: "bg-blue-100 text-blue-800" },
       female: { label: "Nữ", color: "bg-pink-100 text-pink-800" },
-      other: { label: "Khác", color: "bg-gray-100 text-gray-800" }
+      other: { label: "Khác", color: "bg-gray-100 text-gray-800" },
     };
-    
-    const config = genderConfig[gender as keyof typeof genderConfig] || genderConfig.other;
+
+    const config =
+      genderConfig[gender as keyof typeof genderConfig] || genderConfig.other;
     return <Badge className={config.color}>{config.label}</Badge>;
   };
 
   const getRegistrationStatusBadge = (status: string | undefined) => {
     if (!status) return null;
     const statusConfig = {
-      "not-registered": { label: "Chưa đăng ký", color: "bg-gray-100 text-gray-600" },
+      "not-registered": {
+        label: "Chưa đăng ký",
+        color: "bg-gray-100 text-gray-600",
+      },
       registered: { label: "Đã đăng ký", color: "bg-blue-100 text-blue-800" },
-      "checked-in": { label: "Đã check-in", color: "bg-green-100 text-green-800" },
-      "checked-out": { label: "Đã check-out", color: "bg-orange-100 text-orange-800" },
+      "checked-in": {
+        label: "Đã check-in",
+        color: "bg-green-100 text-green-800",
+      },
+      "checked-out": {
+        label: "Đã check-out",
+        color: "bg-orange-100 text-orange-800",
+      },
       cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
-      "no-show": { label: "Không tham dự", color: "bg-gray-100 text-gray-800" }
+      "no-show": { label: "Không tham dự", color: "bg-gray-100 text-gray-800" },
     };
-    
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.registered;
+
+    const config =
+      statusConfig[status as keyof typeof statusConfig] ||
+      statusConfig.registered;
     return <Badge className={config.color}>{config.label}</Badge>;
   };
 
-  const getCheckinStatusBadge = (status: 'not-registered' | 'registered' | 'checked-in' | 'checked-out' | 'no-show' | 'cancelled') => {
+  const getCheckinStatusBadge = (
+    status:
+      | "not-registered"
+      | "registered"
+      | "checked-in"
+      | "checked-out"
+      | "no-show"
+      | "cancelled"
+  ) => {
     const statusConfig = {
-      "not-registered": { label: "Chưa đăng ký", color: "bg-gray-100 text-gray-600", icon: "⭕" },
-      registered: { label: "Đã đăng ký", color: "bg-blue-100 text-blue-800", icon: "📝" },
-      "checked-in": { label: "Đã check-in", color: "bg-green-100 text-green-800", icon: "✅" },
-      "checked-out": { label: "Đã check-out", color: "bg-orange-100 text-orange-800", icon: "🚪" },
-      cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800", icon: "❌" },
-      "no-show": { label: "Không tham dự", color: "bg-gray-100 text-gray-800", icon: "⏰" }
+      "not-registered": {
+        label: "Chưa đăng ký",
+        color: "bg-gray-100 text-gray-600",
+        icon: "⭕",
+      },
+      registered: {
+        label: "Đã đăng ký",
+        color: "bg-blue-100 text-blue-800",
+        icon: "📝",
+      },
+      "checked-in": {
+        label: "Đã check-in",
+        color: "bg-green-100 text-green-800",
+        icon: "✅",
+      },
+      "checked-out": {
+        label: "Đã check-out",
+        color: "bg-orange-100 text-orange-800",
+        icon: "🚪",
+      },
+      cancelled: {
+        label: "Đã hủy",
+        color: "bg-red-100 text-red-800",
+        icon: "❌",
+      },
+      "no-show": {
+        label: "Không tham dự",
+        color: "bg-gray-100 text-gray-800",
+        icon: "⏰",
+      },
     };
-    
+
     const config = statusConfig[status];
     return (
       <Badge className={`${config.color} flex items-center space-x-1`}>
@@ -346,20 +470,23 @@ export default function AttendeesPage() {
 
   const getConferenceStatusIcon = (status: string) => {
     const statusConfig = {
-      "active": { icon: "🟢", label: "Hoạt động", color: "text-green-600" },
-      "inactive": { icon: "🔴", label: "Không hoạt động", color: "text-red-600" },
-      "pending": { icon: "🟡", label: "Chờ duyệt", color: "text-yellow-600" },
-      "completed": { icon: "✅", label: "Hoàn thành", color: "text-blue-600" },
-      "cancelled": { icon: "❌", label: "Đã hủy", color: "text-gray-600" }
+      active: { icon: "🟢", label: "Hoạt động", color: "text-green-600" },
+      inactive: { icon: "🔴", label: "Không hoạt động", color: "text-red-600" },
+      pending: { icon: "🟡", label: "Chờ duyệt", color: "text-yellow-600" },
+      completed: { icon: "✅", label: "Hoàn thành", color: "text-blue-600" },
+      cancelled: { icon: "❌", label: "Đã hủy", color: "text-gray-600" },
     };
-    
-    const config = statusConfig[status?.toLowerCase() as keyof typeof statusConfig] || 
-                   { icon: "❓", label: status || "N/A", color: "text-gray-600" };
-    
+
+    const config = statusConfig[
+      status?.toLowerCase() as keyof typeof statusConfig
+    ] || { icon: "❓", label: status || "N/A", color: "text-gray-600" };
+
     return (
       <div className="flex items-center space-x-1">
         <span className="text-lg">{config.icon}</span>
-        <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
+        <span className={`text-sm font-medium ${config.color}`}>
+          {config.label}
+        </span>
       </div>
     );
   };
@@ -375,23 +502,23 @@ export default function AttendeesPage() {
 
   const formatTime = (timeString: string) => {
     const date = new Date(timeString);
-    return date.toLocaleTimeString('vi-VN', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      timeZone: 'Asia/Ho_Chi_Minh'
+    return date.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Ho_Chi_Minh",
     });
   };
 
   const toggleAttendeeSelection = (attendeeId: number) => {
-    setSelectedAttendees(prev => 
-      prev.includes(attendeeId) 
-        ? prev.filter(id => id !== attendeeId)
+    setSelectedAttendees((prev) =>
+      prev.includes(attendeeId)
+        ? prev.filter((id) => id !== attendeeId)
         : [...prev, attendeeId]
     );
   };
 
   const selectAllAttendees = () => {
-    setSelectedAttendees(filteredAttendees.map(a => a.ID));
+    setSelectedAttendees(filteredAttendees.map((a) => a.ID));
   };
 
   const clearSelection = () => {
@@ -406,62 +533,72 @@ export default function AttendeesPage() {
   // Handle CRUD operations
   const handleCreateAttendee = async (data: any) => {
     try {
-      console.log('Creating attendee:', data);
-      
+      console.log("Creating attendee:", data);
+
       // Call API to create attendee
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/attendees`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        },
-        body: JSON.stringify(data)
-      });
+      const response = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1"
+        }/attendees`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+          body: JSON.stringify(data),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create attendee');
+        throw new Error(errorData.message || "Failed to create attendee");
       }
 
       const result = await response.json();
-      console.log('Attendee created successfully:', result);
-      
+      console.log("Attendee created successfully:", result);
+
       // Refresh data
       await refetch();
       setShowAttendeeDialog(false);
     } catch (error) {
-      console.error('Error creating attendee:', error);
+      console.error("Error creating attendee:", error);
     }
   };
 
   const handleUpdateAttendee = async (data: any) => {
     if (!selectedAttendee?.ID) return;
     try {
-      console.log('Updating attendee:', selectedAttendee.ID, data);
-      
+      console.log("Updating attendee:", selectedAttendee.ID, data);
+
       // Call API to update attendee
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/attendees/${selectedAttendee.ID}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        },
-        body: JSON.stringify(data)
-      });
+      const response = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1"
+        }/attendees/${selectedAttendee.ID}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+          body: JSON.stringify(data),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update attendee');
+        throw new Error(errorData.message || "Failed to update attendee");
       }
 
       const result = await response.json();
-      console.log('Attendee updated successfully:', result);
-      
+      console.log("Attendee updated successfully:", result);
+
       // Refresh data
       await refetch();
       setShowAttendeeDialog(false);
     } catch (error) {
-      console.error('Error updating attendee:', error);
+      console.error("Error updating attendee:", error);
     }
   };
 
@@ -474,61 +611,70 @@ export default function AttendeesPage() {
     if (!attendeeToDelete) return;
 
     try {
-      console.log('Deleting attendee:', attendeeToDelete.ID);
-      
+      console.log("Deleting attendee:", attendeeToDelete.ID);
+
       // Call API to delete attendee
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/attendees/${attendeeToDelete.ID}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+      const response = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1"
+        }/attendees/${attendeeToDelete.ID}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
         }
-      });
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete attendee');
+        throw new Error(errorData.message || "Failed to delete attendee");
       }
 
-      console.log('Attendee deleted successfully');
-      
+      console.log("Attendee deleted successfully");
+
       // Refresh data
       await refetch();
-      
+
       // Close dialog
       setShowDeleteDialog(false);
       setAttendeeToDelete(null);
     } catch (error) {
-      console.error('Error deleting attendee:', error);
+      console.error("Error deleting attendee:", error);
     }
   };
 
   // Handle dialog actions
   const handleViewAttendee = (attendee: any) => {
     // Find the full attendee data with conferences and registrations
-    const fullAttendeeData = attendeesWithConferences.find(a => a.ID === attendee.ID);
+    const fullAttendeeData = attendeesWithConferences.find(
+      (a) => a.ID === attendee.ID
+    );
     setSelectedAttendee(fullAttendeeData || attendee);
-    setDialogMode('view');
+    setDialogMode("view");
     setShowAttendeeDialog(true);
   };
 
   const handleEditAttendee = (attendee: any) => {
     // Find the full attendee data with conferences and registrations
-    const fullAttendeeData = attendeesWithConferences.find(a => a.ID === attendee.ID);
+    const fullAttendeeData = attendeesWithConferences.find(
+      (a) => a.ID === attendee.ID
+    );
     setSelectedAttendee(fullAttendeeData || attendee);
-    setDialogMode('edit');
+    setDialogMode("edit");
     setShowAttendeeDialog(true);
   };
 
   const handleCreateNewAttendee = () => {
     setSelectedAttendee(null);
-    setDialogMode('create');
+    setDialogMode("create");
     setShowAttendeeDialog(true);
   };
 
   const handleSaveAttendee = async (data: any) => {
-    if (dialogMode === 'create') {
+    if (dialogMode === "create") {
       await handleCreateAttendee(data);
-    } else if (dialogMode === 'edit') {
+    } else if (dialogMode === "edit") {
       await handleUpdateAttendee(data);
     }
   };
@@ -537,62 +683,91 @@ export default function AttendeesPage() {
   const handleExportExcel = () => {
     try {
       // Prepare data for export
-      const exportData = filteredAttendees.map(attendee => {
-        const attendeeWithConferences = attendeesWithConferences.find(a => a.ID === attendee.ID);
+      const exportData = filteredAttendees.map((attendee) => {
+        const attendeeWithConferences = attendeesWithConferences.find(
+          (a) => a.ID === attendee.ID
+        );
         return {
-          'ID': attendee.ID,
-          'Họ và tên': attendee.NAME,
-          'Email': attendee.EMAIL,
-          'Số điện thoại': attendee.PHONE || '',
-          'Công ty': attendee.COMPANY || '',
-          'Chức vụ': attendee.POSITION || '',
-          'Giới tính': attendee.GENDER || '',
-          'Ngày sinh': attendee.DATE_OF_BIRTH ? new Date(attendee.DATE_OF_BIRTH).toLocaleDateString('vi-VN') : '',
-          'Trạng thái': attendeeWithConferences?.overallStatus === 'not-registered' ? 'Chưa đăng ký' :
-                       attendeeWithConferences?.overallStatus === 'registered' ? 'Đã đăng ký' :
-                       attendeeWithConferences?.overallStatus === 'checked-in' ? 'Đã check-in' :
-                       attendeeWithConferences?.overallStatus === 'checked-out' ? 'Đã check-out' :
-                       attendeeWithConferences?.overallStatus === 'cancelled' ? 'Đã hủy' :
-                       attendeeWithConferences?.overallStatus === 'no-show' ? 'Không tham dự' : 'Chưa xác định',
-          'Số hội nghị': attendeeWithConferences?.conferences.length || 0,
-          'Hội nghị': attendeeWithConferences?.conferences.map(c => c.NAME).join(', ') || 'Chưa có',
-          'Lần check-in cuối': attendeeWithConferences?.lastCheckinTime ? 
-                               new Date(attendeeWithConferences.lastCheckinTime).toLocaleString('vi-VN') : '',
-          'Lần check-out cuối': attendeeWithConferences?.lastCheckoutTime ? 
-                                new Date(attendeeWithConferences.lastCheckoutTime).toLocaleString('vi-VN') : '',
-          'Ngày tạo': new Date(attendee.CREATED_AT).toLocaleString('vi-VN'),
-          'Yêu cầu ăn uống': attendee.DIETARY || '',
-          'Nhu cầu đặc biệt': attendee.SPECIAL_NEEDS || ''
+          ID: attendee.ID,
+          "Họ và tên": attendee.NAME,
+          Email: attendee.EMAIL,
+          "Số điện thoại": attendee.PHONE || "",
+          "Công ty": attendee.COMPANY || "",
+          "Chức vụ": attendee.POSITION || "",
+          "Giới tính": attendee.GENDER || "",
+          "Ngày sinh": attendee.DATE_OF_BIRTH
+            ? new Date(attendee.DATE_OF_BIRTH).toLocaleDateString("vi-VN")
+            : "",
+          "Trạng thái":
+            attendeeWithConferences?.overallStatus === "not-registered"
+              ? "Chưa đăng ký"
+              : attendeeWithConferences?.overallStatus === "registered"
+              ? "Đã đăng ký"
+              : attendeeWithConferences?.overallStatus === "checked-in"
+              ? "Đã check-in"
+              : attendeeWithConferences?.overallStatus === "checked-out"
+              ? "Đã check-out"
+              : attendeeWithConferences?.overallStatus === "cancelled"
+              ? "Đã hủy"
+              : attendeeWithConferences?.overallStatus === "no-show"
+              ? "Không tham dự"
+              : "Chưa xác định",
+          "Số hội nghị": attendeeWithConferences?.conferences.length || 0,
+          "Hội nghị":
+            attendeeWithConferences?.conferences
+              .map((c) => c.NAME)
+              .join(", ") || "Chưa có",
+          "Lần check-in cuối": attendeeWithConferences?.lastCheckinTime
+            ? new Date(attendeeWithConferences.lastCheckinTime).toLocaleString(
+                "vi-VN"
+              )
+            : "",
+          "Lần check-out cuối": attendeeWithConferences?.lastCheckoutTime
+            ? new Date(attendeeWithConferences.lastCheckoutTime).toLocaleString(
+                "vi-VN"
+              )
+            : "",
+          "Ngày tạo": new Date(attendee.CREATED_AT).toLocaleString("vi-VN"),
+          "Yêu cầu ăn uống": attendee.DIETARY || "",
+          "Nhu cầu đặc biệt": attendee.SPECIAL_NEEDS || "",
         };
       });
 
       // Convert to CSV
       const headers = Object.keys(exportData[0] || {});
       const csvContent = [
-        headers.join(','),
-        ...exportData.map(row => 
-          headers.map(header => {
-            const value = row[header as keyof typeof row];
-            // Escape commas and quotes in CSV
-            return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
-              ? `"${value.replace(/"/g, '""')}"` 
-              : value;
-          }).join(',')
-        )
-      ].join('\n');
+        headers.join(","),
+        ...exportData.map((row) =>
+          headers
+            .map((header) => {
+              const value = row[header as keyof typeof row];
+              // Escape commas and quotes in CSV
+              return typeof value === "string" &&
+                (value.includes(",") || value.includes('"'))
+                ? `"${value.replace(/"/g, '""')}"`
+                : value;
+            })
+            .join(",")
+        ),
+      ].join("\n");
 
       // Create and download file
-      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
+      const blob = new Blob(["\ufeff" + csvContent], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `danh_sach_tham_du_vien_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
+      link.setAttribute("href", url);
+      link.setAttribute(
+        "download",
+        `danh_sach_tham_du_vien_${new Date().toISOString().split("T")[0]}.csv`
+      );
+      link.style.visibility = "hidden";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Error exporting data:', error);
+      console.error("Error exporting data:", error);
     }
   };
 
@@ -602,15 +777,21 @@ export default function AttendeesPage() {
       return;
     }
 
-    const selectedAttendeesData = filteredAttendees.filter(attendee => 
+    const selectedAttendeesData = filteredAttendees.filter((attendee) =>
       selectedAttendees.includes(attendee.ID)
     );
 
-    const emailList = selectedAttendeesData.map(attendee => attendee.EMAIL).join(', ');
-    
+    const emailList = selectedAttendeesData
+      .map((attendee) => attendee.EMAIL)
+      .join(", ");
+
     // Open default email client
-    const subject = encodeURIComponent('Thông báo từ hệ thống quản lý hội nghị');
-    const body = encodeURIComponent('Xin chào,\n\nĐây là thông báo từ hệ thống quản lý hội nghị.\n\nTrân trọng!');
+    const subject = encodeURIComponent(
+      "Thông báo từ hệ thống quản lý hội nghị"
+    );
+    const body = encodeURIComponent(
+      "Xin chào,\n\nĐây là thông báo từ hệ thống quản lý hội nghị.\n\nTrân trọng!"
+    );
     window.open(`mailto:${emailList}?subject=${subject}&body=${body}`);
   };
 
@@ -620,58 +801,79 @@ export default function AttendeesPage() {
     }
 
     try {
-      const selectedAttendeesData = filteredAttendees.filter(attendee => 
+      const selectedAttendeesData = filteredAttendees.filter((attendee) =>
         selectedAttendees.includes(attendee.ID)
       );
 
       // Prepare data for export
-      const exportData = selectedAttendeesData.map(attendee => {
-        const attendeeWithConferences = attendeesWithConferences.find(a => a.ID === attendee.ID);
+      const exportData = selectedAttendeesData.map((attendee) => {
+        const attendeeWithConferences = attendeesWithConferences.find(
+          (a) => a.ID === attendee.ID
+        );
         return {
-          'ID': attendee.ID,
-          'Họ và tên': attendee.NAME,
-          'Email': attendee.EMAIL,
-          'Số điện thoại': attendee.PHONE || '',
-          'Công ty': attendee.COMPANY || '',
-          'Chức vụ': attendee.POSITION || '',
-          'Giới tính': attendee.GENDER || '',
-          'Trạng thái': attendeeWithConferences?.overallStatus === 'not-registered' ? 'Chưa đăng ký' :
-                       attendeeWithConferences?.overallStatus === 'registered' ? 'Đã đăng ký' :
-                       attendeeWithConferences?.overallStatus === 'checked-in' ? 'Đã check-in' :
-                       attendeeWithConferences?.overallStatus === 'checked-out' ? 'Đã check-out' :
-                       attendeeWithConferences?.overallStatus === 'cancelled' ? 'Đã hủy' :
-                       attendeeWithConferences?.overallStatus === 'no-show' ? 'Không tham dự' : 'Chưa xác định',
-          'Số hội nghị': attendeeWithConferences?.conferences.length || 0,
-          'Hội nghị': attendeeWithConferences?.conferences.map(c => c.NAME).join(', ') || 'Chưa có'
+          ID: attendee.ID,
+          "Họ và tên": attendee.NAME,
+          Email: attendee.EMAIL,
+          "Số điện thoại": attendee.PHONE || "",
+          "Công ty": attendee.COMPANY || "",
+          "Chức vụ": attendee.POSITION || "",
+          "Giới tính": attendee.GENDER || "",
+          "Trạng thái":
+            attendeeWithConferences?.overallStatus === "not-registered"
+              ? "Chưa đăng ký"
+              : attendeeWithConferences?.overallStatus === "registered"
+              ? "Đã đăng ký"
+              : attendeeWithConferences?.overallStatus === "checked-in"
+              ? "Đã check-in"
+              : attendeeWithConferences?.overallStatus === "checked-out"
+              ? "Đã check-out"
+              : attendeeWithConferences?.overallStatus === "cancelled"
+              ? "Đã hủy"
+              : attendeeWithConferences?.overallStatus === "no-show"
+              ? "Không tham dự"
+              : "Chưa xác định",
+          "Số hội nghị": attendeeWithConferences?.conferences.length || 0,
+          "Hội nghị":
+            attendeeWithConferences?.conferences
+              .map((c) => c.NAME)
+              .join(", ") || "Chưa có",
         };
       });
 
       // Convert to CSV
       const headers = Object.keys(exportData[0] || {});
       const csvContent = [
-        headers.join(','),
-        ...exportData.map(row => 
-          headers.map(header => {
-            const value = row[header as keyof typeof row];
-            return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
-              ? `"${value.replace(/"/g, '""')}"` 
-              : value;
-          }).join(',')
-        )
-      ].join('\n');
+        headers.join(","),
+        ...exportData.map((row) =>
+          headers
+            .map((header) => {
+              const value = row[header as keyof typeof row];
+              return typeof value === "string" &&
+                (value.includes(",") || value.includes('"'))
+                ? `"${value.replace(/"/g, '""')}"`
+                : value;
+            })
+            .join(",")
+        ),
+      ].join("\n");
 
       // Create and download file
-      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
+      const blob = new Blob(["\ufeff" + csvContent], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `danh_sach_da_chon_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
+      link.setAttribute("href", url);
+      link.setAttribute(
+        "download",
+        `danh_sach_da_chon_${new Date().toISOString().split("T")[0]}.csv`
+      );
+      link.style.visibility = "hidden";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Error exporting selected data:', error);
+      console.error("Error exporting selected data:", error);
     }
   };
 
@@ -686,22 +888,24 @@ export default function AttendeesPage() {
   };
 
   // Check if user is admin for global attendees management
-  const isAdmin = user?.role === 'admin';
-  
+  const isAdmin = user?.role === "admin";
+
   // For global admin page: only admin can access
   // For conference-specific page: check conference permissions
-  const canManage = isGlobalAdminPage 
-    ? isAdmin 
+  const canManage = isGlobalAdminPage
+    ? isAdmin
     : hasConferencePermission("attendees.manage");
-  const canView = isGlobalAdminPage 
-    ? isAdmin 
+  const canView = isGlobalAdminPage
+    ? isAdmin
     : hasConferencePermission("attendees.view");
 
   // Show loading state while auth is loading
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary">        </div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary">
+          {" "}
+        </div>
       </div>
     );
   }
@@ -713,13 +917,15 @@ export default function AttendeesPage() {
         <div className="max-w-md w-full">
           <Card>
             <CardHeader>
-              <CardTitle className="text-center text-red-600">Chưa đăng nhập</CardTitle>
+              <CardTitle className="text-center text-red-600">
+                Chưa đăng nhập
+              </CardTitle>
               <CardDescription className="text-center">
                 Vui lòng đăng nhập để truy cập trang này
               </CardDescription>
             </CardHeader>
           </Card>
-                </div>
+        </div>
       </div>
     );
   }
@@ -732,13 +938,20 @@ export default function AttendeesPage() {
   // Check permissions based on page type
   if (isGlobalAdminPage && !isAdmin) {
     return (
-      <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
+      <MainLayout
+        userRole={userRole}
+        userName={userName}
+        userAvatar={userAvatar}
+      >
         <div className="flex items-center justify-center min-h-screen">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle className="text-center text-red-600">Không có quyền truy cập</CardTitle>
+              <CardTitle className="text-center text-red-600">
+                Không có quyền truy cập
+              </CardTitle>
               <CardDescription className="text-center">
-                Chỉ quản trị viên mới có thể truy cập quản lý người tham dự toàn bộ hội nghị
+                Chỉ quản trị viên mới có thể truy cập quản lý người tham dự toàn
+                bộ hội nghị
               </CardDescription>
             </CardHeader>
           </Card>
@@ -749,11 +962,17 @@ export default function AttendeesPage() {
 
   if (isConferenceSpecificPage && !canView) {
     return (
-      <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
+      <MainLayout
+        userRole={userRole}
+        userName={userName}
+        userAvatar={userAvatar}
+      >
         <div className="flex items-center justify-center min-h-screen">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle className="text-center text-red-600">Không có quyền truy cập</CardTitle>
+              <CardTitle className="text-center text-red-600">
+                Không có quyền truy cập
+              </CardTitle>
               <CardDescription className="text-center">
                 Bạn không có quyền xem danh sách tham dự viên của hội nghị này
               </CardDescription>
@@ -766,803 +985,1115 @@ export default function AttendeesPage() {
 
   return (
     <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
-      <ConferencePermissionGuard 
-        requiredPermissions={["attendees.view"]} 
+      <ConferencePermissionGuard
+        requiredPermissions={["attendees.view"]}
         conferenceId={currentConferenceId ?? undefined}
       >
         <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Users className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold">
-                {isGlobalAdminPage 
-                  ? "Quản lý người tham dự hội nghị" 
-                  : `Danh sách tham dự viên - ${currentConference?.NAME || "Đang tải..."}`
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Users className="h-8 w-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-bold">
+                  {isGlobalAdminPage
+                    ? "Quản lý người tham dự hội nghị"
+                    : `Danh sách tham dự viên - ${
+                        currentConference?.NAME || "Đang tải..."
+                      }`}
+                </h1>
+                <p className="text-muted-foreground">
+                  {isGlobalAdminPage
+                    ? "Quản lý và theo dõi thông tin chi tiết của người tham dự từ tất cả hội nghị"
+                    : `Quản lý danh sách tham dự viên của hội nghị ${
+                        currentConference?.NAME || ""
+                      }`}
+                </p>
+                {isConferenceSpecificPage && currentConference && (
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    <p>
+                      📅{" "}
+                      {new Date(
+                        currentConference.START_DATE
+                      ).toLocaleDateString("vi-VN")}{" "}
+                      -{" "}
+                      {new Date(currentConference.END_DATE).toLocaleDateString(
+                        "vi-VN"
+                      )}
+                    </p>
+                    {currentConference.VENUE && (
+                      <p>📍 {currentConference.VENUE}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  setViewMode(
+                    viewMode === "list"
+                      ? "grid"
+                      : viewMode === "grid"
+                      ? "cards"
+                      : "list"
+                  )
                 }
-              </h1>
-              <p className="text-muted-foreground">
-                {isGlobalAdminPage 
-                  ? "Quản lý và theo dõi thông tin chi tiết của người tham dự từ tất cả hội nghị"
-                  : `Quản lý danh sách tham dự viên của hội nghị ${currentConference?.NAME || ""}`
-                }
-              </p>
-              {isConferenceSpecificPage && currentConference && (
-                <div className="mt-2 text-sm text-muted-foreground">
-                  <p>📅 {new Date(currentConference.START_DATE).toLocaleDateString('vi-VN')} - {new Date(currentConference.END_DATE).toLocaleDateString('vi-VN')}</p>
-                  {currentConference.VENUE && <p>📍 {currentConference.VENUE}</p>}
-                </div>
+              >
+                {viewMode === "list" && <Calendar className="h-4 w-4 mr-2" />}
+                {viewMode === "grid" && <Eye className="h-4 w-4 mr-2" />}
+                {viewMode === "cards" && <Users className="h-4 w-4 mr-2" />}
+                {viewMode === "list"
+                  ? "Danh sách"
+                  : viewMode === "grid"
+                  ? "Lưới"
+                  : "Thẻ"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Bộ lọc
+              </Button>
+              <Button variant="outline" onClick={handleExportExcel}>
+                <Download className="h-4 w-4 mr-2" />
+                Xuất Excel
+              </Button>
+              {canManage && (
+                <Button onClick={handleCreateNewAttendee}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Thêm tham dự viên
+                </Button>
               )}
             </div>
           </div>
-          <div className="flex space-x-2">
-            <Button variant="outline" onClick={() => setViewMode(viewMode === 'list' ? 'grid' : viewMode === 'grid' ? 'cards' : 'list')}>
-              {viewMode === 'list' && <Calendar className="h-4 w-4 mr-2" />}
-              {viewMode === 'grid' && <Eye className="h-4 w-4 mr-2" />}
-              {viewMode === 'cards' && <Users className="h-4 w-4 mr-2" />}
-              {viewMode === 'list' ? 'Danh sách' : viewMode === 'grid' ? 'Lưới' : 'Thẻ'}
-            </Button>
-            <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
-              <Filter className="h-4 w-4 mr-2" />
-              Bộ lọc
-            </Button>
-            <Button variant="outline" onClick={handleExportExcel}>
-              <Download className="h-4 w-4 mr-2" />
-              Xuất Excel
-            </Button>
-            {canManage && (
-              <Button onClick={handleCreateNewAttendee}>
-                <Plus className="h-4 w-4 mr-2" />
-                Thêm tham dự viên
-              </Button>
-            )}
-          </div>
-        </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Users className="h-4 w-4 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium">
-                    {isGlobalAdminPage ? "Tổng tham dự viên" : "Tham dự viên hội nghị"}
-                  </p>
-                  <p className="text-2xl font-bold">{pagination.total}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {isGlobalAdminPage ? "Tất cả hội nghị" : currentConference?.NAME || "Đang tải..."}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <UserCheck className="h-4 w-4 text-green-600" />
-                <div>
-                  <p className="text-sm font-medium">Đã đăng ký</p>
-                  <p className="text-2xl font-bold">{filteredAttendees.length}</p>
-                  <p className="text-xs text-muted-foreground">Kết quả hiện tại</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Calendar className="h-4 w-4 text-orange-600" />
-                <div>
-                  <p className="text-sm font-medium">
-                    {isGlobalAdminPage ? "Hội nghị" : "Trạng thái hội nghị"}
-                  </p>
-                  <div className="text-2xl">
-                    {isGlobalAdminPage 
-                      ? (conferencesLoading ? "..." : allConferences.length)
-                      : (conferenceLoading ? "..." : getConferenceStatusIcon(currentConference?.STATUS || "N/A"))
-                    }
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Users className="h-4 w-4 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-medium">
+                      {isGlobalAdminPage
+                        ? "Tổng tham dự viên"
+                        : "Tham dự viên hội nghị"}
+                    </p>
+                    <p className="text-2xl font-bold">{pagination.total}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isGlobalAdminPage
+                        ? "Tất cả hội nghị"
+                        : currentConference?.NAME || "Đang tải..."}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {isGlobalAdminPage 
-                      ? (conferencesLoading ? "Đang tải..." : "Tổng số hội nghị")
-                      : (conferenceLoading ? "Đang tải..." : "Trạng thái hiện tại")
-                    }
-                  </p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <UserCheck className="h-4 w-4 text-green-600" />
+                  <div>
+                    <p className="text-sm font-medium">Đã đăng ký</p>
+                    <p className="text-2xl font-bold">
+                      {filteredAttendees.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Kết quả hiện tại
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-4 w-4 text-orange-600" />
+                  <div>
+                    <p className="text-sm font-medium">
+                      {isGlobalAdminPage ? "Hội nghị" : "Trạng thái hội nghị"}
+                    </p>
+                    <div className="text-2xl">
+                      {isGlobalAdminPage
+                        ? conferencesLoading
+                          ? "..."
+                          : allConferences.length
+                        : conferenceLoading
+                        ? "..."
+                        : getConferenceStatusIcon(
+                            currentConference?.STATUS || "N/A"
+                          )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {isGlobalAdminPage
+                        ? conferencesLoading
+                          ? "Đang tải..."
+                          : "Tổng số hội nghị"
+                        : conferenceLoading
+                        ? "Đang tải..."
+                        : "Trạng thái hiện tại"}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Filter className="h-4 w-4 text-purple-600" />
+                  <div>
+                    <p className="text-sm font-medium">Đã lọc</p>
+                    <p className="text-2xl font-bold">
+                      {filteredAttendees.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {isGlobalAdminPage
+                        ? filterConference !== "all"
+                          ? `Hội nghị: ${
+                              allConferences.find(
+                                (c) => c.ID.toString() === filterConference
+                              )?.NAME || "Không xác định"
+                            }`
+                          : "Kết quả hiện tại"
+                        : "Kết quả hiện tại"}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Advanced Filters */}
+          {showFilters && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Filter className="h-5 w-5" />
+                  <span>Bộ lọc nâng cao</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div
+                  className={`grid grid-cols-1 md:grid-cols-2 ${
+                    isGlobalAdminPage ? "lg:grid-cols-5" : "lg:grid-cols-4"
+                  } gap-4`}
+                >
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Giới tính
+                    </label>
+                    <select
+                      value={filterGender}
+                      onChange={(e) => setFilterGender(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md"
+                    >
+                      <option value="all">Tất cả giới tính</option>
+                      <option value="male">Nam</option>
+                      <option value="female">Nữ</option>
+                      <option value="other">Khác</option>
+                    </select>
+                  </div>
+                  {isGlobalAdminPage && (
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Hội nghị
+                      </label>
+                      <select
+                        value={filterConference}
+                        onChange={(e) => setFilterConference(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-md"
+                        disabled={conferencesLoading}
+                      >
+                        <option value="all">
+                          {conferencesLoading
+                            ? "Đang tải hội nghị..."
+                            : "Tất cả hội nghị"}
+                        </option>
+                        {allConferences.map((conference) => (
+                          <option
+                            key={conference.ID}
+                            value={conference.ID.toString()}
+                          >
+                            {conference.NAME}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Trạng thái
+                    </label>
+                    <select
+                      value={filterCheckinStatus}
+                      onChange={(e) => setFilterCheckinStatus(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md"
+                    >
+                      <option value="all">Tất cả trạng thái</option>
+                      <option value="not-registered">⭕ Chưa đăng ký</option>
+                      <option value="registered">📝 Đã đăng ký</option>
+                      <option value="checked-in">✅ Đã check-in</option>
+                      <option value="checked-out">🚪 Đã check-out</option>
+                      <option value="cancelled">❌ Đã hủy</option>
+                      <option value="no-show">⏰ Không tham dự</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Sắp xếp theo
+                    </label>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md"
+                    >
+                      <option value="name">Tên</option>
+                      <option value="company">Công ty</option>
+                      <option value="createdAt">Ngày tạo</option>
+                      <option value="email">Email</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Số lượng mỗi trang
+                    </label>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                      className="w-full px-3 py-2 border rounded-md"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setFilterGender("all");
+                      setFilterConference("all");
+                      setFilterCheckinStatus("all");
+                      setSearchTerm("");
+                      setSortBy("name");
+                    }}
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    Reset bộ lọc
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Bulk Actions */}
+          {selectedAttendees.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm font-medium">
+                      Đã chọn {selectedAttendees.length} tham dự viên
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearSelection}
+                    >
+                      Bỏ chọn tất cả
+                    </Button>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleBulkEmail}
+                    >
+                      <Mail className="h-4 w-4 mr-1" />
+                      Gửi email
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleBulkExport}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Xuất danh sách
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleBulkEdit}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Chỉnh sửa hàng loạt
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Filters and Search */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Filter className="h-4 w-4 text-purple-600" />
-                <div>
-                  <p className="text-sm font-medium">Đã lọc</p>
-                  <p className="text-2xl font-bold">{filteredAttendees.length}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {isGlobalAdminPage 
-                      ? (filterConference !== "all" ? `Hội nghị: ${allConferences.find(c => c.ID.toString() === filterConference)?.NAME || "Không xác định"}` : "Kết quả hiện tại")
-                      : "Kết quả hiện tại"
-                    }
-                  </p>
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Tìm kiếm theo tên, email, công ty, kỹ năng, sở thích..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Advanced Filters */}
-        {showFilters && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Filter className="h-5 w-5" />
-                <span>Bộ lọc nâng cao</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`grid grid-cols-1 md:grid-cols-2 ${isGlobalAdminPage ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Giới tính</label>
+                <div className="flex gap-2">
                   <select
                     value={filterGender}
                     onChange={(e) => setFilterGender(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="px-3 py-2 border rounded-md"
                   >
                     <option value="all">Tất cả giới tính</option>
                     <option value="male">Nam</option>
                     <option value="female">Nữ</option>
                     <option value="other">Khác</option>
                   </select>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowBulkActions(!showBulkActions)}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Hành động hàng loạt
+                  </Button>
                 </div>
-                {isGlobalAdminPage && (
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Attendees Display */}
+          {viewMode === "list" && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Hội nghị</label>
-                    <select
-                      value={filterConference}
-                      onChange={(e) => setFilterConference(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md"
-                      disabled={conferencesLoading}
-                    >
-                      <option value="all">
-                        {conferencesLoading ? "Đang tải hội nghị..." : "Tất cả hội nghị"}
-                      </option>
-                      {allConferences.map((conference) => (
-                        <option key={conference.ID} value={conference.ID.toString()}>
-                          {conference.NAME}
-                        </option>
-                      ))}
-                    </select>
+                    <CardTitle>
+                      Danh sách tham dự viên ({filteredAttendees.length})
+                    </CardTitle>
+                    <CardDescription>
+                      Danh sách chi tiết tất cả người tham dự hội nghị
+                    </CardDescription>
                   </div>
-                )}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Trạng thái</label>
-                  <select
-                    value={filterCheckinStatus}
-                    onChange={(e) => setFilterCheckinStatus(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md"
-                  >
-                    <option value="all">Tất cả trạng thái</option>
-                    <option value="not-registered">⭕ Chưa đăng ký</option>
-                    <option value="registered">📝 Đã đăng ký</option>
-                    <option value="checked-in">✅ Đã check-in</option>
-                    <option value="checked-out">🚪 Đã check-out</option>
-                    <option value="cancelled">❌ Đã hủy</option>
-                    <option value="no-show">⏰ Không tham dự</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Sắp xếp theo</label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md"
-                  >
-                    <option value="name">Tên</option>
-                    <option value="company">Công ty</option>
-                    <option value="createdAt">Ngày tạo</option>
-                    <option value="email">Email</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Số lượng mỗi trang</label>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="w-full px-3 py-2 border rounded-md"
-                  >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                </div>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setFilterGender("all");
-                    setFilterConference("all");
-                    setFilterCheckinStatus("all");
-                    setSearchTerm("");
-                    setSortBy("name");
-                  }}
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  Reset bộ lọc
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Bulk Actions */}
-        {selectedAttendees.length > 0 && (
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <span className="text-sm font-medium">
-                    Đã chọn {selectedAttendees.length} tham dự viên
-                  </span>
-                  <Button variant="outline" size="sm" onClick={clearSelection}>
-                    Bỏ chọn tất cả
-                  </Button>
-                </div>
-                <div className="flex space-x-2">
-                  <Button size="sm" variant="outline" onClick={handleBulkEmail}>
-                    <Mail className="h-4 w-4 mr-1" />
-                    Gửi email
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={handleBulkExport}>
-                    <Download className="h-4 w-4 mr-1" />
-                    Xuất danh sách
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={handleBulkEdit}>
-                    <Edit className="h-4 w-4 mr-1" />
-                    Chỉnh sửa hàng loạt
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Filters and Search */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Tìm kiếm theo tên, email, công ty, kỹ năng, sở thích..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <select
-                  value={filterGender}
-                  onChange={(e) => setFilterGender(e.target.value)}
-                  className="px-3 py-2 border rounded-md"
-                >
-                  <option value="all">Tất cả giới tính</option>
-                  <option value="male">Nam</option>
-                  <option value="female">Nữ</option>
-                  <option value="other">Khác</option>
-                </select>
-                <Button variant="outline" onClick={() => setShowBulkActions(!showBulkActions)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Hành động hàng loạt
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Attendees Display */}
-        {viewMode === 'list' && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Danh sách tham dự viên ({filteredAttendees.length})</CardTitle>
-                  <CardDescription>
-                    Danh sách chi tiết tất cả người tham dự hội nghị
-                  </CardDescription>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={selectAllAttendees}>
-                    Chọn tất cả
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={clearSelection}>
-                    Bỏ chọn
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : error ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-center">
-                    <p className="text-red-600 mb-2">Có lỗi xảy ra khi tải dữ liệu</p>
-                    <p className="text-sm text-muted-foreground mb-4">{error}</p>
-                    <Button onClick={refetch} variant="outline">
-                      Thử lại
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={selectAllAttendees}
+                    >
+                      Chọn tất cả
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearSelection}
+                    >
+                      Bỏ chọn
                     </Button>
                   </div>
                 </div>
-              ) : filteredAttendees.length === 0 ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-center">
-                    <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">Không tìm thấy tham dự viên nào</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Tổng attendees: {attendees.length}, Conferences: {conferencesLoading ? "Đang tải..." : allConferences.length}
-                    </p>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedAttendees.length === filteredAttendees.length && filteredAttendees.length > 0}
-                          onChange={selectedAttendees.length === filteredAttendees.length ? clearSelection : selectAllAttendees}
-                        />
-                      </TableHead>
-                      <TableHead>Thông tin</TableHead>
-                      <TableHead>Liên hệ</TableHead>
-                      <TableHead>Công ty</TableHead>
-                      {isGlobalAdminPage && <TableHead>Hội nghị</TableHead>}
-                      <TableHead>Trạng thái</TableHead>
-                      <TableHead>Giới tính</TableHead>
-                      <TableHead>Ngày tạo</TableHead>
-                      {canManage && <TableHead>Hành động</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAttendees.map((attendee) => {
-                      // Find the attendee's conferences from the original data
-                      const attendeeWithConferences = attendeesWithConferences.find(a => a.ID === attendee.ID);
-                      const attendeeConferences = attendeeWithConferences?.conferences || [];
-                      
-                      console.log('🎯 Rendering attendee:', attendee.NAME, 'Conferences:', attendeeConferences.length);
-                      return (
-                      <TableRow key={attendee.ID} className="hover:bg-gray-50">
-                        <TableCell>
-                          <input 
-                            type="checkbox" 
-                            checked={selectedAttendees.includes(attendee.ID)}
-                            onChange={() => toggleAttendeeSelection(attendee.ID)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                              {attendee.AVATAR_URL ? (
-                                <img 
-                                  src={attendee.AVATAR_URL} 
-                                  alt={attendee.NAME}
-                                  className="w-10 h-10 rounded-full object-cover"
-                                />
-                              ) : (
-                                <Users className="h-5 w-5 text-primary" />
-                              )}
-                            </div>
-                            <div>
-                              <p className="font-medium">{attendee.NAME}</p>
-                              <p className="text-sm text-muted-foreground">{attendee.POSITION || "Chưa cập nhật"}</p>
-                              <div className="flex items-center space-x-1 mt-1">
-                                {getGenderBadge(attendee.GENDER)}
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="flex items-center space-x-2">
-                              <Mail className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm">{attendee.EMAIL}</span>
-                            </div>
-                            {attendee.PHONE && (
-                              <div className="flex items-center space-x-2">
-                                <Phone className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm">{attendee.PHONE}</span>
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{attendee.COMPANY || "Chưa cập nhật"}</p>
-                            <p className="text-sm text-muted-foreground">{attendee.POSITION || ""}</p>
-                          </div>
-                        </TableCell>
-                        {isGlobalAdminPage && (
-                          <TableCell>
-                            <div className="max-w-32 truncate">
-                              <p className="text-sm font-medium">
-                                {attendeeConferences.length > 0 ? attendeeConferences[0].NAME : "Chưa có hội nghị"}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {attendeeConferences.length > 1 ? `+${attendeeConferences.length - 1} hội nghị khác` : ""}
-                              </p>
-                            </div>
-                          </TableCell>
-                        )}
-                        <TableCell>
-                          <div className="space-y-1">
-                            {getCheckinStatusBadge(attendeeWithConferences?.overallStatus || 'registered')}
-                            {attendeeWithConferences?.lastCheckinTime && (
-                              <p className="text-xs text-muted-foreground">
-                                Check-in: {new Date(attendeeWithConferences.lastCheckinTime).toLocaleString('vi-VN')}
-                              </p>
-                            )}
-                            {attendeeWithConferences?.lastCheckoutTime && (
-                              <p className="text-xs text-muted-foreground">
-                                Check-out: {new Date(attendeeWithConferences.lastCheckoutTime).toLocaleString('vi-VN')}
-                              </p>
-                            )}
-                            {attendeeWithConferences?.registrations && attendeeWithConferences.registrations.length > 0 && (
-                              <p className="text-xs text-muted-foreground">
-                                {attendeeWithConferences.registrations.length} đăng ký
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            {getGenderBadge(attendee.GENDER)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <p>{new Date(attendee.CREATED_AT).toLocaleDateString('vi-VN')}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(attendee.CREATED_AT).toLocaleTimeString('vi-VN')}
-                            </p>
-                          </div>
-                        </TableCell>
-                        {canManage && (
-                          <TableCell>
-                            <div className="flex space-x-1">
-                              <Button size="sm" variant="outline" onClick={() => handleViewAttendee(attendee)}>
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleEditAttendee(attendee)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleDeleteAttendee(attendee)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Pagination */}
-        {!isLoading && !error && attendees.length > 0 && (
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">
-                  Hiển thị {((currentPage - 1) * pageSize) + 1} đến {Math.min(currentPage * pageSize, pagination.total)} trong tổng số {pagination.total} kết quả
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage <= 1}
-                  >
-                    Trước
-                  </Button>
-                  <div className="flex items-center space-x-1">
-                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                      const page = i + 1;
-                      return (
+                ) : error ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-center">
+                      <p className="text-red-600 mb-2">
+                        Có lỗi xảy ra khi tải dữ liệu
+                      </p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {error}
+                      </p>
+                      <div className="space-y-2">
                         <Button
-                          key={page}
-                          variant={currentPage === page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handlePageChange(page)}
+                          onClick={handleRetry}
+                          variant="outline"
+                          disabled={retryCount >= maxRetries}
                         >
-                          {page}
+                          {retryCount >= maxRetries
+                            ? "Đã thử tối đa"
+                            : `Thử lại (${retryCount}/${maxRetries})`}
                         </Button>
-                      );
-                    })}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage >= pagination.totalPages}
-                  >
-                    Sau
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Grid View */}
-        {viewMode === 'grid' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredAttendees.map((attendee) => {
-              // Find the attendee's conferences from the original data
-              const attendeeWithConferences = attendeesWithConferences.find(a => a.ID === attendee.ID);
-              const attendeeConferences = attendeeWithConferences?.conferences || [];
-              
-              console.log('🎯 Grid view - Rendering attendee:', attendee.NAME, 'Conferences:', attendeeConferences.length);
-              return (
-              <Card key={attendee.ID} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                      {attendee.AVATAR_URL ? (
-                        <img 
-                          src={attendee.AVATAR_URL} 
-                          alt={attendee.NAME}
-                          className="w-12 h-12 rounded-full object-cover"
-                        />
-                      ) : (
-                        <Users className="h-6 w-6 text-primary" />
+                        <Button onClick={refetch} variant="outline">
+                          Làm mới
+                        </Button>
+                      </div>
+                      {retryCount >= maxRetries && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Đã thử {maxRetries} lần. Vui lòng kiểm tra kết nối
+                          mạng hoặc liên hệ quản trị viên.
+                        </p>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg truncate">{attendee.NAME}</CardTitle>
-                      <CardDescription className="truncate">{attendee.POSITION || "Chưa cập nhật"}</CardDescription>
-                      <div className="flex items-center space-x-1 mt-1">
-                        {getGenderBadge(attendee.GENDER)}
-                      </div>
+                  </div>
+                ) : filteredAttendees.length === 0 ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-center">
+                      <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">
+                        Không tìm thấy tham dự viên nào
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Tổng attendees: {attendees.length}, Conferences:{" "}
+                        {conferencesLoading
+                          ? "Đang tải..."
+                          : allConferences.length}
+                      </p>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2 text-sm">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="truncate">{attendee.EMAIL}</span>
-                    </div>
-                    {attendee.PHONE && (
-                      <div className="flex items-center space-x-2 text-sm">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span>{attendee.PHONE}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center space-x-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="truncate">{attendee.COMPANY || "Chưa cập nhật"}</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {isGlobalAdminPage && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Hội nghị:</span>
-                        <span className="font-medium">{attendeeConferences.length > 0 ? attendeeConferences[0].NAME : "Chưa có"}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Trạng thái:</span>
-                      <div className="flex items-center space-x-1">
-                        {getCheckinStatusBadge(attendeeWithConferences?.overallStatus || 'registered')}
-                      </div>
-                    </div>
-                    {attendeeWithConferences?.lastCheckinTime && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Check-in:</span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(attendeeWithConferences.lastCheckinTime).toLocaleString('vi-VN')}
-                        </span>
-                      </div>
-                    )}
-                    {attendeeWithConferences?.lastCheckoutTime && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Check-out:</span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(attendeeWithConferences.lastCheckoutTime).toLocaleString('vi-VN')}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Ngày tạo:</span>
-                      <span className="font-medium">{new Date(attendee.CREATED_AT).toLocaleDateString('vi-VN')}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-2 pt-2">
-                    <Button size="sm" variant="outline" className="flex-1" onClick={() => handleViewAttendee(attendee)}>
-                      <Eye className="h-4 w-4 mr-1" />
-                      Xem
-                    </Button>
-                    {canManage && (
-                      <Button size="sm" variant="outline" onClick={() => handleEditAttendee(attendee)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Cards View */}
-        {viewMode === 'cards' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredAttendees.map((attendee) => {
-              // Find the attendee's conferences from the original data
-              const attendeeWithConferences = attendeesWithConferences.find(a => a.ID === attendee.ID);
-              const attendeeConferences = attendeeWithConferences?.conferences || [];
-              
-              console.log('🎯 Cards view - Rendering attendee:', attendee.NAME, 'Conferences:', attendeeConferences.length);
-              return (
-              <Card key={attendee.ID} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                        {attendee.AVATAR_URL ? (
-                          <img 
-                            src={attendee.AVATAR_URL} 
-                            alt={attendee.NAME}
-                            className="w-16 h-16 rounded-full object-cover"
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <input
+                            type="checkbox"
+                            checked={
+                              selectedAttendees.length ===
+                                filteredAttendees.length &&
+                              filteredAttendees.length > 0
+                            }
+                            onChange={
+                              selectedAttendees.length ===
+                              filteredAttendees.length
+                                ? clearSelection
+                                : selectAllAttendees
+                            }
                           />
-                        ) : (
-                          <Users className="h-8 w-8 text-primary" />
+                        </TableHead>
+                        <TableHead>Thông tin</TableHead>
+                        <TableHead>Liên hệ</TableHead>
+                        <TableHead>Công ty</TableHead>
+                        {isGlobalAdminPage && <TableHead>Hội nghị</TableHead>}
+                        <TableHead>Trạng thái</TableHead>
+                        <TableHead>Giới tính</TableHead>
+                        <TableHead>Ngày tạo</TableHead>
+                        {canManage && <TableHead>Hành động</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAttendees.map((attendee) => {
+                        // Find the attendee's conferences from the original data
+                        const attendeeWithConferences =
+                          attendeesWithConferences.find(
+                            (a) => a.ID === attendee.ID
+                          );
+                        const attendeeConferences =
+                          attendeeWithConferences?.conferences || [];
+
+                        console.log(
+                          "🎯 Rendering attendee:",
+                          attendee.NAME,
+                          "Conferences:",
+                          attendeeConferences.length
+                        );
+                        return (
+                          <TableRow
+                            key={attendee.ID}
+                            className="hover:bg-gray-50"
+                          >
+                            <TableCell>
+                              <input
+                                type="checkbox"
+                                checked={selectedAttendees.includes(
+                                  attendee.ID
+                                )}
+                                onChange={() =>
+                                  toggleAttendeeSelection(attendee.ID)
+                                }
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                                  {attendee.AVATAR_URL ? (
+                                    <img
+                                      src={attendee.AVATAR_URL}
+                                      alt={attendee.NAME}
+                                      className="w-10 h-10 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <Users className="h-5 w-5 text-primary" />
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-medium">{attendee.NAME}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {attendee.POSITION || "Chưa cập nhật"}
+                                  </p>
+                                  <div className="flex items-center space-x-1 mt-1">
+                                    {getGenderBadge(attendee.GENDER)}
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <div className="flex items-center space-x-2">
+                                  <Mail className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-sm">
+                                    {attendee.EMAIL}
+                                  </span>
+                                </div>
+                                {attendee.PHONE && (
+                                  <div className="flex items-center space-x-2">
+                                    <Phone className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">
+                                      {attendee.PHONE}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">
+                                  {attendee.COMPANY || "Chưa cập nhật"}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {attendee.POSITION || ""}
+                                </p>
+                              </div>
+                            </TableCell>
+                            {isGlobalAdminPage && (
+                              <TableCell>
+                                <div className="max-w-32 truncate">
+                                  <p className="text-sm font-medium">
+                                    {attendeeConferences.length > 0
+                                      ? attendeeConferences[0].NAME
+                                      : "Chưa có hội nghị"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {attendeeConferences.length > 1
+                                      ? `+${
+                                          attendeeConferences.length - 1
+                                        } hội nghị khác`
+                                      : ""}
+                                  </p>
+                                </div>
+                              </TableCell>
+                            )}
+                            <TableCell>
+                              <div className="space-y-1">
+                                {getCheckinStatusBadge(
+                                  attendeeWithConferences?.overallStatus ||
+                                    "registered"
+                                )}
+                                {attendeeWithConferences?.lastCheckinTime && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Check-in:{" "}
+                                    {new Date(
+                                      attendeeWithConferences.lastCheckinTime
+                                    ).toLocaleString("vi-VN")}
+                                  </p>
+                                )}
+                                {attendeeWithConferences?.lastCheckoutTime && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Check-out:{" "}
+                                    {new Date(
+                                      attendeeWithConferences.lastCheckoutTime
+                                    ).toLocaleString("vi-VN")}
+                                  </p>
+                                )}
+                                {attendeeWithConferences?.registrations &&
+                                  attendeeWithConferences.registrations.length >
+                                    0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {
+                                        attendeeWithConferences.registrations
+                                          .length
+                                      }{" "}
+                                      đăng ký
+                                    </p>
+                                  )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                {getGenderBadge(attendee.GENDER)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <p>
+                                  {new Date(
+                                    attendee.CREATED_AT
+                                  ).toLocaleDateString("vi-VN")}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(
+                                    attendee.CREATED_AT
+                                  ).toLocaleTimeString("vi-VN")}
+                                </p>
+                              </div>
+                            </TableCell>
+                            {canManage && (
+                              <TableCell>
+                                <div className="flex space-x-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleViewAttendee(attendee)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEditAttendee(attendee)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                      handleDeleteAttendee(attendee)
+                                    }
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Pagination */}
+          {!isLoading && !error && attendees.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Hiển thị {(currentPage - 1) * pageSize + 1} đến{" "}
+                    {Math.min(currentPage * pageSize, pagination.total)} trong
+                    tổng số {pagination.total} kết quả
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage <= 1}
+                    >
+                      Trước
+                    </Button>
+                    <div className="flex items-center space-x-1">
+                      {Array.from(
+                        { length: Math.min(5, pagination.totalPages) },
+                        (_, i) => {
+                          const page = i + 1;
+                          return (
+                            <Button
+                              key={page}
+                              variant={
+                                currentPage === page ? "default" : "outline"
+                              }
+                              size="sm"
+                              onClick={() => handlePageChange(page)}
+                            >
+                              {page}
+                            </Button>
+                          );
+                        }
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage >= pagination.totalPages}
+                    >
+                      Sau
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Grid View */}
+          {viewMode === "grid" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredAttendees.map((attendee) => {
+                // Find the attendee's conferences from the original data
+                const attendeeWithConferences = attendeesWithConferences.find(
+                  (a) => a.ID === attendee.ID
+                );
+                const attendeeConferences =
+                  attendeeWithConferences?.conferences || [];
+
+                console.log(
+                  "🎯 Grid view - Rendering attendee:",
+                  attendee.NAME,
+                  "Conferences:",
+                  attendeeConferences.length
+                );
+                return (
+                  <Card
+                    key={attendee.ID}
+                    className="hover:shadow-lg transition-shadow"
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                          {attendee.AVATAR_URL ? (
+                            <img
+                              src={attendee.AVATAR_URL}
+                              alt={attendee.NAME}
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                          ) : (
+                            <Users className="h-6 w-6 text-primary" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-lg truncate">
+                            {attendee.NAME}
+                          </CardTitle>
+                          <CardDescription className="truncate">
+                            {attendee.POSITION || "Chưa cập nhật"}
+                          </CardDescription>
+                          <div className="flex items-center space-x-1 mt-1">
+                            {getGenderBadge(attendee.GENDER)}
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2 text-sm">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <span className="truncate">{attendee.EMAIL}</span>
+                        </div>
+                        {attendee.PHONE && (
+                          <div className="flex items-center space-x-2 text-sm">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span>{attendee.PHONE}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-2 text-sm">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <span className="truncate">
+                            {attendee.COMPANY || "Chưa cập nhật"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        {isGlobalAdminPage && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span>Hội nghị:</span>
+                            <span className="font-medium">
+                              {attendeeConferences.length > 0
+                                ? attendeeConferences[0].NAME
+                                : "Chưa có"}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Trạng thái:</span>
+                          <div className="flex items-center space-x-1">
+                            {getCheckinStatusBadge(
+                              attendeeWithConferences?.overallStatus ||
+                                "registered"
+                            )}
+                          </div>
+                        </div>
+                        {attendeeWithConferences?.lastCheckinTime && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span>Check-in:</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(
+                                attendeeWithConferences.lastCheckinTime
+                              ).toLocaleString("vi-VN")}
+                            </span>
+                          </div>
+                        )}
+                        {attendeeWithConferences?.lastCheckoutTime && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span>Check-out:</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(
+                                attendeeWithConferences.lastCheckoutTime
+                              ).toLocaleString("vi-VN")}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Ngày tạo:</span>
+                          <span className="font-medium">
+                            {new Date(attendee.CREATED_AT).toLocaleDateString(
+                              "vi-VN"
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-2 pt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleViewAttendee(attendee)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Xem
+                        </Button>
+                        {canManage && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditAttendee(attendee)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         )}
                       </div>
-                      <div>
-                        <CardTitle className="text-xl">{attendee.NAME}</CardTitle>
-                        <CardDescription className="text-base">{attendee.POSITION || "Chưa cập nhật"}</CardDescription>
-                        <p className="text-sm text-muted-foreground">{attendee.COMPANY || "Chưa cập nhật"}</p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Cards View */}
+          {viewMode === "cards" && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {filteredAttendees.map((attendee) => {
+                // Find the attendee's conferences from the original data
+                const attendeeWithConferences = attendeesWithConferences.find(
+                  (a) => a.ID === attendee.ID
+                );
+                const attendeeConferences =
+                  attendeeWithConferences?.conferences || [];
+
+                console.log(
+                  "🎯 Cards view - Rendering attendee:",
+                  attendee.NAME,
+                  "Conferences:",
+                  attendeeConferences.length
+                );
+                return (
+                  <Card
+                    key={attendee.ID}
+                    className="hover:shadow-lg transition-shadow"
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                            {attendee.AVATAR_URL ? (
+                              <img
+                                src={attendee.AVATAR_URL}
+                                alt={attendee.NAME}
+                                className="w-16 h-16 rounded-full object-cover"
+                              />
+                            ) : (
+                              <Users className="h-8 w-8 text-primary" />
+                            )}
+                          </div>
+                          <div>
+                            <CardTitle className="text-xl">
+                              {attendee.NAME}
+                            </CardTitle>
+                            <CardDescription className="text-base">
+                              {attendee.POSITION || "Chưa cập nhật"}
+                            </CardDescription>
+                            <p className="text-sm text-muted-foreground">
+                              {attendee.COMPANY || "Chưa cập nhật"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end space-y-1">
+                          {getGenderBadge(attendee.GENDER)}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end space-y-1">
-                      {getGenderBadge(attendee.GENDER)}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="truncate">{attendee.EMAIL}</span>
-                    </div>
-                    {attendee.PHONE && (
-                      <div className="flex items-center space-x-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span>{attendee.PHONE}</span>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-center space-x-2">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <span className="truncate">{attendee.EMAIL}</span>
+                        </div>
+                        {attendee.PHONE && (
+                          <div className="flex items-center space-x-2">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span>{attendee.PHONE}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <span className="truncate">
+                            {attendee.COMPANY || "Chưa cập nhật"}
+                          </span>
+                        </div>
+                        {isGlobalAdminPage && (
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span>
+                              {attendeeConferences.length > 0
+                                ? attendeeConferences[0].NAME
+                                : "Chưa có hội nghị"}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-2">
+                          <span className="text-muted-foreground">
+                            Trạng thái:
+                          </span>
+                          {getCheckinStatusBadge(
+                            attendeeWithConferences?.overallStatus ||
+                              "registered"
+                          )}
+                        </div>
+                        {attendeeWithConferences?.lastCheckinTime && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-muted-foreground">
+                              Check-in:
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(
+                                attendeeWithConferences.lastCheckinTime
+                              ).toLocaleString("vi-VN")}
+                            </span>
+                          </div>
+                        )}
+                        {attendeeWithConferences?.lastCheckoutTime && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-muted-foreground">
+                              Check-out:
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(
+                                attendeeWithConferences.lastCheckoutTime
+                              ).toLocaleString("vi-VN")}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span>
+                            {new Date(attendee.CREATED_AT).toLocaleDateString(
+                              "vi-VN"
+                            )}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="truncate">{attendee.COMPANY || "Chưa cập nhật"}</span>
-                    </div>
-                    {isGlobalAdminPage && (
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span>{attendeeConferences.length > 0 ? attendeeConferences[0].NAME : "Chưa có hội nghị"}</span>
+
+                      {attendee.DIETARY && (
+                        <div>
+                          <p className="text-sm font-medium mb-2">
+                            Yêu cầu ăn uống:
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {attendee.DIETARY}
+                          </p>
+                        </div>
+                      )}
+
+                      {attendee.SPECIAL_NEEDS && (
+                        <div>
+                          <p className="text-sm font-medium mb-2">
+                            Nhu cầu đặc biệt:
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {attendee.SPECIAL_NEEDS}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                          <p className="text-2xl font-bold text-primary">
+                            {attendee.ID}
+                          </p>
+                          <p className="text-xs text-muted-foreground">ID</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-blue-600">
+                            {attendee.GENDER || "N/A"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Giới tính
+                          </p>
+                        </div>
                       </div>
-                    )}
-                    <div className="flex items-center space-x-2">
-                      <span className="text-muted-foreground">Trạng thái:</span>
-                      {getCheckinStatusBadge(attendeeWithConferences?.overallStatus || 'registered')}
-                    </div>
-                    {attendeeWithConferences?.lastCheckinTime && (
-                      <div className="flex items-center space-x-2">
-                        <span className="text-muted-foreground">Check-in:</span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(attendeeWithConferences.lastCheckinTime).toLocaleString('vi-VN')}
-                        </span>
+
+                      <div className="flex space-x-2 pt-2">
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleViewAttendee(attendee)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Xem chi tiết
+                        </Button>
+                        {canManage && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditAttendee(attendee)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
-                    )}
-                    {attendeeWithConferences?.lastCheckoutTime && (
-                      <div className="flex items-center space-x-2">
-                        <span className="text-muted-foreground">Check-out:</span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(attendeeWithConferences.lastCheckoutTime).toLocaleString('vi-VN')}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>{new Date(attendee.CREATED_AT).toLocaleDateString('vi-VN')}</span>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
 
-                  {attendee.DIETARY && (
-                    <div>
-                      <p className="text-sm font-medium mb-2">Yêu cầu ăn uống:</p>
-                      <p className="text-sm text-muted-foreground">{attendee.DIETARY}</p>
-                    </div>
-                  )}
+          {/* Attendee Dialog */}
+          <AttendeeDialog
+            attendee={selectedAttendee}
+            conferences={allConferences}
+            isOpen={showAttendeeDialog}
+            onClose={() => setShowAttendeeDialog(false)}
+            onSave={handleSaveAttendee}
+            onRefresh={refetch}
+            mode={dialogMode}
+          />
 
-                  {attendee.SPECIAL_NEEDS && (
-                    <div>
-                      <p className="text-sm font-medium mb-2">Nhu cầu đặc biệt:</p>
-                      <p className="text-sm text-muted-foreground">{attendee.SPECIAL_NEEDS}</p>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                      <p className="text-2xl font-bold text-primary">{attendee.ID}</p>
-                      <p className="text-xs text-muted-foreground">ID</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-blue-600">
-                        {attendee.GENDER || "N/A"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Giới tính</p>
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-2 pt-2">
-                    <Button size="sm" className="flex-1" onClick={() => handleViewAttendee(attendee)}>
-                      <Eye className="h-4 w-4 mr-1" />
-                      Xem chi tiết
-                    </Button>
-                    {canManage && (
-                      <Button size="sm" variant="outline" onClick={() => handleEditAttendee(attendee)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Attendee Dialog */}
-        <AttendeeDialog
-          attendee={selectedAttendee}
-          conferences={allConferences}
-          isOpen={showAttendeeDialog}
-          onClose={() => setShowAttendeeDialog(false)}
-          onSave={handleSaveAttendee}
-          onRefresh={refetch}
-          mode={dialogMode}
-        />
-
-        {/* Delete Confirmation Dialog */}
-        <DeleteAttendeeDialog
-          attendee={attendeeToDelete}
-          isOpen={showDeleteDialog}
-          onClose={() => {
-            setShowDeleteDialog(false);
-            setAttendeeToDelete(null);
-          }}
-          onConfirm={handleConfirmDelete}
-        />
-      </div>
-          </ConferencePermissionGuard>
+          {/* Delete Confirmation Dialog */}
+          <DeleteAttendeeDialog
+            attendee={attendeeToDelete}
+            isOpen={showDeleteDialog}
+            onClose={() => {
+              setShowDeleteDialog(false);
+              setAttendeeToDelete(null);
+            }}
+            onConfirm={handleConfirmDelete}
+          />
+        </div>
+      </ConferencePermissionGuard>
     </MainLayout>
   );
 }

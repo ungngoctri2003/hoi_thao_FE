@@ -308,9 +308,7 @@ export function Sidebar({ userRole }: SidebarProps) {
 
   // Group items by category for better organization
   const groupedItems = {
-    main: items.filter((item) =>
-      ["/dashboard", "/profile"].includes(item.href)
-    ),
+    main: items.filter((item) => ["/"].includes(item.href)),
     management: items.filter((item) =>
       [
         "/conference-management",
@@ -322,7 +320,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       ].includes(item.href)
     ),
     features: items.filter((item) =>
-      ["/my-events", "/messaging"].includes(item.href)
+      ["/dashboard", "/profile", "/my-events", "/messaging"].includes(item.href)
     ),
   };
 
@@ -497,52 +495,6 @@ export function Sidebar({ userRole }: SidebarProps) {
                     </div>
                   )}
                 </div>
-              );
-            })}
-            {!isCollapsed &&
-              (groupedItems.main.length > 0 ||
-                groupedItems.management.length > 0 ||
-                groupedItems.features.length > 0) && (
-                <div className="border-t border-sidebar-border my-2"></div>
-              )}
-          </>
-        )}
-
-        {/* Main Items */}
-        {groupedItems.main.length > 0 && (
-          <>
-            {groupedItems.main.map((item) => {
-              const isActive = pathname === item.href;
-              const button = (
-                <Link key={item.href} href={item.href}>
-                  <Button
-                    variant={isActive ? "secondary" : "ghost"}
-                    className={cn(
-                      "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent",
-                      isCollapsed && "px-2",
-                      isActive &&
-                        "bg-sidebar-accent text-sidebar-accent-foreground"
-                    )}
-                  >
-                    <item.icon
-                      className={cn("h-4 w-4", !isCollapsed && "mr-3")}
-                    />
-                    {!isCollapsed && item.label}
-                  </Button>
-                </Link>
-              );
-
-              return isCollapsed ? (
-                <SidebarTooltip
-                  key={item.href}
-                  content={item.label}
-                  description={item.description}
-                  role={currentRole}
-                >
-                  {button}
-                </SidebarTooltip>
-              ) : (
-                button
               );
             })}
             {!isCollapsed &&

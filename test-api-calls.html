@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Calls Monitor</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .log {
+        background-color: #f8f9fa;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 3px;
+      }
+      .success {
+        color: green;
+      }
+      .error {
+        color: red;
+      }
+      .info {
+        color: blue;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      .stats {
+        background-color: #e9ecef;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔍 API Calls Monitor</h1>
+
+    <div class="stats">
+      <h3>Statistics</h3>
+      <p><strong>Total API Calls:</strong> <span id="totalCalls">0</span></p>
+      <p>
+        <strong>Attendees API Calls:</strong> <span id="attendeesCalls">0</span>
+      </p>
+      <p>
+        <strong>Conferences API Calls:</strong>
+        <span id="conferencesCalls">0</span>
+      </p>
+      <p>
+        <strong>Last Call Time:</strong> <span id="lastCallTime">Never</span>
+      </p>
+    </div>
+
+    <div>
+      <button onclick="startMonitoring()">Start Monitoring</button>
+      <button onclick="clearLogs()">Clear Logs</button>
+      <button onclick="testAttendeesAPI()">Test Attendees API</button>
+      <button onclick="testConferencesAPI()">Test Conferences API</button>
+    </div>
+
+    <div id="logs"></div>
+
+    <script>
+      let totalCalls = 0;
+      let attendeesCalls = 0;
+      let conferencesCalls = 0;
+      let isMonitoring = false;
+
+      const API_BASE_URL = "http://localhost:4000/api/v1";
+
+      function log(message, type = "info") {
+        const logsDiv = document.getElementById("logs");
+        const logDiv = document.createElement("div");
+        logDiv.className = `log ${type}`;
+        logDiv.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logsDiv.appendChild(logDiv);
+        logsDiv.scrollTop = logsDiv.scrollHeight;
+      }
+
+      function updateStats() {
+        document.getElementById("totalCalls").textContent = totalCalls;
+        document.getElementById("attendeesCalls").textContent = attendeesCalls;
+        document.getElementById("conferencesCalls").textContent =
+          conferencesCalls;
+        document.getElementById("lastCallTime").textContent =
+          new Date().toLocaleTimeString();
+      }
+
+      function clearLogs() {
+        document.getElementById("logs").innerHTML = "";
+        totalCalls = 0;
+        attendeesCalls = 0;
+        conferencesCalls = 0;
+        updateStats();
+      }
+
+      function startMonitoring() {
+        if (isMonitoring) {
+          log("Already monitoring!", "error");
+          return;
+        }
+
+        isMonitoring = true;
+        log("🔍 Started monitoring API calls...", "success");
+
+        // Monitor fetch calls
+        const originalFetch = window.fetch;
+        window.fetch = function (...args) {
+          const url = args[0];
+          totalCalls++;
+
+          if (typeof url === "string") {
+            if (url.includes("/attendees")) {
+              attendeesCalls++;
+              log(`📞 Attendees API call: ${url}`, "info");
+            } else if (url.includes("/conferences")) {
+              conferencesCalls++;
+              log(`📞 Conferences API call: ${url}`, "info");
+            } else {
+              log(`📞 Other API call: ${url}`, "info");
+            }
+          }
+
+          updateStats();
+          return originalFetch.apply(this, args);
+        };
+
+        log("✅ API monitoring is now active", "success");
+      }
+
+      async function testAttendeesAPI() {
+        try {
+          log("🧪 Testing Attendees API...", "info");
+          const response = await fetch(`${API_BASE_URL}/attendees`, {
+            headers: {
+              Authorization: `Bearer ${
+                localStorage.getItem("accessToken") || "test-token"
+              }`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            log(
+              `✅ Attendees API Success: ${data.data?.length || 0} attendees`,
+              "success"
+            );
+          } else {
+            log(`❌ Attendees API Failed: ${response.status}`, "error");
+          }
+        } catch (error) {
+          log(`❌ Attendees API Error: ${error.message}`, "error");
+        }
+      }
+
+      async function testConferencesAPI() {
+        try {
+          log("🧪 Testing Conferences API...", "info");
+          const response = await fetch(`${API_BASE_URL}/conferences`, {
+            headers: {
+              Authorization: `Bearer ${
+                localStorage.getItem("accessToken") || "test-token"
+              }`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            log(
+              `✅ Conferences API Success: ${
+                data.data?.length || 0
+              } conferences`,
+              "success"
+            );
+          } else {
+            log(`❌ Conferences API Failed: ${response.status}`, "error");
+          }
+        } catch (error) {
+          log(`❌ Conferences API Error: ${error.message}`, "error");
+        }
+      }
+
+      // Auto-start monitoring
+      window.onload = function () {
+        log("🚀 API Calls Monitor loaded", "info");
+        log('Click "Start Monitoring" to begin tracking API calls', "info");
+      };
+    </script>
+  </body>
+</html>

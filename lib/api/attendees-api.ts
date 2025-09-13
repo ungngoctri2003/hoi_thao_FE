@@ -1,4 +1,5 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
 
 export interface Attendee {
   ID: number;
@@ -75,7 +76,13 @@ export interface CheckinStatus {
   registrationId: number;
   conferenceId: number;
   conferenceName: string;
-  status: 'not-registered' | 'registered' | 'checked-in' | 'checked-out' | 'cancelled' | 'no-show';
+  status:
+    | "not-registered"
+    | "registered"
+    | "checked-in"
+    | "checked-out"
+    | "cancelled"
+    | "no-show";
   qrCode: string;
   registrationDate: Date;
   checkinTime?: Date;
@@ -97,36 +104,89 @@ class AttendeesAPI {
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       this.requestQueue.push(async () => {
-        try {
-          const token = localStorage.getItem('accessToken');
-          
-          // Rate limiting: ensure minimum interval between requests
-          const now = Date.now();
-          const timeSinceLastRequest = now - this.lastRequestTime;
-          if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-            await new Promise(resolve => setTimeout(resolve, this.MIN_REQUEST_INTERVAL - timeSinceLastRequest));
+        let retryCount = 0;
+
+        while (retryCount < this.MAX_RETRIES) {
+          try {
+            const token = localStorage.getItem("accessToken");
+
+            // Rate limiting: ensure minimum interval between requests
+            const now = Date.now();
+            const timeSinceLastRequest = now - this.lastRequestTime;
+            if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+              await new Promise((resolve) =>
+                setTimeout(
+                  resolve,
+                  this.MIN_REQUEST_INTERVAL - timeSinceLastRequest
+                )
+              );
+            }
+
+            console.log(
+              `📡 Making request to ${this.baseUrl}${endpoint} (attempt ${
+                retryCount + 1
+              })`
+            );
+
+            const response = await fetch(`${this.baseUrl}${endpoint}`, {
+              ...options,
+              headers: {
+                "Content-Type": "application/json",
+                ...(token && { Authorization: `Bearer ${token}` }),
+                ...options.headers,
+              },
+            });
+
+            this.lastRequestTime = Date.now();
+
+            if (!response.ok) {
+              let errorMessage = `HTTP error! status: ${response.status}`;
+              try {
+                const errorData = await response.json();
+                errorMessage =
+                  errorData.message || errorData.error?.message || errorMessage;
+              } catch (parseError) {
+                console.warn("Could not parse error response:", parseError);
+              }
+
+              // Don't retry for client errors (4xx)
+              if (response.status >= 400 && response.status < 500) {
+                throw new Error(errorMessage);
+              }
+
+              // Retry for server errors (5xx) or network issues
+              if (retryCount < this.MAX_RETRIES - 1) {
+                const delay = this.RETRY_DELAY * Math.pow(2, retryCount); // Exponential backoff
+                console.log(`⏳ Retrying in ${delay}ms...`);
+                await new Promise((resolve) => setTimeout(resolve, delay));
+                retryCount++;
+                continue;
+              }
+
+              throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            console.log(`✅ Request successful: ${endpoint}`);
+            resolve(data);
+            return;
+          } catch (error) {
+            console.error(
+              `❌ Request failed (attempt ${retryCount + 1}):`,
+              error
+            );
+
+            if (retryCount < this.MAX_RETRIES - 1) {
+              const delay = this.RETRY_DELAY * Math.pow(2, retryCount);
+              console.log(`⏳ Retrying in ${delay}ms...`);
+              await new Promise((resolve) => setTimeout(resolve, delay));
+              retryCount++;
+              continue;
+            }
+
+            reject(error);
+            return;
           }
-          
-          const response = await fetch(`${this.baseUrl}${endpoint}`, {
-            ...options,
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token && { Authorization: `Bearer ${token}` }),
-              ...options.headers,
-            },
-          });
-
-          this.lastRequestTime = Date.now();
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-          }
-
-          const data = await response.json();
-          resolve(data);
-        } catch (error) {
-          reject(error);
         }
       });
 
@@ -147,7 +207,7 @@ class AttendeesAPI {
         try {
           await request();
         } catch (error) {
-          console.error('Request failed:', error);
+          console.error("Request failed:", error);
         }
       }
     }
@@ -156,13 +216,15 @@ class AttendeesAPI {
   }
 
   // Get all attendees with pagination and filters
-  async getAttendees(params: AttendeeListParams = {}): Promise<AttendeeListResponse> {
+  async getAttendees(
+    params: AttendeeListParams = {}
+  ): Promise<AttendeeListResponse> {
     const searchParams = new URLSearchParams();
-    
-    if (params.page) searchParams.append('page', params.page.toString());
-    if (params.limit) searchParams.append('limit', params.limit.toString());
-    if (params.search) searchParams.append('search', params.search);
-    
+
+    if (params.page) searchParams.append("page", params.page.toString());
+    if (params.limit) searchParams.append("limit", params.limit.toString());
+    if (params.search) searchParams.append("search", params.search);
+
     if (params.filters) {
       Object.entries(params.filters).forEach(([key, value]) => {
         if (value) searchParams.append(`filters[${key}]`, value);
@@ -179,30 +241,42 @@ class AttendeesAPI {
   }
 
   // Search attendees
-  async searchAttendees(query: string, limit: number = 10): Promise<{ data: Attendee[] }> {
-    return this.request<{ data: Attendee[] }>(`/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+  async searchAttendees(
+    query: string,
+    limit: number = 10
+  ): Promise<{ data: Attendee[] }> {
+    return this.request<{ data: Attendee[] }>(
+      `/search?q=${encodeURIComponent(query)}&limit=${limit}`
+    );
   }
 
   // Create new attendee
-  async createAttendee(data: Omit<Attendee, 'ID' | 'CREATED_AT'>): Promise<{ data: Attendee }> {
-    return this.request<{ data: Attendee }>('', {
-      method: 'POST',
+  async createAttendee(
+    data: Omit<Attendee, "ID" | "CREATED_AT">
+  ): Promise<{ data: Attendee }> {
+    return this.request<{ data: Attendee }>("", {
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
 
   // Update attendee
-  async updateAttendee(id: number, data: Partial<Omit<Attendee, 'ID' | 'CREATED_AT'>>): Promise<{ data: Attendee }> {
+  async updateAttendee(
+    id: number,
+    data: Partial<Omit<Attendee, "ID" | "CREATED_AT">>
+  ): Promise<{ data: Attendee }> {
     return this.request<{ data: Attendee }>(`/${id}`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(data),
     });
   }
 
   // Update current user's attendee info
-  async updateMe(data: Partial<Omit<Attendee, 'ID' | 'CREATED_AT'>>): Promise<{ data: Attendee }> {
-    return this.request<{ data: Attendee }>('/me', {
-      method: 'PATCH',
+  async updateMe(
+    data: Partial<Omit<Attendee, "ID" | "CREATED_AT">>
+  ): Promise<{ data: Attendee }> {
+    return this.request<{ data: Attendee }>("/me", {
+      method: "PATCH",
       body: JSON.stringify(data),
     });
   }
@@ -210,43 +284,67 @@ class AttendeesAPI {
   // Delete attendee
   async deleteAttendee(id: number): Promise<void> {
     await this.request<void>(`/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
   // Get attendee registrations
-  async getAttendeeRegistrations(id: number): Promise<{ data: Registration[] }> {
+  async getAttendeeRegistrations(
+    id: number
+  ): Promise<{ data: Registration[] }> {
     return this.request<{ data: Registration[] }>(`/${id}/registrations`);
   }
 
   // Register attendee for conference
-  async registerForConference(attendeeId: number, conferenceId: number): Promise<{ data: Registration }> {
-    return this.request<{ data: Registration }>(`/${attendeeId}/registrations`, {
-      method: 'POST',
-      body: JSON.stringify({ conferenceId }),
-    });
+  async registerForConference(
+    attendeeId: number,
+    conferenceId: number
+  ): Promise<{ data: Registration }> {
+    return this.request<{ data: Registration }>(
+      `/${attendeeId}/registrations`,
+      {
+        method: "POST",
+        body: JSON.stringify({ conferenceId }),
+      }
+    );
   }
 
   // Update registration status
-  async updateRegistrationStatus(registrationId: number, status: string): Promise<{ data: Registration }> {
-    return this.request<{ data: Registration }>(`/registrations/${registrationId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
+  async updateRegistrationStatus(
+    registrationId: number,
+    status: string
+  ): Promise<{ data: Registration }> {
+    return this.request<{ data: Registration }>(
+      `/registrations/${registrationId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }
+    );
   }
 
   // Check-in attendee
-  async checkinAttendee(registrationId: number): Promise<{ data: Registration }> {
-    return this.request<{ data: Registration }>(`/registrations/${registrationId}/checkin`, {
-      method: 'POST',
-    });
+  async checkinAttendee(
+    registrationId: number
+  ): Promise<{ data: Registration }> {
+    return this.request<{ data: Registration }>(
+      `/registrations/${registrationId}/checkin`,
+      {
+        method: "POST",
+      }
+    );
   }
 
   // Check-out attendee
-  async checkoutAttendee(registrationId: number): Promise<{ data: Registration }> {
-    return this.request<{ data: Registration }>(`/registrations/${registrationId}/checkout`, {
-      method: 'POST',
-    });
+  async checkoutAttendee(
+    registrationId: number
+  ): Promise<{ data: Registration }> {
+    return this.request<{ data: Registration }>(
+      `/registrations/${registrationId}/checkout`,
+      {
+        method: "POST",
+      }
+    );
   }
 }
 
@@ -264,19 +362,24 @@ class ConferencesAPI {
     return new Promise((resolve, reject) => {
       this.requestQueue.push(async () => {
         try {
-          const token = localStorage.getItem('accessToken');
-          
+          const token = localStorage.getItem("accessToken");
+
           // Rate limiting: ensure minimum interval between requests
           const now = Date.now();
           const timeSinceLastRequest = now - this.lastRequestTime;
           if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-            await new Promise(resolve => setTimeout(resolve, this.MIN_REQUEST_INTERVAL - timeSinceLastRequest));
+            await new Promise((resolve) =>
+              setTimeout(
+                resolve,
+                this.MIN_REQUEST_INTERVAL - timeSinceLastRequest
+              )
+            );
           }
-          
+
           const response = await fetch(`${this.baseUrl}${endpoint}`, {
             ...options,
             headers: {
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
               ...(token && { Authorization: `Bearer ${token}` }),
               ...options.headers,
             },
@@ -286,7 +389,9 @@ class ConferencesAPI {
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            throw new Error(
+              errorData.message || `HTTP error! status: ${response.status}`
+            );
           }
 
           const data = await response.json();
@@ -313,7 +418,7 @@ class ConferencesAPI {
         try {
           await request();
         } catch (error) {
-          console.error('Request failed:', error);
+          console.error("Request failed:", error);
         }
       }
     }
@@ -323,7 +428,7 @@ class ConferencesAPI {
 
   // Get all conferences
   async getConferences(): Promise<{ data: Conference[] }> {
-    return this.request<{ data: Conference[] }>('');
+    return this.request<{ data: Conference[] }>("");
   }
 
   // Get conference by ID
@@ -339,12 +444,12 @@ class RegistrationsAPI {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const token = localStorage.getItem('accessToken');
-    
+    const token = localStorage.getItem("accessToken");
+
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
         ...options.headers,
       },
@@ -352,7 +457,9 @@ class RegistrationsAPI {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      throw new Error(
+        errorData.message || `HTTP error! status: ${response.status}`
+      );
     }
 
     return response.json();
@@ -360,12 +467,16 @@ class RegistrationsAPI {
 
   // Get all registrations
   async getRegistrations(): Promise<{ data: Registration[] }> {
-    return this.request<{ data: Registration[] }>('');
+    return this.request<{ data: Registration[] }>("");
   }
 
   // Get registrations by conference
-  async getRegistrationsByConference(conferenceId: number): Promise<{ data: Registration[] }> {
-    return this.request<{ data: Registration[] }>(`?conferenceId=${conferenceId}`);
+  async getRegistrationsByConference(
+    conferenceId: number
+  ): Promise<{ data: Registration[] }> {
+    return this.request<{ data: Registration[] }>(
+      `?conferenceId=${conferenceId}`
+    );
   }
 }
 
