@@ -45,27 +45,36 @@ class WebSocketService {
     this.isConnecting = true;
 
     try {
-      const token = this.getToken();
+      let token = this.getToken();
       if (!token) {
-        console.log("No access token found, skipping WebSocket connection");
-        this.isConnecting = false;
-        return;
-      }
+        console.log("No valid access token found, attempting to refresh...");
 
-      // Check if token is valid format before proceeding
-      try {
-        const parts = token.split(".");
-        if (parts.length !== 3) {
-          console.error("Invalid token format - not a valid JWT");
+        // Try to refresh token if no valid token is found
+        if (!this.hasAttemptedTokenRefresh) {
+          const refreshSuccess = await this.attemptTokenRefresh();
+          if (refreshSuccess) {
+            token = this.getToken();
+            if (!token) {
+              console.error(
+                "Token refresh succeeded but no token found after refresh"
+              );
+              this.isConnecting = false;
+              return;
+            }
+          } else {
+            console.error(
+              "Token refresh failed, skipping WebSocket connection"
+            );
+            this.isConnecting = false;
+            return;
+          }
+        } else {
+          console.error(
+            "Token refresh already attempted, skipping WebSocket connection"
+          );
           this.isConnecting = false;
           return;
         }
-        // Try to parse the payload to check if it's valid JSON
-        JSON.parse(atob(parts[1]));
-      } catch (error) {
-        console.error("Invalid token format - cannot parse JWT:", error);
-        this.isConnecting = false;
-        return;
       }
 
       console.log("Connecting to WebSocket...");
@@ -220,6 +229,12 @@ class WebSocketService {
     this.reconnectAttempts = 0;
   }
 
+  public async forceReconnect(): Promise<void> {
+    console.log("Force reconnecting WebSocket...");
+    this.reset();
+    await this.connect();
+  }
+
   public isSocketConnected(): boolean {
     return this.isConnected && this.socket?.connected === true;
   }
@@ -241,11 +256,29 @@ class WebSocketService {
         this.socket?.emit("join-room", `user:${userId}`);
         console.log(`Joined room: user:${userId}`);
       }
+
+      // Dispatch connection event
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("websocket-connected", {
+            detail: { socketId: this.socket?.id },
+          })
+        );
+      }
     });
 
     this.socket.on("disconnect", (reason) => {
       console.log("WebSocket disconnected:", reason);
       this.isConnected = false;
+
+      // Dispatch disconnection event
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("websocket-disconnected", {
+            detail: { reason },
+          })
+        );
+      }
     });
 
     this.socket.on("connect_error", (error) => {
@@ -259,10 +292,35 @@ class WebSocketService {
       });
 
       // Additional debugging for token issues
-      if (error.message === "Invalid token") {
+      if (
+        error.message === "Invalid token" ||
+        error.message.includes("token")
+      ) {
         console.error("Token validation failed on server side");
-        console.error("Current token:", this.getToken() ? "exists" : "missing");
-        console.error("Token length:", this.getToken()?.length || 0);
+        const currentToken = this.getToken();
+        console.error("Current token:", currentToken ? "exists" : "missing");
+        console.error("Token length:", currentToken?.length || 0);
+
+        // Debug token details
+        if (currentToken) {
+          try {
+            const parts = currentToken.split(".");
+            if (parts.length === 3) {
+              const payload = JSON.parse(atob(parts[1]));
+              console.error("Token payload debug:", {
+                userId: payload.userId,
+                email: payload.email,
+                role: payload.role,
+                exp: payload.exp,
+                expDate: new Date(payload.exp * 1000).toISOString(),
+                currentTime: new Date().toISOString(),
+                isExpired: Date.now() >= payload.exp * 1000,
+              });
+            }
+          } catch (parseError) {
+            console.error("Failed to parse token payload:", parseError);
+          }
+        }
 
         // Only try to refresh token once per session
         if (!this.hasAttemptedTokenRefresh) {
@@ -297,6 +355,15 @@ class WebSocketService {
 
       this.isConnected = false;
       this.reconnectAttempts++;
+
+      // Dispatch error event
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("websocket-error", {
+            detail: { error, reconnectAttempts: this.reconnectAttempts },
+          })
+        );
+      }
 
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
         console.log("Max reconnection attempts reached, pausing WebSocket");
@@ -432,33 +499,91 @@ class WebSocketService {
 
   private getToken(): string | null {
     if (typeof window !== "undefined") {
-      // Try to get from cookies first (consistent with API client)
-      const cookies = document.cookie.split(";");
-      const tokenCookie = cookies.find((cookie) =>
-        cookie.trim().startsWith("accessToken=")
-      );
-      if (tokenCookie) {
-        const token = tokenCookie.split("=")[1];
-        // Only URL decode if the token appears to be URL encoded
-        try {
-          // Check if token contains URL encoded characters
-          if (token.includes("%")) {
-            return decodeURIComponent(token);
+      // Try multiple sources for token (consistent with API client)
+      const sources = [
+        // 1. Try cookies first
+        () => {
+          const cookies = document.cookie.split(";");
+          const tokenCookie = cookies.find((cookie) =>
+            cookie.trim().startsWith("accessToken=")
+          );
+          if (tokenCookie) {
+            const token = tokenCookie.split("=")[1];
+            // Only URL decode if the token appears to be URL encoded
+            try {
+              if (token.includes("%")) {
+                return decodeURIComponent(token);
+              }
+              return token;
+            } catch (error) {
+              console.warn("Failed to decode token from cookie:", error);
+              return token; // Return as-is if decoding fails
+            }
           }
-          return token;
+          return null;
+        },
+        // 2. Try localStorage accessToken
+        () => localStorage.getItem("accessToken"),
+        // 3. Try localStorage token (legacy)
+        () => localStorage.getItem("token"),
+        // 4. Try sessionStorage
+        () => sessionStorage.getItem("accessToken"),
+        () => sessionStorage.getItem("token"),
+      ];
+
+      for (const source of sources) {
+        try {
+          const token = source();
+          if (token && token.trim() !== "") {
+            // Validate token format before returning
+            if (this.isValidTokenFormat(token)) {
+              console.log(
+                "Valid token found from source:",
+                source.name || "unknown"
+              );
+              return token;
+            } else {
+              console.warn("Invalid token format found, trying next source");
+            }
+          }
         } catch (error) {
-          console.warn("Failed to decode token from cookie:", error);
-          return token; // Return as-is if decoding fails
+          console.warn("Error accessing token source:", error);
         }
       }
 
-      // Fallback to localStorage
-      const token = localStorage.getItem("accessToken");
-      if (token) {
-        return token;
-      }
+      console.log("No valid token found in any source");
     }
     return null;
+  }
+
+  private isValidTokenFormat(token: string): boolean {
+    try {
+      // Check if it's a valid JWT format
+      const parts = token.split(".");
+      if (parts.length !== 3) {
+        return false;
+      }
+
+      // Try to parse the payload to check if it's valid JSON
+      const payload = JSON.parse(atob(parts[1]));
+
+      // Check if token has required fields
+      if (!payload.userId || !payload.exp) {
+        return false;
+      }
+
+      // Check if token is not expired
+      const now = Math.floor(Date.now() / 1000);
+      if (now >= payload.exp) {
+        console.warn("Token is expired");
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.warn("Token format validation failed:", error);
+      return false;
+    }
   }
 
   private getCurrentUserId(): number | null {

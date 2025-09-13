@@ -31,6 +31,7 @@ import {
   ChevronRight,
   ChevronDown,
   MessageCircle,
+  Brain,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -64,6 +65,14 @@ const allNavigationItems = [
     label: "Danh sách tham dự",
     requiredPermissions: ["attendees.manage"],
     description: "Quản lý danh sách người tham dự toàn bộ hội nghị",
+    adminOnly: true,
+  },
+  {
+    href: "/ai-analytics",
+    icon: Brain,
+    label: "Phân tích AI",
+    requiredPermissions: ["analytics.view"],
+    description: "Phân tích AI tổng quan cho tất cả hội nghị",
     adminOnly: true,
   },
   {
@@ -127,8 +136,18 @@ const getNavigationItems = (
       return userRole === "admin";
     }
 
+    // Special handling for global AI analytics - only show to admin
+    if (item.href === "/ai-analytics" && item.adminOnly) {
+      return userRole === "admin";
+    }
+
     // Admin always has access to attendees management regardless of permissions
     if (item.href === "/attendees" && userRole === "admin") {
+      return true;
+    }
+
+    // Admin always has access to AI analytics regardless of permissions
+    if (item.href === "/ai-analytics" && userRole === "admin") {
       return true;
     }
 
@@ -290,6 +309,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       [
         "/conference-management",
         "/attendees",
+        "/ai-analytics",
         "/roles",
         "/audit",
         "/settings",
