@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { GlobalLoading, InlineLoading } from "@/components/ui/global-loading";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -606,7 +607,7 @@ export function MyEventsContent() {
                 >
                   {isLoading === "viewing" ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <InlineLoading size="sm" />
                       Đang tải...
                     </>
                   ) : (
@@ -626,7 +627,7 @@ export function MyEventsContent() {
                   >
                     {isLoading === "registering" ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <InlineLoading size="sm" />
                         Đang đăng ký...
                       </>
                     ) : (
@@ -649,7 +650,7 @@ export function MyEventsContent() {
                 >
                   {isLoading === "viewing" ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <InlineLoading size="sm" />
                       Đang tải...
                     </>
                   ) : (
@@ -665,7 +666,7 @@ export function MyEventsContent() {
                 >
                   {isLoading === "unregistering" ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <InlineLoading size="sm" />
                       Đang hủy...
                     </>
                   ) : (
@@ -684,7 +685,7 @@ export function MyEventsContent() {
               >
                 {isLoading === "downloading" ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <InlineLoading size="sm" />
                     Đang tải...
                   </>
                 ) : (
@@ -705,7 +706,7 @@ export function MyEventsContent() {
               >
                 {isLoading === "viewing" ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <InlineLoading size="sm" />
                     Đang tải...
                   </>
                 ) : (
@@ -723,7 +724,7 @@ export function MyEventsContent() {
                 >
                   {isLoading === "managing" ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <InlineLoading size="sm" />
                       Đang tải...
                     </>
                   ) : (
@@ -743,7 +744,7 @@ export function MyEventsContent() {
                   >
                     {isLoading === "viewing" ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <InlineLoading size="sm" />
                         Đang tải...
                       </>
                     ) : (
@@ -762,7 +763,7 @@ export function MyEventsContent() {
                   >
                     {isLoading === "downloading-reports" ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <InlineLoading size="sm" />
                         Đang tải...
                       </>
                     ) : (
@@ -785,7 +786,7 @@ export function MyEventsContent() {
               >
                 {isLoading === "start" ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <InlineLoading size="sm" />
                     Đang bắt đầu...
                   </>
                 ) : (
@@ -807,7 +808,7 @@ export function MyEventsContent() {
                 >
                   {isLoading === "complete" ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <InlineLoading size="sm" />
                       Đang hoàn thành...
                     </>
                   ) : (
@@ -826,7 +827,7 @@ export function MyEventsContent() {
                 >
                   {isLoading === "cancel" ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <InlineLoading size="sm" />
                       Đang hủy...
                     </>
                   ) : (
@@ -901,10 +902,11 @@ export function MyEventsContent() {
           <p className="text-muted-foreground mt-2">{getPageDescription()}</p>
         </div>
         <div className="flex items-center justify-center py-12">
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span>Đang tải dữ liệu...</span>
-          </div>
+          <GlobalLoading
+            message="Đang tải sự kiện..."
+            variant="default"
+            size="md"
+          />
         </div>
       </div>
     );
@@ -973,7 +975,11 @@ export function MyEventsContent() {
           disabled={isLoading}
           className="flex items-center gap-2"
         >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+          {isLoading ? (
+            <InlineLoading size="sm" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
           Làm mới
         </Button>
       </div>

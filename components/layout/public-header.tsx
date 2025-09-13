@@ -1,62 +1,66 @@
-"use client"
+"use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
-  QrCode, 
-  MapPin, 
-  Smartphone, 
-  Menu, 
+import {
+  QrCode,
+  MapPin,
+  Smartphone,
+  Menu,
   X,
   Calendar,
   Users,
-  Home
+  Home,
+  Moon,
+  Sun,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export function PublicHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
 
   const navigationItems = [
     {
       name: "Trang chủ",
       href: "/",
       icon: Home,
-      description: "Về trang chủ"
+      description: "Về trang chủ",
     },
     {
       name: "Check-in",
       href: "/checkin-public",
       icon: QrCode,
-      description: "Quét QR code để check-in"
+      description: "Quét QR code để check-in",
     },
-      {
+    {
       name: "Đăng ký tham dự",
       href: "/register-attendee",
       icon: Calendar,
-      description: "Đăng ký tham dự hội nghị"
+      description: "Đăng ký tham dự hội nghị",
     },
     {
       name: "Lịch trình",
       href: "/sessions-public",
       icon: Calendar,
-      description: "Xem lịch trình hội nghị"
+      description: "Xem lịch trình hội nghị",
     },
     {
       name: "Bản đồ địa điểm",
       href: "/venue-public",
       icon: MapPin,
-      description: "Xem bản đồ và địa điểm hội nghị"
+      description: "Xem bản đồ và địa điểm hội nghị",
     },
     {
       name: "Ứng dụng di động",
       href: "/mobile-public",
       icon: Smartphone,
-      description: "Tải ứng dụng di động"
-    }
+      description: "Tải ứng dụng di động",
+    },
   ];
 
   const isActive = (href: string) => {
@@ -67,7 +71,10 @@ export function PublicHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" suppressHydrationWarning>
+    <header
+      className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      suppressHydrationWarning
+    >
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
@@ -77,7 +84,9 @@ export function PublicHeader() {
             </div>
             <div className="hidden sm:block">
               <h1 className="text-xl font-bold">Conference Management</h1>
-              <p className="text-xs text-muted-foreground">Hệ thống quản lý hội nghị</p>
+              <p className="text-xs text-muted-foreground">
+                Hệ thống quản lý hội nghị
+              </p>
             </div>
           </div>
 
@@ -97,10 +106,32 @@ export function PublicHeader() {
                 </Link>
               );
             })}
+
+            {/* Theme Toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="ml-2 h-10 w-10 p-0"
+            >
+              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <span className="sr-only">Toggle theme</span>
+            </Button>
           </nav>
 
-          {/* Mobile Menu Button */}
-          <div className="md:hidden">
+          {/* Mobile Menu Button & Theme Toggle */}
+          <div className="md:hidden flex items-center space-x-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="h-10 w-10 p-0"
+            >
+              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <span className="sr-only">Toggle theme</span>
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -123,10 +154,10 @@ export function PublicHeader() {
                 const Icon = item.icon;
                 return (
                   <Link key={item.href} href={item.href}>
-                    <Card 
+                    <Card
                       className={`cursor-pointer transition-colors ${
-                        isActive(item.href) 
-                          ? "bg-primary text-primary-foreground" 
+                        isActive(item.href)
+                          ? "bg-primary text-primary-foreground"
                           : "hover:bg-muted"
                       }`}
                       onClick={() => setIsMobileMenuOpen(false)}
@@ -136,7 +167,9 @@ export function PublicHeader() {
                           <Icon className="h-5 w-5" />
                           <div>
                             <h3 className="font-medium">{item.name}</h3>
-                            <p className="text-sm opacity-80">{item.description}</p>
+                            <p className="text-sm opacity-80">
+                              {item.description}
+                            </p>
                           </div>
                         </div>
                       </CardContent>

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { InlineLoading } from "@/components/ui/global-loading";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -32,7 +33,7 @@ import { apiClient } from "@/lib/api";
 export default function ProfilePage() {
   const { user: authUser, updateProfile } = useAuth();
   const { showSuccess, showError } = useNotification();
-  
+
   // Sử dụng dữ liệu từ authentication state
   const [user, setUser] = useState({
     name: authUser?.name || "Người dùng",
@@ -78,28 +79,33 @@ export default function ProfilePage() {
   const handleSave = async () => {
     setIsUpdating(true);
     try {
-      console.log('💾 Saving profile with data:', {
+      console.log("💾 Saving profile with data:", {
         name: editData.name,
         email: editData.email,
-        avatar: editData.avatar ? editData.avatar.substring(0, 50) + '...' : 'null'
+        avatar: editData.avatar
+          ? editData.avatar.substring(0, 50) + "..."
+          : "null",
       });
-      
+
       // Call updateProfile from auth service - this will update the global auth state
       await updateProfile({
         name: editData.name,
         email: editData.email,
         avatar: editData.avatar,
       });
-      
-      showSuccess('Cập nhật thành công', 'Thông tin cá nhân đã được cập nhật');
-      
+
+      showSuccess("Cập nhật thành công", "Thông tin cá nhân đã được cập nhật");
+
       // The auth state will be updated automatically via the useAuth hook
       // No need to manually update local state
-      
+
       setOpen(false);
     } catch (error) {
-      console.error('Failed to update profile:', error);
-      showError('Cập nhật thất bại', 'Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.');
+      console.error("Failed to update profile:", error);
+      showError(
+        "Cập nhật thất bại",
+        "Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại."
+      );
     } finally {
       setIsUpdating(false);
     }
@@ -161,10 +167,12 @@ export default function ProfilePage() {
                 <DialogHeader>
                   <DialogTitle>Chỉnh sửa thông tin cá nhân</DialogTitle>
                   <DialogDescription>
-                    Thay đổi thông tin cá nhân của bạn. Vai trò không thể chỉnh sửa.
+                    Thay đổi thông tin cá nhân của bạn. Vai trò không thể chỉnh
+                    sửa.
                     {isImageUploading && (
                       <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">
-                        📤 Đang upload ảnh lên cloud... Vui lòng đợi trước khi lưu.
+                        📤 Đang upload ảnh lên cloud... Vui lòng đợi trước khi
+                        lưu.
                       </div>
                     )}
                   </DialogDescription>
@@ -215,18 +223,28 @@ export default function ProfilePage() {
                   <DialogClose asChild>
                     <Button variant="outline">Hủy</Button>
                   </DialogClose>
-                  <Button 
-                    onClick={handleSave} 
+                  <Button
+                    onClick={handleSave}
                     disabled={isUpdating || isImageUploading}
                   >
-                    {isUpdating ? "Đang lưu..." : 
-                     isImageUploading ? "Đang upload ảnh..." : 
-                     "Lưu thay đổi"}
+                    {isUpdating ? (
+                      <div className="flex items-center gap-2">
+                        <InlineLoading size="sm" />
+                        Đang lưu...
+                      </div>
+                    ) : isImageUploading ? (
+                      <div className="flex items-center gap-2">
+                        <InlineLoading size="sm" />
+                        Đang upload ảnh...
+                      </div>
+                    ) : (
+                      "Lưu thay đổi"
+                    )}
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            <ChangePassword 
+            <ChangePassword
               trigger={
                 <Button variant="outline" size="lg">
                   <Lock className="mr-2 h-4 w-4" />

@@ -1,30 +1,37 @@
-"use client"
+"use client";
 
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { useFirebaseAuth } from '@/hooks/use-firebase-auth';
-import { useNotification } from '@/hooks/use-notification';
-import { useSafeAudit } from '@/hooks/use-safe-audit';
-import { apiClient } from '@/lib/api';
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { useFirebaseAuth } from "@/hooks/use-firebase-auth";
+import { useNotification } from "@/hooks/use-notification";
+import { useSafeAudit } from "@/hooks/use-safe-audit";
+import { apiClient } from "@/lib/api";
+import { InlineLoading } from "@/components/ui/global-loading";
 
 interface GoogleSignInButtonProps {
   onSuccess?: () => void;
   onError?: (error: string) => void;
-  variant?: "default" | "outline" | "secondary" | "ghost" | "link" | "destructive";
+  variant?:
+    | "default"
+    | "outline"
+    | "secondary"
+    | "ghost"
+    | "link"
+    | "destructive";
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
   children?: React.ReactNode;
   mode?: "login" | "register"; // Thêm prop để phân biệt login/register
 }
 
-export function GoogleSignInButton({ 
-  onSuccess, 
-  onError, 
+export function GoogleSignInButton({
+  onSuccess,
+  onError,
   variant = "outline",
   size = "default",
   className = "",
   children,
-  mode = "login" // Mặc định là login
+  mode = "login", // Mặc định là login
 }: GoogleSignInButtonProps) {
   const { signInWithGoogle, loading } = useFirebaseAuth();
   const { showSuccess, showError } = useNotification();
@@ -38,18 +45,19 @@ export function GoogleSignInButton({
       } else {
         await actions.custom("Đăng ký với Google", "Xác thực");
       }
-      
+
       // With redirect flow, this will redirect the user to Google
       // The actual authentication will be handled when they return
       await signInWithGoogle(mode);
-      
+
       // This code won't execute because of the redirect
       // The authentication will be handled in the useEffect when the user returns
     } catch (error: any) {
-      console.error('Google authentication error:', error);
-      const errorMessage = mode === "login" 
-        ? "Không thể đăng nhập với Google." 
-        : "Không thể đăng ký với Google.";
+      console.error("Google authentication error:", error);
+      const errorMessage =
+        mode === "login"
+          ? "Không thể đăng nhập với Google."
+          : "Không thể đăng ký với Google.";
       showError("Lỗi xác thực", error.message || errorMessage);
       onError?.(error.message || "Authentication failed");
     }
@@ -60,13 +68,13 @@ export function GoogleSignInButton({
       type="button"
       variant={variant}
       size={size}
-      className={`w-full transition-all duration-300 hover:scale-105 hover:shadow-lg hover:bg-primary hover:text-primary-foreground ${className}`}
+      className={`w-full transition-all duration-300 ${className}`}
       onClick={handleGoogleSignIn}
       disabled={loading}
     >
       {loading ? (
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+          <InlineLoading size="sm" />
           Đang xử lý...
         </div>
       ) : (
@@ -90,7 +98,7 @@ export function GoogleSignInButton({
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-{mode === "login" ? "Đăng nhập với Google" : "Đăng ký với Google"}
+            {mode === "login" ? "Đăng nhập với Google" : "Đăng ký với Google"}
           </div>
         )
       )}

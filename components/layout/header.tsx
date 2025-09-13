@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useFirebaseAuth } from "@/hooks/use-firebase-auth";
 import { ConferenceSelectorCompact } from "@/components/layout/conference-selector";
+import { InlineLoading } from "@/components/ui/global-loading";
 // import { RefreshPermissionsButton } from "@/components/auth/refresh-permissions-button";
 
 interface HeaderProps {
@@ -108,7 +109,7 @@ export function Header({ userName, userRole, userAvatar }: HeaderProps) {
         </Button>
 
         {/* Notifications - Hidden for now */}
-        {/* <DropdownMenu>
+        {/* <DropdownMenu></DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -213,7 +214,7 @@ export function Header({ userName, userRole, userAvatar }: HeaderProps) {
             >
               {isLoggingOut ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                  <InlineLoading size="sm" />
                   Đang đăng xuất...
                 </div>
               ) : (
