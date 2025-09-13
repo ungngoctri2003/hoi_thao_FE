@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Token Fix Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+      }
+      .warning {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      button:disabled {
+        background-color: #6c757d;
+        cursor: not-allowed;
+      }
+      .log {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 10px;
+        margin: 10px 0;
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>WebSocket Token Fix Test</h1>
+      <p>Test WebSocket connection with token refresh functionality</p>
+
+      <div id="status" class="status info">Ready to test</div>
+
+      <div>
+        <button onclick="testTokenStorage()">Test Token Storage</button>
+        <button onclick="testWebSocketConnection()">
+          Test WebSocket Connection
+        </button>
+        <button onclick="testTokenRefresh()">Test Token Refresh</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+      </div>
+
+      <div id="logs" class="log"></div>
+    </div>
+
+    <script>
+      let websocketService = null;
+
+      // Mock WebSocket service for testing
+      class MockWebSocketService {
+        constructor() {
+          this.socket = null;
+          this.isConnected = false;
+          this.reconnectAttempts = 0;
+          this.maxReconnectAttempts = 5;
+          this.reconnectDelay = 1000;
+          this.isConnecting = false;
+          this.hasAttemptedTokenRefresh = false;
+          this.isPaused = false;
+        }
+
+        log(message, type = "info") {
+          const timestamp = new Date().toLocaleTimeString();
+          const logElement = document.getElementById("logs");
+          const logEntry = document.createElement("div");
+          logEntry.innerHTML = `[${timestamp}] ${message}`;
+          logEntry.style.color =
+            type === "error"
+              ? "#721c24"
+              : type === "success"
+              ? "#155724"
+              : type === "warning"
+              ? "#856404"
+              : "#0c5460";
+          logElement.appendChild(logEntry);
+          logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        getToken() {
+          if (typeof window !== "undefined") {
+            const sources = [
+              () => {
+                const token = localStorage.getItem("accessToken");
+                this.log(
+                  `localStorage accessToken: ${token ? "exists" : "missing"}`
+                );
+                return token;
+              },
+              () => {
+                const cookies = document.cookie.split(";");
+                const tokenCookie = cookies.find((cookie) =>
+                  cookie.trim().startsWith("accessToken=")
+                );
+                if (tokenCookie) {
+                  const token = tokenCookie.split("=")[1];
+                  this.log(
+                    `Cookie accessToken: ${token ? "exists" : "missing"}`
+                  );
+                  try {
+                    if (token.includes("%")) {
+                      return decodeURIComponent(token);
+                    }
+                    return token;
+                  } catch (error) {
+                    this.log(
+                      `Failed to decode token from cookie: ${error}`,
+                      "warning"
+                    );
+                    return token;
+                  }
+                }
+                return null;
+              },
+              () => {
+                const token = localStorage.getItem("token");
+                this.log(
+                  `localStorage token (legacy): ${token ? "exists" : "missing"}`
+                );
+                return token;
+              },
+            ];
+
+            for (const source of sources) {
+              try {
+                const token = source();
+                if (token && token.trim() !== "") {
+                  if (this.isValidTokenFormat(token)) {
+                    this.log(
+                      `Valid token found from source: ${
+                        source.name || "unknown"
+                      }`,
+                      "success"
+                    );
+                    return token;
+                  } else {
+                    this.log(
+                      "Invalid token format found, trying next source",
+                      "warning"
+                    );
+                  }
+                }
+              } catch (error) {
+                this.log(`Error accessing token source: ${error}`, "warning");
+              }
+            }
+
+            this.log("No valid token found in any source", "error");
+          }
+          return null;
+        }
+
+        isValidTokenFormat(token) {
+          try {
+            const parts = token.split(".");
+            if (parts.length !== 3) {
+              return false;
+            }
+
+            const payload = JSON.parse(atob(parts[1]));
+
+            if (!payload.userId || !payload.exp) {
+              return false;
+            }
+
+            const now = Math.floor(Date.now() / 1000);
+            if (now >= payload.exp) {
+              this.log("Token is expired", "warning");
+              return false;
+            }
+
+            return true;
+          } catch (error) {
+            this.log(`Token format validation failed: ${error}`, "warning");
+            return false;
+          }
+        }
+
+        setToken(token) {
+          if (typeof window !== "undefined") {
+            this.log("Setting new access token...");
+
+            localStorage.setItem("accessToken", token);
+            this.log("Token saved to localStorage");
+
+            const expires = new Date();
+            expires.setDate(expires.getDate() + 7);
+            document.cookie = `accessToken=${token}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+            this.log("Token saved to cookie");
+
+            const verifyToken = localStorage.getItem("accessToken");
+            if (verifyToken === token) {
+              this.log("Token verification successful", "success");
+            } else {
+              this.log("Token verification failed", "error");
+            }
+          }
+        }
+
+        async attemptTokenRefresh() {
+          try {
+            const refreshToken = localStorage.getItem("refreshToken");
+            if (!refreshToken) {
+              this.log("No refresh token available", "error");
+              return false;
+            }
+
+            this.log("Attempting to refresh token...");
+
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Mock successful refresh
+            const mockNewToken = this.generateMockToken();
+            this.setToken(mockNewToken);
+
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
+            const newToken = this.getToken();
+            if (newToken) {
+              this.log(
+                "Token refresh successful, new token verified",
+                "success"
+              );
+              return true;
+            } else {
+              this.log(
+                "Token refresh succeeded but token not found after setting",
+                "error"
+              );
+              const fallbackToken = localStorage.getItem("accessToken");
+              if (fallbackToken && this.isValidTokenFormat(fallbackToken)) {
+                this.log("Using fallback token from localStorage", "success");
+                return true;
+              }
+              return false;
+            }
+          } catch (error) {
+            this.log(`Token refresh failed: ${error}`, "error");
+            return false;
+          }
+        }
+
+        generateMockToken() {
+          const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+          const payload = btoa(
+            JSON.stringify({
+              userId: 1,
+              email: "test@example.com",
+              exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+              iat: Math.floor(Date.now() / 1000),
+            })
+          );
+          const signature = "mock-signature";
+          return `${header}.${payload}.${signature}`;
+        }
+
+        async connect() {
+          if (this.socket?.connected) {
+            this.log("WebSocket already connected");
+            return;
+          }
+
+          if (this.isConnecting) {
+            this.log("WebSocket connection already in progress");
+            return;
+          }
+
+          if (this.isPaused) {
+            this.log("WebSocket is paused due to repeated failures");
+            return;
+          }
+
+          this.isConnecting = true;
+
+          try {
+            let token = this.getToken();
+            if (!token) {
+              this.log("No valid access token found, attempting to refresh...");
+
+              if (!this.hasAttemptedTokenRefresh) {
+                this.log("No valid token found, attempting token refresh...");
+                const refreshSuccess = await this.attemptTokenRefresh();
+                if (refreshSuccess) {
+                  await new Promise((resolve) => setTimeout(resolve, 200));
+                  token = this.getToken();
+                  if (!token) {
+                    this.log(
+                      "Token refresh succeeded but no token found after refresh",
+                      "error"
+                    );
+                    this.isConnecting = false;
+                    return;
+                  } else {
+                    this.log(
+                      "Token refresh successful, proceeding with connection",
+                      "success"
+                    );
+                  }
+                } else {
+                  this.log(
+                    "Token refresh failed, skipping WebSocket connection",
+                    "error"
+                  );
+                  this.isConnecting = false;
+                  return;
+                }
+              } else {
+                this.log(
+                  "Token refresh already attempted, skipping WebSocket connection",
+                  "error"
+                );
+                this.isConnecting = false;
+                return;
+              }
+            }
+
+            this.log("Connecting to WebSocket...");
+            this.log(
+              `Token being sent: ${
+                token ? token.substring(0, 20) + "..." : "none"
+              }`
+            );
+            this.log(`Token length: ${token?.length || 0}`);
+
+            // Mock WebSocket connection
+            this.socket = {
+              connected: true,
+              id: "mock-socket-id",
+            };
+            this.isConnected = true;
+            this.reconnectAttempts = 0;
+            this.isConnecting = false;
+            this.hasAttemptedTokenRefresh = false;
+            this.isPaused = false;
+
+            this.log("WebSocket connected successfully", "success");
+          } catch (error) {
+            this.log(`Failed to connect WebSocket: ${error}`, "error");
+            this.isConnected = false;
+          } finally {
+            this.isConnecting = false;
+          }
+        }
+
+        getConnectionStatus() {
+          return {
+            connected: this.isConnected,
+            socketId: this.socket?.id,
+            reconnectAttempts: this.reconnectAttempts,
+          };
+        }
+      }
+
+      // Initialize
+      websocketService = new MockWebSocketService();
+
+      function updateStatus(message, type = "info") {
+        const statusElement = document.getElementById("status");
+        statusElement.textContent = message;
+        statusElement.className = `status ${type}`;
+      }
+
+      function testTokenStorage() {
+        updateStatus("Testing token storage...", "info");
+        websocketService.log("=== Testing Token Storage ===");
+
+        // Test setting token
+        const testToken = websocketService.generateMockToken();
+        websocketService.setToken(testToken);
+
+        // Test getting token
+        const retrievedToken = websocketService.getToken();
+        if (retrievedToken === testToken) {
+          websocketService.log("Token storage test PASSED", "success");
+          updateStatus("Token storage test PASSED", "success");
+        } else {
+          websocketService.log("Token storage test FAILED", "error");
+          updateStatus("Token storage test FAILED", "error");
+        }
+      }
+
+      function testWebSocketConnection() {
+        updateStatus("Testing WebSocket connection...", "info");
+        websocketService.log("=== Testing WebSocket Connection ===");
+
+        // Set up a valid token first
+        const testToken = websocketService.generateMockToken();
+        websocketService.setToken(testToken);
+
+        // Test connection
+        websocketService.connect().then(() => {
+          const status = websocketService.getConnectionStatus();
+          if (status.connected) {
+            websocketService.log("WebSocket connection test PASSED", "success");
+            updateStatus("WebSocket connection test PASSED", "success");
+          } else {
+            websocketService.log("WebSocket connection test FAILED", "error");
+            updateStatus("WebSocket connection test FAILED", "error");
+          }
+        });
+      }
+
+      function testTokenRefresh() {
+        updateStatus("Testing token refresh...", "info");
+        websocketService.log("=== Testing Token Refresh ===");
+
+        // Clear existing token
+        localStorage.removeItem("accessToken");
+        document.cookie =
+          "accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax";
+
+        // Set up refresh token
+        localStorage.setItem("refreshToken", "mock-refresh-token");
+
+        // Test refresh
+        websocketService.attemptTokenRefresh().then((success) => {
+          if (success) {
+            websocketService.log("Token refresh test PASSED", "success");
+            updateStatus("Token refresh test PASSED", "success");
+          } else {
+            websocketService.log("Token refresh test FAILED", "error");
+            updateStatus("Token refresh test FAILED", "error");
+          }
+        });
+      }
+
+      function clearLogs() {
+        document.getElementById("logs").innerHTML = "";
+        updateStatus("Logs cleared", "info");
+      }
+
+      // Auto-run basic test on load
+      window.onload = function () {
+        websocketService.log("WebSocket Token Fix Test loaded");
+        websocketService.log("Click buttons to run tests");
+      };
+    </script>
+  </body>
+</html>

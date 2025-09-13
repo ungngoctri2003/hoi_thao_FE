@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/use-auth";
 import { websocketService } from "@/lib/websocket";
 import {
@@ -19,7 +20,6 @@ import {
   Eye,
   Download,
   RefreshCw,
-  Filter,
   Target,
   Building,
   Globe,
@@ -28,6 +28,10 @@ import { GlobalAIInsights } from "@/components/analytics/global-ai-insights";
 import { GlobalTrends } from "@/components/analytics/global-trends";
 import { TopConferences } from "@/components/analytics/top-conferences";
 import { GlobalDemographics } from "@/components/analytics/global-demographics";
+import { ChatGPTInsights } from "@/components/analytics/chatgpt-insights";
+import { AIStatsCard } from "@/components/analytics/ai-stats-card";
+import { AIConnectionStatus } from "@/components/analytics/ai-connection-status";
+import { AILoadingSkeleton } from "@/components/analytics/ai-loading-skeleton";
 
 interface GlobalAnalyticsData {
   totalConferences: number;
@@ -71,6 +75,19 @@ interface GlobalAnalyticsData {
     conferenceId?: number;
     conferenceName?: string;
   }>;
+  chatGPTInsights?: {
+    insights: Array<{
+      type: "trend" | "recommendation" | "alert" | "prediction";
+      title: string;
+      description: string;
+      confidence: number;
+      priority: "high" | "medium" | "low";
+      conferenceId?: number;
+      conferenceName?: string;
+    }>;
+    summary: string;
+    recommendations: string[];
+  };
   monthlyStats: Array<{
     month: string;
     conferences: number;
@@ -89,43 +106,251 @@ export default function GlobalAIAnalyticsPage() {
   const [selectedConference, setSelectedConference] = useState<number | null>(
     null
   );
-  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRealTimeUpdating, setIsRealTimeUpdating] = useState(false);
   const [websocketStatus, setWebsocketStatus] = useState<{
     connected: boolean;
     socketId?: string;
     reconnectAttempts: number;
   }>({ connected: false, reconnectAttempts: 0 });
 
-  // Export report function
-  const exportReport = () => {
+  // Debounce refs
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastFetchTimeRef = useRef<number>(0);
+  const isFetchingRef = useRef<boolean>(false);
+  const isInitializedRef = useRef<boolean>(false);
+
+  // Memoized helper function to format month display
+  const formatMonthDisplay = useCallback((monthStr: string): string => {
+    try {
+      // Handle different month formats
+      if (!monthStr) return "N/A";
+
+      // If month is in YYYY-MM format, use it directly
+      if (/^\d{4}-\d{2}$/.test(monthStr)) {
+        const date = new Date(monthStr + "-01");
+        return date.toLocaleDateString("vi-VN", {
+          year: "numeric",
+          month: "long",
+        });
+      }
+
+      // If month is in MM/YYYY format, convert it
+      if (/^\d{1,2}\/\d{4}$/.test(monthStr)) {
+        const [month, year] = monthStr.split("/");
+        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+        return date.toLocaleDateString("vi-VN", {
+          year: "numeric",
+          month: "long",
+        });
+      }
+
+      // If month is just a number (1-12), assume current year
+      if (/^\d{1,2}$/.test(monthStr)) {
+        const currentYear = new Date().getFullYear();
+        const date = new Date(currentYear, parseInt(monthStr) - 1, 1);
+        return date.toLocaleDateString("vi-VN", {
+          year: "numeric",
+          month: "long",
+        });
+      }
+
+      // Fallback: try to parse as date
+      const date = new Date(monthStr);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString("vi-VN", {
+          year: "numeric",
+          month: "long",
+        });
+      }
+
+      // If all else fails, return the original string
+      return monthStr;
+    } catch (error) {
+      console.warn("Error parsing month:", monthStr, error);
+      return monthStr || "N/A";
+    }
+  }, []);
+
+  // Memoized export report function
+  const exportReport = useCallback(() => {
     if (!analyticsData) {
       alert("Không có dữ liệu để xuất báo cáo");
       return;
     }
 
-    const reportData = {
-      timestamp: new Date().toISOString(),
-      timeRange: selectedTimeRange,
-      data: analyticsData,
-    };
+    try {
+      // Create a new workbook
+      const workbook = XLSX.utils.book_new();
 
-    const dataStr = JSON.stringify(reportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(dataBlob);
+      // 1. Tổng quan dữ liệu
+      const overviewData = [
+        ["Tổng quan AI Analytics"],
+        ["Thời gian xuất báo cáo", new Date().toLocaleString("vi-VN")],
+        [
+          "Khoảng thời gian",
+          selectedTimeRange === "all" ? "Tất cả" : selectedTimeRange,
+        ],
+        ["Tổng số hội nghị", analyticsData.totalConferences],
+        ["Tổng số tham dự viên", analyticsData.totalAttendees],
+        ["Tổng số phiên", analyticsData.totalSessions],
+        ["Tổng số tương tác", analyticsData.totalInteractions],
+        ["Tỷ lệ tương tác trung bình", `${analyticsData.averageEngagement}%`],
+        [
+          "Mức độ hài lòng trung bình",
+          `${analyticsData.averageSatisfaction?.toFixed(2) || 0}/5`,
+        ],
+      ];
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `ai-analytics-report-${
-      new Date().toISOString().split("T")[0]
-    }.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+      const overviewSheet = XLSX.utils.aoa_to_sheet(overviewData);
+      XLSX.utils.book_append_sheet(workbook, overviewSheet, "Tổng quan");
 
-  // Helper function to get access token
-  const getAccessToken = (): string | null => {
+      // 2. Top hội nghị
+      if (analyticsData.topPerformingConferences?.length > 0) {
+        const topConferencesData = [
+          [
+            "ID",
+            "Tên hội nghị",
+            "Số tham dự viên",
+            "Tỷ lệ tương tác (%)",
+            "Mức độ hài lòng (/5)",
+            "Xu hướng",
+          ],
+          ...analyticsData.topPerformingConferences.map((conf) => [
+            conf.id,
+            conf.name,
+            conf.attendees,
+            conf.engagement,
+            conf.satisfaction?.toFixed(2) || 0,
+            conf.trend === "up"
+              ? "Tăng"
+              : conf.trend === "down"
+              ? "Giảm"
+              : "Ổn định",
+          ]),
+        ];
+
+        const topConferencesSheet = XLSX.utils.aoa_to_sheet(topConferencesData);
+        XLSX.utils.book_append_sheet(
+          workbook,
+          topConferencesSheet,
+          "Top hội nghị"
+        );
+      }
+
+      // 3. Xu hướng toàn cầu
+      if (analyticsData.globalTrends?.length > 0) {
+        const trendsData = [
+          ["Chỉ số", "Giá trị", "Thay đổi (%)", "Xu hướng"],
+          ...analyticsData.globalTrends.map((trend) => [
+            trend.metric,
+            trend.value,
+            trend.change,
+            trend.trend === "up"
+              ? "Tăng"
+              : trend.trend === "down"
+              ? "Giảm"
+              : "Ổn định",
+          ]),
+        ];
+
+        const trendsSheet = XLSX.utils.aoa_to_sheet(trendsData);
+        XLSX.utils.book_append_sheet(
+          workbook,
+          trendsSheet,
+          "Xu hướng toàn cầu"
+        );
+      }
+
+      // 4. Nhân khẩu học
+      if (analyticsData.demographics) {
+        // Nhóm tuổi
+        const ageGroupsData = [
+          ["Nhóm tuổi", "Số lượng", "Tỷ lệ (%)"],
+          ...analyticsData.demographics.ageGroups.map((age) => [
+            age.range,
+            age.count,
+            age.percentage,
+          ]),
+        ];
+
+        const ageGroupsSheet = XLSX.utils.aoa_to_sheet(ageGroupsData);
+        XLSX.utils.book_append_sheet(workbook, ageGroupsSheet, "Nhóm tuổi");
+
+        // Ngành nghề
+        const industriesData = [
+          ["Ngành nghề", "Số lượng", "Tỷ lệ (%)"],
+          ...analyticsData.demographics.industries.map((industry) => [
+            industry.industry,
+            industry.count,
+            industry.percentage,
+          ]),
+        ];
+
+        const industriesSheet = XLSX.utils.aoa_to_sheet(industriesData);
+        XLSX.utils.book_append_sheet(workbook, industriesSheet, "Ngành nghề");
+      }
+
+      // 5. Thống kê theo tháng
+      if (analyticsData.monthlyStats?.length > 0) {
+        const monthlyData = [
+          ["Tháng", "Số hội nghị", "Số tham dự viên", "Tỷ lệ tương tác (%)"],
+          ...analyticsData.monthlyStats.map((stat) => [
+            stat.month,
+            stat.conferences,
+            stat.attendees,
+            stat.engagement,
+          ]),
+        ];
+
+        const monthlySheet = XLSX.utils.aoa_to_sheet(monthlyData);
+        XLSX.utils.book_append_sheet(
+          workbook,
+          monthlySheet,
+          "Thống kê theo tháng"
+        );
+      }
+
+      // 6. AI Insights
+      if (analyticsData.aiInsights?.length > 0) {
+        const insightsData = [
+          ["Loại", "Tiêu đề", "Mô tả", "Độ tin cậy (%)", "Ưu tiên"],
+          ...analyticsData.aiInsights.map((insight) => [
+            insight.type === "trend"
+              ? "Xu hướng"
+              : insight.type === "recommendation"
+              ? "Khuyến nghị"
+              : insight.type === "alert"
+              ? "Cảnh báo"
+              : "Dự đoán",
+            insight.title,
+            insight.description,
+            insight.confidence,
+            insight.priority === "high"
+              ? "Cao"
+              : insight.priority === "medium"
+              ? "Trung bình"
+              : "Thấp",
+          ]),
+        ];
+
+        const insightsSheet = XLSX.utils.aoa_to_sheet(insightsData);
+        XLSX.utils.book_append_sheet(workbook, insightsSheet, "AI Insights");
+      }
+
+      // Export file
+      const fileName = `ai-analytics-report-${
+        new Date().toISOString().split("T")[0]
+      }.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    } catch (error) {
+      console.error("Lỗi khi xuất báo cáo Excel:", error);
+      alert("Có lỗi xảy ra khi xuất báo cáo. Vui lòng thử lại.");
+    }
+  }, [analyticsData, selectedTimeRange]);
+
+  // Memoized helper function to get access token
+  const getAccessToken = useCallback((): string | null => {
     if (typeof window === "undefined") return null;
 
     // Try multiple sources for token
@@ -164,78 +389,228 @@ export default function GlobalAIAnalyticsPage() {
 
     console.log("No valid token found in any source");
     return null;
-  };
+  }, []);
 
-  // Fetch data from API
-  const fetchAnalyticsData = async (timeRange?: string) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
-      const token = getAccessToken();
-      console.log(
-        "Token retrieved:",
-        token ? `${token.substring(0, 20)}...` : "null"
-      );
-
-      if (!token) {
-        throw new Error(
-          "Không tìm thấy token xác thực. Vui lòng đăng nhập lại để truy cập trang này."
-        );
+  // Memoized fetch data from API with debouncing
+  const fetchAnalyticsData = useCallback(
+    async (timeRange?: string, conferenceId?: number | null) => {
+      // Prevent duplicate calls
+      if (isFetchingRef.current) {
+        console.log("⏸️ Already fetching, skipping duplicate call");
+        return;
       }
 
-      // Build URL with time range parameter
-      const url = new URL(`${apiUrl}/analytics/global-ai`);
-      if (timeRange && timeRange !== "all") {
-        url.searchParams.append("timeRange", timeRange);
+      // Clear any existing timeout
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
       }
 
-      const response = await fetch(url.toString(), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      // Debounce rapid requests (minimum 300ms between requests)
+      const now = Date.now();
+      if (now - lastFetchTimeRef.current < 300) {
+        fetchTimeoutRef.current = setTimeout(() => {
+          fetchAnalyticsData(timeRange, conferenceId);
+        }, 300 - (now - lastFetchTimeRef.current));
+        return;
+      }
 
-      if (!response.ok) {
-        if (response.status === 401) {
+      lastFetchTimeRef.current = now;
+      isFetchingRef.current = true;
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        const apiUrl =
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
+        const token = getAccessToken();
+
+        if (!token) {
+          console.error("❌ No token found");
           throw new Error(
-            "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
-          );
-        } else if (response.status === 403) {
-          throw new Error("Bạn không có quyền truy cập trang này.");
-        } else if (response.status >= 500) {
-          throw new Error("Lỗi máy chủ. Vui lòng thử lại sau.");
-        } else {
-          throw new Error(
-            `Không thể tải dữ liệu: ${response.status} ${response.statusText}`
+            "Không tìm thấy token xác thực. Vui lòng đăng nhập lại để truy cập trang này."
           );
         }
-      }
 
-      const result = await response.json();
-      console.log("Analytics data received:", result);
+        // Build URL with time range and conference parameters
+        const url = new URL(`${apiUrl}/analytics/global-ai`);
+        if (timeRange && timeRange !== "all") {
+          url.searchParams.append("timeRange", timeRange);
+        }
+        if (conferenceId) {
+          url.searchParams.append("conferenceId", conferenceId.toString());
+        }
 
-      if (result.data) {
-        setAnalyticsData(result.data);
-      } else {
-        throw new Error("Định dạng dữ liệu không hợp lệ từ API");
+        console.log("🌐 Final API URL:", url.toString());
+        console.log(
+          "📊 Parameters - timeRange:",
+          timeRange,
+          "conferenceId:",
+          conferenceId
+        );
+
+        const response = await fetch(url.toString(), {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          console.error("❌ API Error:", response.status, response.statusText);
+          if (response.status === 401) {
+            throw new Error(
+              "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+            );
+          } else if (response.status === 403) {
+            throw new Error("Bạn không có quyền truy cập trang này.");
+          } else if (response.status >= 500) {
+            throw new Error("Lỗi máy chủ. Vui lòng thử lại sau.");
+          } else {
+            throw new Error(
+              `Không thể tải dữ liệu: ${response.status} ${response.statusText}`
+            );
+          }
+        }
+
+        const result = await response.json();
+        console.log("✅ Analytics data received:", result);
+        console.log("📊 TimeRange used:", timeRange || "all");
+
+        if (result.data) {
+          console.log("📈 Setting analytics data...");
+          setAnalyticsData(result.data);
+          setLastUpdated(new Date());
+          console.log("✅ Analytics data updated successfully");
+
+          // Debug monthly stats
+          if (result.data.monthlyStats) {
+            console.log("📅 Monthly stats received:", result.data.monthlyStats);
+            result.data.monthlyStats.forEach((stat: any, index: number) => {
+              console.log(`📊 Month ${index + 1}:`, {
+                month: stat.month,
+                formatted: formatMonthDisplay(stat.month),
+                conferences: stat.conferences,
+                attendees: stat.attendees,
+                engagement: stat.engagement,
+              });
+            });
+          }
+        } else {
+          console.error("❌ No data in API response:", result);
+          throw new Error("Định dạng dữ liệu không hợp lệ từ API");
+        }
+      } catch (error) {
+        console.error("❌ Error fetching analytics data:", error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Có lỗi xảy ra khi tải dữ liệu"
+        );
+        setAnalyticsData(null);
+      } finally {
+        console.log("🏁 API request completed, setting loading to false");
+        setIsLoading(false);
+        isFetchingRef.current = false;
       }
-    } catch (error) {
-      console.error("Error fetching analytics data:", error);
-      setError(
-        error instanceof Error ? error.message : "Có lỗi xảy ra khi tải dữ liệu"
+    },
+    [getAccessToken, formatMonthDisplay]
+  );
+
+  // Memoized WebSocket event handlers
+  const handleWebSocketConnect = useCallback(() => {
+    console.log("WebSocket connected in AI analytics page");
+    const status = websocketService.getConnectionStatus();
+    setWebsocketStatus(status);
+  }, []);
+
+  const handleWebSocketDisconnect = useCallback(() => {
+    console.log("WebSocket disconnected in AI analytics page");
+    const status = websocketService.getConnectionStatus();
+    setWebsocketStatus(status);
+  }, []);
+
+  const handleWebSocketError = useCallback((event: Event) => {
+    const customEvent = event as CustomEvent;
+    console.error("WebSocket error in AI analytics page:", customEvent.detail);
+    const status = websocketService.getConnectionStatus();
+    setWebsocketStatus(status);
+  }, []);
+
+  const handleAnalyticsUpdate = useCallback(
+    (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log("Analytics data updated via WebSocket:", customEvent.detail);
+
+      // Refresh analytics data when updates are received
+      if (customEvent.detail?.type === "analytics_update") {
+        setIsRealTimeUpdating(true);
+        fetchAnalyticsData(selectedTimeRange, selectedConference).finally(
+          () => {
+            setIsRealTimeUpdating(false);
+          }
+        );
+      }
+    },
+    [fetchAnalyticsData, selectedTimeRange]
+  );
+
+  const handleConferenceUpdate = useCallback(
+    (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log(
+        "Conference updated, refreshing analytics:",
+        customEvent.detail
       );
-      setAnalyticsData(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
+      // Refresh analytics data when conference data changes
+      if (
+        customEvent.detail?.type === "conference_update" ||
+        customEvent.detail?.type === "registration_update" ||
+        customEvent.detail?.type === "checkin_update"
+      ) {
+        setIsRealTimeUpdating(true);
+        fetchAnalyticsData(selectedTimeRange, selectedConference).finally(
+          () => {
+            setIsRealTimeUpdating(false);
+          }
+        );
+      }
+    },
+    [fetchAnalyticsData, selectedTimeRange]
+  );
+
+  // Initial data fetch effect
   useEffect(() => {
-    fetchAnalyticsData();
+    if (!isInitializedRef.current) {
+      console.log("🎯 useEffect triggered - calling fetchAnalyticsData");
+      isInitializedRef.current = true;
+      fetchAnalyticsData(selectedTimeRange, selectedConference);
+    }
 
+    // Cleanup timeout on unmount
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      // Reset fetching flag
+      isFetchingRef.current = false;
+    };
+  }, []); // Empty dependency array - only run once on mount
+
+  // Effect to refetch data when selectedTimeRange changes (selectedConference is handled in onChange)
+  useEffect(() => {
+    if (isInitializedRef.current) {
+      console.log(
+        "📅 selectedTimeRange changed, refetching data:",
+        selectedTimeRange
+      );
+      fetchAnalyticsData(selectedTimeRange, selectedConference);
+    }
+  }, [selectedTimeRange, fetchAnalyticsData]);
+
+  // WebSocket setup effect
+  useEffect(() => {
     // Check WebSocket connection status
     const checkWebSocketStatus = () => {
       const status = websocketService.getConnectionStatus();
@@ -245,28 +620,8 @@ export default function GlobalAIAnalyticsPage() {
     // Initial check
     checkWebSocketStatus();
 
-    // Set up periodic status checks
-    const statusInterval = setInterval(checkWebSocketStatus, 5000);
-
-    // Listen for WebSocket events
-    const handleWebSocketConnect = () => {
-      console.log("WebSocket connected in AI analytics page");
-      checkWebSocketStatus();
-    };
-
-    const handleWebSocketDisconnect = () => {
-      console.log("WebSocket disconnected in AI analytics page");
-      checkWebSocketStatus();
-    };
-
-    const handleWebSocketError = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      console.error(
-        "WebSocket error in AI analytics page:",
-        customEvent.detail
-      );
-      checkWebSocketStatus();
-    };
+    // Set up periodic status checks (reduced frequency)
+    const statusInterval = setInterval(checkWebSocketStatus, 10000); // Changed from 5000 to 10000
 
     // Add event listeners
     window.addEventListener("websocket-connected", handleWebSocketConnect);
@@ -275,6 +630,8 @@ export default function GlobalAIAnalyticsPage() {
       handleWebSocketDisconnect
     );
     window.addEventListener("websocket-error", handleWebSocketError);
+    window.addEventListener("analytics-update", handleAnalyticsUpdate);
+    window.addEventListener("conference-update", handleConferenceUpdate);
 
     return () => {
       clearInterval(statusInterval);
@@ -284,11 +641,67 @@ export default function GlobalAIAnalyticsPage() {
         handleWebSocketDisconnect
       );
       window.removeEventListener("websocket-error", handleWebSocketError);
+      window.removeEventListener("analytics-update", handleAnalyticsUpdate);
+      window.removeEventListener("conference-update", handleConferenceUpdate);
     };
-  }, []);
+  }, [
+    handleWebSocketConnect,
+    handleWebSocketDisconnect,
+    handleWebSocketError,
+    handleAnalyticsUpdate,
+    handleConferenceUpdate,
+  ]);
+
+  // Memoized user data - MUST be called before any conditional returns
+  const userRole = useMemo(
+    () => (user?.role as "admin" | "staff" | "attendee") || "attendee",
+    [user?.role]
+  );
+  const userName = useMemo(() => user?.name || "Người dùng", [user?.name]);
+  const userAvatar = useMemo(() => user?.avatar, [user?.avatar]);
+
+  // Memoized average confidence calculation
+  const averageConfidence = useMemo(() => {
+    if (!analyticsData) return 0;
+    const allInsights = [
+      ...(analyticsData.aiInsights || []),
+      ...(analyticsData.chatGPTInsights?.insights || []),
+    ];
+    if (allInsights.length === 0) return 0;
+    const totalConfidence = allInsights.reduce(
+      (sum, insight) => sum + insight.confidence,
+      0
+    );
+    return Math.round(totalConfidence / allInsights.length);
+  }, [analyticsData?.aiInsights, analyticsData?.chatGPTInsights?.insights]);
+
+  // Memoized monthly stats for display
+  const monthlyStatsDisplay = useMemo(() => {
+    if (!analyticsData?.monthlyStats) return [];
+    return analyticsData.monthlyStats
+      .filter((stat) => stat && stat.month) // Filter out invalid entries
+      .slice(0, 6)
+      .map((stat, index) => ({
+        ...stat,
+        index,
+      }));
+  }, [analyticsData?.monthlyStats, formatMonthDisplay]);
+
+  // Memoized time range options to prevent re-creation
+  const timeRangeOptions = useMemo(
+    () => [
+      { value: "week", label: "Tuần này", icon: "📅" },
+      { value: "month", label: "Tháng này", icon: "📊" },
+      { value: "quarter", label: "Quý này", icon: "📈" },
+      { value: "year", label: "Năm này", icon: "🗓️" },
+      { value: "all", label: "Tất cả", icon: "🌐" },
+    ],
+    []
+  );
 
   // Show loading state while auth is loading
   if (authLoading) {
+    console.log("🔄 Auth loading...");
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -298,6 +711,7 @@ export default function GlobalAIAnalyticsPage() {
 
   // Show not authenticated state
   if (!isAuthenticated || !user) {
+    console.log("❌ Not authenticated or no user");
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full">
@@ -316,12 +730,8 @@ export default function GlobalAIAnalyticsPage() {
     );
   }
 
-  // Check if user is admin
-  const userRole = (user.role as "admin" | "staff" | "attendee") || "attendee";
-  const userName = user.name || "Người dùng";
-  const userAvatar = user.avatar;
-
   if (userRole !== "admin") {
+    console.log("🚫 User is not admin, role:", userRole);
     return (
       <MainLayout
         userRole={userRole}
@@ -387,8 +797,11 @@ export default function GlobalAIAnalyticsPage() {
 
   return (
     <MainLayout userRole={userRole} userName={userName} userAvatar={userAvatar}>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-        <div className="space-y-8 p-6">
+      <div
+        className="w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6"
+        style={{ minHeight: "100vh", overflowY: "auto", position: "relative" }}
+      >
+        <div className="space-y-8">
           {/* Header with Gradient */}
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 p-8 text-white shadow-2xl">
             <div className="absolute inset-0 bg-black/10"></div>
@@ -420,6 +833,20 @@ export default function GlobalAIAnalyticsPage() {
                             : "Mất kết nối WebSocket"}
                         </span>
                       </div>
+                      {isRealTimeUpdating && (
+                        <div className="flex items-center space-x-2 rounded-full bg-blue-500/20 px-4 py-2 backdrop-blur-sm">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400"></div>
+                          <span className="text-sm font-medium text-blue-100">
+                            Đang cập nhật real-time...
+                          </span>
+                        </div>
+                      )}
+                      {lastUpdated && (
+                        <div className="text-xs text-blue-100/80">
+                          Cập nhật lần cuối:{" "}
+                          {lastUpdated.toLocaleTimeString("vi-VN")}
+                        </div>
+                      )}
                       {!websocketStatus.connected && (
                         <Button
                           variant="secondary"
@@ -436,15 +863,6 @@ export default function GlobalAIAnalyticsPage() {
                 <div className="flex space-x-3">
                   <Button
                     variant="secondary"
-                    disabled={isLoading}
-                    onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-                    className="bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm border-white/30"
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    {showAdvancedFilter ? "Ẩn bộ lọc" : "Bộ lọc"}
-                  </Button>
-                  <Button
-                    variant="secondary"
                     disabled={isLoading || !analyticsData}
                     onClick={exportReport}
                     className="bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm border-white/30"
@@ -453,7 +871,9 @@ export default function GlobalAIAnalyticsPage() {
                     Xuất báo cáo
                   </Button>
                   <Button
-                    onClick={() => fetchAnalyticsData(selectedTimeRange)}
+                    onClick={() =>
+                      fetchAnalyticsData(selectedTimeRange, selectedConference)
+                    }
                     disabled={isLoading}
                     className="bg-white text-blue-600 hover:bg-blue-50 font-semibold shadow-lg"
                   >
@@ -472,138 +892,19 @@ export default function GlobalAIAnalyticsPage() {
             <div className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-white/5"></div>
           </div>
 
-          {/* Advanced Filter Panel */}
-          {showAdvancedFilter && (
-            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Filter className="h-5 w-5 text-blue-600" />
-                  <span>Bộ lọc nâng cao</span>
-                </CardTitle>
-                <CardDescription>
-                  Tùy chỉnh các tham số để lọc dữ liệu phân tích
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Khoảng thời gian
-                    </label>
-                    <select
-                      value={selectedTimeRange}
-                      onChange={(e) => {
-                        setSelectedTimeRange(e.target.value);
-                        fetchAnalyticsData(e.target.value);
-                      }}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="all">Tất cả thời gian</option>
-                      <option value="week">Tuần này</option>
-                      <option value="month">Tháng này</option>
-                      <option value="quarter">Quý này</option>
-                      <option value="year">Năm này</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Hội nghị cụ thể
-                    </label>
-                    <select
-                      value={selectedConference || ""}
-                      onChange={(e) =>
-                        setSelectedConference(
-                          e.target.value ? Number(e.target.value) : null
-                        )
-                      }
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Tất cả hội nghị</option>
-                      {analyticsData?.topPerformingConferences?.map((conf) => (
-                        <option key={conf.id} value={conf.id}>
-                          {conf.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex items-end">
-                    <Button
-                      onClick={() => {
-                        setSelectedTimeRange("all");
-                        setSelectedConference(null);
-                        fetchAnalyticsData("all");
-                      }}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Đặt lại
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Loading State */}
-          {isLoading && (
-            <div className="space-y-6">
-              <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
-                <CardContent className="p-12">
-                  <div className="flex flex-col items-center justify-center space-y-6">
-                    <div className="relative">
-                      <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200"></div>
-                      <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-600 border-t-transparent absolute top-0 left-0"></div>
-                    </div>
-                    <div className="text-center">
-                      <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                        Đang phân tích dữ liệu AI
-                      </h3>
-                      <p className="text-gray-600">
-                        Hệ thống đang xử lý và phân tích dữ liệu từ các hội
-                        nghị...
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Skeleton Loaders */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[1, 2, 3, 4].map((i) => (
-                  <Card
-                    key={i}
-                    className="border-0 shadow-lg bg-white/60 backdrop-blur-sm"
-                  >
-                    <CardContent className="p-6">
-                      <div className="animate-pulse">
-                        <div className="flex items-center space-x-3 mb-4">
-                          <div className="h-10 w-10 bg-gray-300 rounded-lg"></div>
-                          <div className="space-y-2">
-                            <div className="h-4 bg-gray-300 rounded w-20"></div>
-                            <div className="h-6 bg-gray-300 rounded w-16"></div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
+          {isLoading && <AILoadingSkeleton />}
 
           {/* Show data only when not loading and data is available */}
           {!isLoading && analyticsData && (
             <>
               {/* Time Range Selector */}
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <Card className="border-0 shadow-lg bg-white">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className="rounded-lg bg-blue-100 p-2">
-                        <Filter className="h-5 w-5 text-blue-600" />
+                        <BarChart3 className="h-5 w-5 text-blue-600" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-800">
@@ -612,15 +913,38 @@ export default function GlobalAIAnalyticsPage() {
                         <p className="text-sm text-gray-600">
                           Chọn khoảng thời gian để xem dữ liệu
                         </p>
+                        <div className="mt-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {isLoading ? (
+                              <>
+                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
+                                Đang tải...
+                              </>
+                            ) : (
+                              <>
+                                Hiện tại:{" "}
+                                {selectedTimeRange === "all"
+                                  ? "Tất cả"
+                                  : selectedTimeRange === "week"
+                                  ? "Tuần này"
+                                  : selectedTimeRange === "month"
+                                  ? "Tháng này"
+                                  : selectedTimeRange === "quarter"
+                                  ? "Quý này"
+                                  : selectedTimeRange === "year"
+                                  ? "Năm này"
+                                  : selectedTimeRange}
+                              </>
+                            )}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex space-x-2">
-                      {[
-                        { value: "week", label: "Tuần này", icon: "📅" },
-                        { value: "month", label: "Tháng này", icon: "📊" },
-                        { value: "quarter", label: "Quý này", icon: "📈" },
-                        { value: "all", label: "Tất cả", icon: "🌐" },
-                      ].map((option) => (
+                    <div
+                      className="flex flex-wrap gap-2"
+                      style={{ position: "relative", zIndex: 10 }}
+                    >
+                      {timeRangeOptions.map((option) => (
                         <Button
                           key={option.value}
                           variant={
@@ -629,15 +953,29 @@ export default function GlobalAIAnalyticsPage() {
                               : "outline"
                           }
                           size="sm"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isLoading) return;
                             setSelectedTimeRange(option.value);
-                            fetchAnalyticsData(option.value);
+                            fetchAnalyticsData(
+                              option.value,
+                              selectedConference
+                            );
                           }}
                           className={`transition-all duration-200 ${
                             selectedTimeRange === option.value
                               ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
                               : "hover:bg-blue-50 hover:border-blue-300"
+                          } ${
+                            isLoading ? "opacity-50 cursor-not-allowed" : ""
                           }`}
+                          style={{
+                            pointerEvents: "auto",
+                            position: "relative",
+                            zIndex: 1000,
+                            cursor: "pointer",
+                          }}
                         >
                           <span className="mr-2">{option.icon}</span>
                           {option.label}
@@ -742,11 +1080,59 @@ export default function GlobalAIAnalyticsPage() {
                 isLoading={false}
               />
 
+              {/* AI Connection Status */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <AIStatsCard
+                    totalInsights={
+                      (analyticsData.aiInsights || []).length +
+                      (analyticsData.chatGPTInsights?.insights || []).length
+                    }
+                    highPriorityInsights={
+                      (analyticsData.aiInsights || []).filter(
+                        (insight) => insight.priority === "high"
+                      ).length +
+                      (analyticsData.chatGPTInsights?.insights || []).filter(
+                        (insight) => insight.priority === "high"
+                      ).length
+                    }
+                    averageConfidence={averageConfidence}
+                    lastUpdated={lastUpdated || new Date()}
+                    isLoading={false}
+                  />
+                </div>
+                <div>
+                  <AIConnectionStatus
+                    isConnected={true}
+                    isAnalyzing={isLoading}
+                    lastAnalysisTime={lastUpdated || undefined}
+                    onRetry={() =>
+                      fetchAnalyticsData(selectedTimeRange, selectedConference)
+                    }
+                  />
+                </div>
+              </div>
+
               {/* AI Insights */}
               <GlobalAIInsights
                 insights={analyticsData.aiInsights || []}
                 isLoading={false}
               />
+
+              {/* ChatGPT Insights */}
+              {analyticsData.chatGPTInsights && (
+                <ChatGPTInsights
+                  insights={analyticsData.chatGPTInsights.insights || []}
+                  summary={analyticsData.chatGPTInsights.summary || ""}
+                  recommendations={
+                    analyticsData.chatGPTInsights.recommendations || []
+                  }
+                  isLoading={false}
+                  onRefresh={() =>
+                    fetchAnalyticsData(selectedTimeRange, selectedConference)
+                  }
+                />
+              )}
 
               {/* Top Performing Conferences */}
               <TopConferences
@@ -788,66 +1174,59 @@ export default function GlobalAIAnalyticsPage() {
                   analyticsData.monthlyStats.length > 0 ? (
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {analyticsData.monthlyStats
-                          .slice(0, 6)
-                          .map((stat, index) => (
-                            <div
-                              key={stat.month}
-                              className="group relative overflow-hidden rounded-xl border-0 bg-gradient-to-br from-white to-gray-50 p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-                            >
-                              <div className="absolute top-0 right-0 h-20 w-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full -translate-y-10 translate-x-10"></div>
-                              <div className="relative z-10">
-                                <div className="flex items-center justify-between mb-4">
-                                  <div className="text-sm font-semibold text-gray-600">
-                                    {new Date(
-                                      stat.month + "-01"
-                                    ).toLocaleDateString("vi-VN", {
-                                      year: "numeric",
-                                      month: "long",
-                                    })}
-                                  </div>
-                                  <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                                    #{index + 1}
-                                  </div>
+                        {monthlyStatsDisplay.map((stat) => (
+                          <div
+                            key={stat.month}
+                            className="group relative overflow-hidden rounded-xl border-0 bg-gradient-to-br from-white to-gray-50 p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                          >
+                            <div className="absolute top-0 right-0 h-20 w-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full -translate-y-10 translate-x-10"></div>
+                            <div className="relative z-10">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="text-sm font-semibold text-gray-600">
+                                  {formatMonthDisplay(stat.month)}
                                 </div>
-                                <div className="space-y-3">
-                                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                                    <div className="flex items-center space-x-2">
-                                      <Building className="h-4 w-4 text-blue-600" />
-                                      <span className="text-sm font-medium text-blue-800">
-                                        Hội nghị
-                                      </span>
-                                    </div>
-                                    <span className="text-lg font-bold text-blue-900">
-                                      {stat.conferences}
+                                <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                                  #{stat.index + 1}
+                                </div>
+                              </div>
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                                  <div className="flex items-center space-x-2">
+                                    <Building className="h-4 w-4 text-blue-600" />
+                                    <span className="text-sm font-medium text-blue-800">
+                                      Hội nghị
                                     </span>
                                   </div>
-                                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                                    <div className="flex items-center space-x-2">
-                                      <Users className="h-4 w-4 text-green-600" />
-                                      <span className="text-sm font-medium text-green-800">
-                                        Tham dự viên
-                                      </span>
-                                    </div>
-                                    <span className="text-lg font-bold text-green-900">
-                                      {stat.attendees}
+                                  <span className="text-lg font-bold text-blue-900">
+                                    {stat.conferences || 0}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                                  <div className="flex items-center space-x-2">
+                                    <Users className="h-4 w-4 text-green-600" />
+                                    <span className="text-sm font-medium text-green-800">
+                                      Tham dự viên
                                     </span>
                                   </div>
-                                  <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                                    <div className="flex items-center space-x-2">
-                                      <Eye className="h-4 w-4 text-purple-600" />
-                                      <span className="text-sm font-medium text-purple-800">
-                                        Tương tác
-                                      </span>
-                                    </div>
-                                    <span className="text-lg font-bold text-purple-900">
-                                      {stat.engagement}%
+                                  <span className="text-lg font-bold text-green-900">
+                                    {(stat.attendees || 0).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                                  <div className="flex items-center space-x-2">
+                                    <Eye className="h-4 w-4 text-purple-600" />
+                                    <span className="text-sm font-medium text-purple-800">
+                                      Tương tác
                                     </span>
                                   </div>
+                                  <span className="text-lg font-bold text-purple-900">
+                                    {(stat.engagement || 0).toFixed(1)}%
+                                  </span>
                                 </div>
                               </div>
                             </div>
-                          ))}
+                          </div>
+                        ))}
                       </div>
                       {analyticsData.monthlyStats.length > 6 && (
                         <div className="text-center">

@@ -51,8 +51,11 @@ class WebSocketService {
 
         // Try to refresh token if no valid token is found
         if (!this.hasAttemptedTokenRefresh) {
+          console.log("No valid token found, attempting token refresh...");
           const refreshSuccess = await this.attemptTokenRefresh();
           if (refreshSuccess) {
+            // Wait a bit for token to be properly set
+            await new Promise((resolve) => setTimeout(resolve, 200));
             token = this.getToken();
             if (!token) {
               console.error(
@@ -60,6 +63,10 @@ class WebSocketService {
               );
               this.isConnecting = false;
               return;
+            } else {
+              console.log(
+                "Token refresh successful, proceeding with connection"
+              );
             }
           } else {
             console.error(
@@ -501,7 +508,16 @@ class WebSocketService {
     if (typeof window !== "undefined") {
       // Try multiple sources for token (consistent with API client)
       const sources = [
-        // 1. Try cookies first
+        // 1. Try localStorage accessToken first (most reliable)
+        () => {
+          const token = localStorage.getItem("accessToken");
+          console.log(
+            "localStorage accessToken:",
+            token ? "exists" : "missing"
+          );
+          return token;
+        },
+        // 2. Try cookies
         () => {
           const cookies = document.cookie.split(";");
           const tokenCookie = cookies.find((cookie) =>
@@ -509,6 +525,7 @@ class WebSocketService {
           );
           if (tokenCookie) {
             const token = tokenCookie.split("=")[1];
+            console.log("Cookie accessToken:", token ? "exists" : "missing");
             // Only URL decode if the token appears to be URL encoded
             try {
               if (token.includes("%")) {
@@ -522,13 +539,29 @@ class WebSocketService {
           }
           return null;
         },
-        // 2. Try localStorage accessToken
-        () => localStorage.getItem("accessToken"),
         // 3. Try localStorage token (legacy)
-        () => localStorage.getItem("token"),
+        () => {
+          const token = localStorage.getItem("token");
+          console.log(
+            "localStorage token (legacy):",
+            token ? "exists" : "missing"
+          );
+          return token;
+        },
         // 4. Try sessionStorage
-        () => sessionStorage.getItem("accessToken"),
-        () => sessionStorage.getItem("token"),
+        () => {
+          const token = sessionStorage.getItem("accessToken");
+          console.log(
+            "sessionStorage accessToken:",
+            token ? "exists" : "missing"
+          );
+          return token;
+        },
+        () => {
+          const token = sessionStorage.getItem("token");
+          console.log("sessionStorage token:", token ? "exists" : "missing");
+          return token;
+        },
       ];
 
       for (const source of sources) {
@@ -721,8 +754,27 @@ class WebSocketService {
         // Update tokens in localStorage and cookies
         this.setToken(result.data.accessToken);
         this.setRefreshToken(result.data.refreshToken);
-        console.log("Token refresh successful");
-        return true;
+
+        // Add a small delay to ensure cookies are set
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Verify token was set correctly
+        const newToken = this.getToken();
+        if (newToken) {
+          console.log("Token refresh successful, new token verified");
+          return true;
+        } else {
+          console.error(
+            "Token refresh succeeded but token not found after setting"
+          );
+          // Try to get token from localStorage as fallback
+          const fallbackToken = localStorage.getItem("accessToken");
+          if (fallbackToken && this.isValidTokenFormat(fallbackToken)) {
+            console.log("Using fallback token from localStorage");
+            return true;
+          }
+          return false;
+        }
       }
       return false;
     } catch (error) {
@@ -778,12 +830,25 @@ class WebSocketService {
 
   private setToken(token: string): void {
     if (typeof window !== "undefined") {
+      console.log("Setting new access token...");
+
+      // Set localStorage first (most reliable)
+      localStorage.setItem("accessToken", token);
+      console.log("Token saved to localStorage");
+
       // Set cookie with 7 days expiration
       const expires = new Date();
       expires.setDate(expires.getDate() + 7);
       document.cookie = `accessToken=${token}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
-      // Also keep in localStorage as backup
-      localStorage.setItem("accessToken", token);
+      console.log("Token saved to cookie");
+
+      // Verify token was set correctly
+      const verifyToken = localStorage.getItem("accessToken");
+      if (verifyToken === token) {
+        console.log("Token verification successful");
+      } else {
+        console.error("Token verification failed");
+      }
     }
   }
 

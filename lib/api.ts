@@ -2520,6 +2520,47 @@ class ApiClient {
     return path;
   }
 
+  // Conference Registration API methods
+  async registerForConference(
+    conferenceId: number
+  ): Promise<{ data: { id: number } }> {
+    const response = await this.request<{ id: number }>(
+      `/conference-registrations/${conferenceId}/register`,
+      {
+        method: "POST",
+      }
+    );
+    return { data: response.data };
+  }
+
+  async unregisterFromConference(conferenceId: number): Promise<void> {
+    await this.request(`/conference-registrations/${conferenceId}/unregister`, {
+      method: "DELETE",
+    });
+  }
+
+  async checkRegistrationStatus(
+    conferenceId: number
+  ): Promise<{ data: { isRegistered: boolean; assignment?: any } }> {
+    const response = await this.request<{
+      isRegistered: boolean;
+      assignment?: any;
+    }>(`/conference-registrations/${conferenceId}/status`, {
+      method: "GET",
+    });
+    return { data: response.data };
+  }
+
+  async getMyRegistrations(): Promise<{ data: any[] }> {
+    const response = await this.request<any[]>(
+      "/conference-registrations/my-registrations",
+      {
+        method: "GET",
+      }
+    );
+    return { data: response.data };
+  }
+
   // Messaging API methods
   async getOrCreateConversationSession(
     conferenceId: number,

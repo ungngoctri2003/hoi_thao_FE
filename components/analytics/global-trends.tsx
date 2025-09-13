@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { memo, useCallback } from "react";
 
 interface GlobalTrend {
   metric: string;
@@ -21,8 +22,11 @@ interface GlobalTrendsProps {
   isLoading: boolean;
 }
 
-export function GlobalTrends({ trends, isLoading }: GlobalTrendsProps) {
-  const getTrendIcon = (trend: string) => {
+const GlobalTrends = memo(function GlobalTrends({
+  trends,
+  isLoading,
+}: GlobalTrendsProps) {
+  const getTrendIcon = useCallback((trend: string) => {
     switch (trend) {
       case "up":
         return <TrendingUp className="h-5 w-5 text-green-600" />;
@@ -31,9 +35,9 @@ export function GlobalTrends({ trends, isLoading }: GlobalTrendsProps) {
       default:
         return <Minus className="h-5 w-5 text-gray-500" />;
     }
-  };
+  }, []);
 
-  const getTrendColor = (trend: string) => {
+  const getTrendColor = useCallback((trend: string) => {
     switch (trend) {
       case "up":
         return "from-green-50 to-green-100 border-green-200";
@@ -42,7 +46,7 @@ export function GlobalTrends({ trends, isLoading }: GlobalTrendsProps) {
       default:
         return "from-gray-50 to-gray-100 border-gray-200";
     }
-  };
+  }, []);
 
   return (
     <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
@@ -126,4 +130,6 @@ export function GlobalTrends({ trends, isLoading }: GlobalTrendsProps) {
       </CardContent>
     </Card>
   );
-}
+});
+
+export { GlobalTrends };

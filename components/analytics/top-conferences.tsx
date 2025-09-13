@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
+import { memo, useCallback } from "react";
 
 interface TopConference {
   id: number;
@@ -23,11 +24,11 @@ interface TopConferencesProps {
   isLoading: boolean;
 }
 
-export function TopConferences({
+const TopConferences = memo(function TopConferences({
   conferences,
   isLoading,
 }: TopConferencesProps) {
-  const getTrendIcon = (trend: string) => {
+  const getTrendIcon = useCallback((trend: string) => {
     switch (trend) {
       case "up":
         return <TrendingUp className="h-4 w-4 text-green-600" />;
@@ -36,7 +37,7 @@ export function TopConferences({
       default:
         return <div className="h-4 w-4 bg-gray-400 rounded-full" />;
     }
-  };
+  }, []);
 
   return (
     <Card>
@@ -81,4 +82,6 @@ export function TopConferences({
       </CardContent>
     </Card>
   );
-}
+});
+
+export { TopConferences };

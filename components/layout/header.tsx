@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Search, User, LogOut, Moon, Sun } from "lucide-react";
+import { Search, User, LogOut, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -26,26 +26,26 @@ interface HeaderProps {
   userAvatar?: string;
 }
 
-const fakeNotifications = [
-  {
-    id: 1,
-    title: "Bạn đã nhận được huy hiệu mới!",
-    description: "Chúc mừng bạn đã đạt huy hiệu 'Tham dự tích cực'.",
-    time: "2 phút trước",
-  },
-  {
-    id: 2,
-    title: "Có phiên họp sắp bắt đầu",
-    description: "Phiên 'AI trong tương lai' sẽ bắt đầu sau 10 phút.",
-    time: "10 phút trước",
-  },
-  {
-    id: 3,
-    title: "Cập nhật hệ thống",
-    description: "Hệ thống sẽ bảo trì vào lúc 22:00 hôm nay.",
-    time: "1 giờ trước",
-  },
-];
+// const fakeNotifications = [
+//   {
+//     id: 1,
+//     title: "Bạn đã nhận được huy hiệu mới!",
+//     description: "Chúc mừng bạn đã đạt huy hiệu 'Tham dự tích cực'.",
+//     time: "2 phút trước",
+//   },
+//   {
+//     id: 2,
+//     title: "Có phiên họp sắp bắt đầu",
+//     description: "Phiên 'AI trong tương lai' sẽ bắt đầu sau 10 phút.",
+//     time: "10 phút trước",
+//   },
+//   {
+//     id: 3,
+//     title: "Cập nhật hệ thống",
+//     description: "Hệ thống sẽ bảo trì vào lúc 22:00 hôm nay.",
+//     time: "1 giờ trước",
+//   },
+// ];
 
 export function Header({ userName, userRole, userAvatar }: HeaderProps) {
   const { theme, setTheme } = useTheme();
@@ -61,12 +61,12 @@ export function Header({ userName, userRole, userAvatar }: HeaderProps) {
       await firebaseLogout();
       // Firebase logout will handle the redirect, so we don't need router.push here
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
       // Fallback: if Firebase logout fails, use app logout
       try {
         await logout();
       } catch (appLogoutError) {
-        console.error('App logout also failed:', appLogoutError);
+        console.error("App logout also failed:", appLogoutError);
         // Final fallback: redirect manually
         router.push("/login");
       }
@@ -107,8 +107,8 @@ export function Header({ userName, userRole, userAvatar }: HeaderProps) {
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
         </Button>
 
-        {/* Notifications */}
-        <DropdownMenu>
+        {/* Notifications - Hidden for now */}
+        {/* <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -151,7 +151,7 @@ export function Header({ userName, userRole, userAvatar }: HeaderProps) {
               </div>
             )}
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu> */}
 
         {/* User Menu */}
         <DropdownMenu>
@@ -184,10 +184,10 @@ export function Header({ userName, userRole, userAvatar }: HeaderProps) {
                     ? "Nhân viên"
                     : "Tham dự"}
                 </p>
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className={`text-xs ${
-                    userRole === "admin" 
+                    userRole === "admin"
                       ? "border-red-200 text-red-700 bg-red-50 dark:border-red-800 dark:text-red-300 dark:bg-red-950"
                       : userRole === "staff"
                       ? "border-blue-200 text-blue-700 bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:bg-blue-950"
@@ -206,8 +206,8 @@ export function Header({ userName, userRole, userAvatar }: HeaderProps) {
               </a>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="text-red-600" 
+            <DropdownMenuItem
+              className="text-red-600"
               onSelect={handleLogout}
               disabled={isLoggingOut || isLoading}
             >

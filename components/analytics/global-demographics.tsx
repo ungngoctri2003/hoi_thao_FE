@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { memo } from "react";
 
 interface DemographicsData {
   ageGroups: Array<{
@@ -26,7 +27,7 @@ interface GlobalDemographicsProps {
   isLoading: boolean;
 }
 
-export function GlobalDemographics({
+const GlobalDemographics = memo(function GlobalDemographics({
   demographics,
   isLoading,
 }: GlobalDemographicsProps) {
@@ -161,4 +162,6 @@ export function GlobalDemographics({
       </Card>
     </div>
   );
-}
+});
+
+export { GlobalDemographics };

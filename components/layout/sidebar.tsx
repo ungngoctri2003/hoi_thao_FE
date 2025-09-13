@@ -164,6 +164,14 @@ const getNavigationItems = (
       return true;
     }
 
+    // Special handling for my-events - it's a general feature, not conference-specific
+    if (item.href === "/my-events") {
+      console.log("My Events item check:", { hasBasicPermission, userRole });
+      // All roles (admin, staff, attendee) should have my-events.view permission
+      // If permission check fails, still show it as it's a core feature
+      return true;
+    }
+
     // For admin and staff, show all basic permissions even without conference assignments
     if (userRole === "admin" || userRole === "staff") {
       // For conference-specific features, check if user has basic permission OR conference permission
@@ -174,7 +182,6 @@ const getNavigationItems = (
         "/sessions",
         "/badges",
         "/analytics",
-        "/my-events",
       ];
 
       if (conferenceSpecificFeatures.includes(item.href)) {
@@ -198,7 +205,6 @@ const getNavigationItems = (
       "/sessions",
       "/badges",
       "/analytics",
-      "/my-events",
     ];
 
     if (conferenceSpecificFeatures.includes(item.href)) {
