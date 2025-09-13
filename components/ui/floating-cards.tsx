@@ -8,6 +8,7 @@ import {
   Smartphone,
   Calendar,
   ArrowUpRight,
+  User,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -31,10 +32,10 @@ const quickAccessItems = [
     hoverColor: "hover:from-blue-600 hover:to-cyan-600",
   },
   {
-    href: "/mobile-public",
-    icon: Smartphone,
-    title: "Ứng dụng di động",
-    description: "Tải ứng dụng di động cho trải nghiệm tốt nhất",
+    href: "/register-attendee",
+    icon: User,
+    title: "Đăng ký miễn phí",
+    description: "Đăng ký miễn phí để trải nghiệm tốt nhất",
     color: "from-purple-500 to-pink-500",
     bgColor: "bg-purple-50 dark:bg-purple-950/20",
     hoverColor: "hover:from-purple-600 hover:to-pink-600",
