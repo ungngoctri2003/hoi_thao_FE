@@ -133,12 +133,7 @@ function getPermissionName(code: string): string {
     "audit.view": "Xem Nhật ký",
     "settings.manage": "Quản lý Cài đặt",
     "analytics.view": "Xem Phân tích",
-    "networking.view": "Xem Kết nối mạng",
     "messaging.view": "Xem Tin nhắn",
-    "venue.view": "Xem Bản đồ",
-    "sessions.view": "Xem Phiên trực tiếp",
-    "badges.view": "Xem Huy hiệu",
-    "mobile.view": "Xem Ứng dụng di động",
     "my-events.view": "Xem Sự kiện của tôi",
   };
   return permissionNames[code] || code;
@@ -164,12 +159,7 @@ function getPermissionDescription(code: string): string {
     "audit.view": "Xem nhật ký hệ thống",
     "settings.manage": "Quản lý cài đặt",
     "analytics.view": "Xem báo cáo phân tích",
-    "networking.view": "Xem kết nối mạng",
     "messaging.view": "Xem tin nhắn",
-    "venue.view": "Xem bản đồ địa điểm",
-    "sessions.view": "Xem phiên trực tiếp",
-    "badges.view": "Xem huy hiệu",
-    "mobile.view": "Xem ứng dụng di động",
     "my-events.view": "Xem sự kiện của tôi",
   };
   return permissionDescriptions[code] || "";
@@ -254,24 +244,7 @@ function getRoleBasedPermissions(
       name: "Quản lý Cài đặt",
     },
     "analytics.view": { id: 18, code: "analytics.view", name: "Xem Phân tích" },
-    "networking.view": {
-      id: 19,
-      code: "networking.view",
-      name: "Xem Kết nối mạng",
-    },
     "messaging.view": { id: 20, code: "messaging.view", name: "Xem Tin nhắn" },
-    "venue.view": { id: 21, code: "venue.view", name: "Xem Bản đồ" },
-    "sessions.view": {
-      id: 22,
-      code: "sessions.view",
-      name: "Xem Phiên trực tiếp",
-    },
-    "badges.view": { id: 23, code: "badges.view", name: "Xem Huy hiệu" },
-    "mobile.view": {
-      id: 24,
-      code: "mobile.view",
-      name: "Xem Ứng dụng di động",
-    },
     "my-events.view": {
       id: 25,
       code: "my-events.view",
@@ -295,12 +268,7 @@ function getRoleBasedPermissions(
         basePermissions["attendees.write"],
         basePermissions["attendees.manage"],
         basePermissions["checkin.manage"],
-        basePermissions["networking.view"],
         basePermissions["messaging.view"],
-        basePermissions["venue.view"],
-        basePermissions["sessions.view"],
-        basePermissions["badges.view"],
-        basePermissions["mobile.view"],
       ];
     case "attendee":
       return [
@@ -308,12 +276,7 @@ function getRoleBasedPermissions(
         basePermissions["profile.view"],
         basePermissions["conferences.view"],
         basePermissions["conferences.export"],
-        basePermissions["networking.view"],
         basePermissions["messaging.view"],
-        basePermissions["venue.view"],
-        basePermissions["sessions.view"],
-        basePermissions["badges.view"],
-        basePermissions["mobile.view"],
         basePermissions["my-events.view"],
       ];
     default:

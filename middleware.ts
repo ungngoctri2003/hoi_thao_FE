@@ -1,102 +1,105 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 // Define public routes that don't require authentication
 const publicRoutes = [
-  '/',
-  '/login',
-  '/register',
-  '/register-simple',
-  '/forgot-password',
-  '/reset-password',
-  '/checkin-public',
-  '/venue-public',
-  '/mobile-public',
-  '/sessions',
-  '/badges',
-  '/networking',
-  '/test-public-pages',
-  '/test-middleware'
-]
+  "/",
+  "/login",
+  "/register",
+  "/register-simple",
+  "/forgot-password",
+  "/reset-password",
+  "/checkin-public",
+  "/test-public-pages",
+  "/test-middleware",
+];
 
 // Define protected routes that require authentication
 const protectedRoutes = [
-  '/dashboard',
-  '/profile',
-  '/settings',
-  '/conferences',
-  '/conference-management',
-  '/attendees',
-  '/checkin',
-  '/analytics',
-  '/audit',
-  '/roles',
-  '/venue',
-  '/my-events',
-  '/messaging'
-]
+  "/dashboard",
+  "/profile",
+  "/settings",
+  "/conferences",
+  "/conference-management",
+  "/attendees",
+  "/checkin",
+  "/analytics",
+  "/audit",
+  "/roles",
+  "/my-events",
+  "/messaging",
+];
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
-  
+  const { pathname } = request.nextUrl;
+
   // Check if the current path is a public route
-  const isPublicRoute = publicRoutes.some(route => 
-    pathname === route || pathname.startsWith(route)
-  )
-  
+  const isPublicRoute = publicRoutes.some(
+    (route) => pathname === route || pathname.startsWith(route)
+  );
+
   // If it's a public route, allow access without authentication
   if (isPublicRoute) {
-    return NextResponse.next()
+    return NextResponse.next();
   }
-  
+
   // Check if the current path is a protected route
-  const isProtectedRoute = protectedRoutes.some(route => 
+  const isProtectedRoute = protectedRoutes.some((route) =>
     pathname.startsWith(route)
-  )
-  
+  );
+
   // Get the access token from cookies or headers
-  const token = request.cookies.get('accessToken')?.value || 
-                request.headers.get('authorization')?.replace('Bearer ', '')
-  
+  const token =
+    request.cookies.get("accessToken")?.value ||
+    request.headers.get("authorization")?.replace("Bearer ", "");
+
   // If it's a protected route and no token, redirect to login
   if (isProtectedRoute && !token) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(loginUrl)
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
   }
-  
+
   // If there's a token but it's expired or invalid, clear it and redirect to login
   if (isProtectedRoute && token) {
     try {
       // Basic JWT token validation - check if it's expired
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      const currentTime = Math.floor(Date.now() / 1000)
-      
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const currentTime = Math.floor(Date.now() / 1000);
+
       if (payload.exp && payload.exp < currentTime) {
         // Token is expired, clear it and redirect to login
-        const response = NextResponse.redirect(new URL('/login', request.url))
-        response.cookies.delete('accessToken')
-        response.cookies.delete('refreshToken')
-        return response
+        const response = NextResponse.redirect(new URL("/login", request.url));
+        response.cookies.delete("accessToken");
+        response.cookies.delete("refreshToken");
+        return response;
       }
     } catch (error) {
       // Invalid token format, clear it and redirect to login
-      const response = NextResponse.redirect(new URL('/login', request.url))
-      response.cookies.delete('accessToken')
-      response.cookies.delete('refreshToken')
-      return response
+      const response = NextResponse.redirect(new URL("/login", request.url));
+      response.cookies.delete("accessToken");
+      response.cookies.delete("refreshToken");
+      return response;
     }
   }
-  
+
   // If user is already authenticated and trying to access auth pages, redirect to dashboard
-  if (token && (pathname === '/login' || pathname === '/register' || pathname === '/register-simple')) {
+  if (
+    token &&
+    (pathname === "/login" ||
+      pathname === "/register" ||
+      pathname === "/register-simple")
+  ) {
     // Check if there's a redirect parameter and use it, otherwise go to dashboard
-    const redirectParam = request.nextUrl.searchParams.get('redirect')
-    const redirectUrl = redirectParam && redirectParam !== '/login' ? redirectParam : '/dashboard'
-    return NextResponse.redirect(new URL(redirectUrl, request.url))
+    const redirectParam = request.nextUrl.searchParams.get("redirect");
+    const redirectUrl =
+      redirectParam && redirectParam !== "/login"
+        ? redirectParam
+        : "/dashboard";
+    return NextResponse.redirect(new URL(redirectUrl, request.url));
   }
-  
-  return NextResponse.next()
+
+  return NextResponse.next();
 }
 
 export const config = {
@@ -109,6 +112,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public files
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|css|js|woff|woff2|ttf|eot)).*)',
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|css|js|woff|woff2|ttf|eot)).*)",
   ],
-}
+};

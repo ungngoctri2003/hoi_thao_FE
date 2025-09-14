@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useAuth } from './use-auth';
-import { useConferenceId } from './use-conference-id';
-import { apiClient, UserConferenceAssignment } from '@/lib/api';
+import { useState, useEffect } from "react";
+import { useAuth } from "./use-auth";
+import { useConferenceId } from "./use-conference-id";
+import { apiClient, UserConferenceAssignment } from "@/lib/api";
 
 export interface ConferencePermission {
   conferenceId: number;
@@ -13,11 +13,16 @@ export interface ConferencePermission {
 }
 
 export function useConferencePermissions() {
-  const [conferencePermissions, setConferencePermissions] = useState<ConferencePermission[]>([]);
+  const [conferencePermissions, setConferencePermissions] = useState<
+    ConferencePermission[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentConferenceId, setCurrentConferenceId] = useState<number | null>(null);
+  const [currentConferenceId, setCurrentConferenceId] = useState<number | null>(
+    null
+  );
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { conferenceId: urlConferenceId, isLoading: urlConferenceIdLoading } = useConferenceId();
+  const { conferenceId: urlConferenceId, isLoading: urlConferenceIdLoading } =
+    useConferenceId();
 
   useEffect(() => {
     const fetchConferencePermissions = async () => {
@@ -25,7 +30,7 @@ export function useConferencePermissions() {
       if (authLoading) {
         return;
       }
-      
+
       if (!isAuthenticated || !user) {
         setConferencePermissions([]);
         setCurrentConferenceId(null);
@@ -35,40 +40,41 @@ export function useConferencePermissions() {
 
       try {
         setIsLoading(true);
-        
+
         // For admin users, get all conferences and give them all permissions
-        if (user.role === 'admin') {
-          const conferencesResponse = await apiClient.getConferences({ page: 1, limit: 1000 });
-          
+        if (user.role === "admin") {
+          const conferencesResponse = await apiClient.getConferences({
+            page: 1,
+            limit: 1000,
+          });
+
           // Transform all conferences to conference permissions with full admin permissions
-          const permissions: ConferencePermission[] = conferencesResponse.data.map((conference) => ({
-            conferenceId: conference.id,
-            conferenceName: conference.name,
-            permissions: {
-              'conferences.view': true,
-              'conferences.create': true,
-              'conferences.update': true,
-              'conferences.delete': true,
-              'conferences.manage': true,
-              'attendees.view': true,
-              'attendees.manage': true,
-              'checkin.manage': true,
-              'sessions.view': true,
-              'sessions.manage': true,
-              'analytics.view': true,
-              'networking.view': true,
-              'messaging.view': true,
-              'venue.view': true,
-              'badges.view': true,
-              'mobile.view': true
-            },
-            isActive: true
-          }));
-          
+          const permissions: ConferencePermission[] =
+            conferencesResponse.data.map((conference) => ({
+              conferenceId: conference.id,
+              conferenceName: conference.name,
+              permissions: {
+                "conferences.view": true,
+                "conferences.create": true,
+                "conferences.update": true,
+                "conferences.delete": true,
+                "conferences.manage": true,
+                "attendees.view": true,
+                "attendees.manage": true,
+                "checkin.manage": true,
+                "analytics.view": true,
+                "messaging.view": true,
+              },
+              isActive: true,
+            }));
+
           setConferencePermissions(permissions);
-          
+
           // Set current conference ID
-          if (urlConferenceId && permissions.some(p => p.conferenceId === urlConferenceId)) {
+          if (
+            urlConferenceId &&
+            permissions.some((p) => p.conferenceId === urlConferenceId)
+          ) {
             setCurrentConferenceId(urlConferenceId);
           } else if (permissions.length > 0) {
             setCurrentConferenceId(permissions[0].conferenceId);
@@ -78,24 +84,34 @@ export function useConferencePermissions() {
         } else {
           // For staff and attendees, get their conference assignments
           const response = await apiClient.getMyAssignments();
-          
+
           // Transform assignments to conference permissions
-          const permissions: ConferencePermission[] = response.data.map((assignment: UserConferenceAssignment) => ({
-            conferenceId: assignment.conferenceId,
-            conferenceName: assignment.conferenceName || `Hội nghị #${assignment.conferenceId}`,
-            permissions: typeof assignment.permissions === 'string' 
-              ? JSON.parse(assignment.permissions) 
-              : assignment.permissions || {},
-            isActive: assignment.isActive === 1
-          }));
-          
+          const permissions: ConferencePermission[] = response.data.map(
+            (assignment: UserConferenceAssignment) => ({
+              conferenceId: assignment.conferenceId,
+              conferenceName:
+                assignment.conferenceName ||
+                `Hội nghị #${assignment.conferenceId}`,
+              permissions:
+                typeof assignment.permissions === "string"
+                  ? JSON.parse(assignment.permissions)
+                  : assignment.permissions || {},
+              isActive: assignment.isActive === 1,
+            })
+          );
+
           setConferencePermissions(permissions);
-          
+
           // Set current conference ID
-          if (urlConferenceId && permissions.some(p => p.conferenceId === urlConferenceId && p.isActive)) {
+          if (
+            urlConferenceId &&
+            permissions.some(
+              (p) => p.conferenceId === urlConferenceId && p.isActive
+            )
+          ) {
             setCurrentConferenceId(urlConferenceId);
           } else if (permissions.length > 0) {
-            const activeConference = permissions.find(p => p.isActive);
+            const activeConference = permissions.find((p) => p.isActive);
             if (activeConference) {
               setCurrentConferenceId(activeConference.conferenceId);
             } else if (permissions.length > 0) {
@@ -106,7 +122,7 @@ export function useConferencePermissions() {
           }
         }
       } catch (error) {
-        console.error('Failed to fetch conference permissions:', error);
+        console.error("Failed to fetch conference permissions:", error);
         setConferencePermissions([]);
         setCurrentConferenceId(null);
       } finally {
@@ -127,19 +143,21 @@ export function useConferencePermissions() {
       fetchConferencePermissions();
     };
 
-    window.addEventListener('permissions-changed', handlePermissionChange);
-    window.addEventListener('conferences-updated', handleConferenceUpdate);
-    
+    window.addEventListener("permissions-changed", handlePermissionChange);
+    window.addEventListener("conferences-updated", handleConferenceUpdate);
+
     return () => {
-      window.removeEventListener('permissions-changed', handlePermissionChange);
-      window.removeEventListener('conferences-updated', handleConferenceUpdate);
+      window.removeEventListener("permissions-changed", handlePermissionChange);
+      window.removeEventListener("conferences-updated", handleConferenceUpdate);
     };
   }, [user, isAuthenticated, authLoading]); // Add authLoading to dependencies
 
   // Separate effect to handle conferenceId changes
   useEffect(() => {
     if (urlConferenceId && conferencePermissions.length > 0) {
-      const hasAccess = conferencePermissions.some(p => p.conferenceId === urlConferenceId && p.isActive);
+      const hasAccess = conferencePermissions.some(
+        (p) => p.conferenceId === urlConferenceId && p.isActive
+      );
       if (hasAccess) {
         setCurrentConferenceId(urlConferenceId);
       }
@@ -147,16 +165,19 @@ export function useConferencePermissions() {
   }, [urlConferenceId, conferencePermissions]);
 
   // Check if user has permission for current conference
-  const hasConferencePermission = (permissionCode: string, conferenceId?: number): boolean => {
+  const hasConferencePermission = (
+    permissionCode: string,
+    conferenceId?: number
+  ): boolean => {
     // If auth is still loading, return false to prevent premature redirects
     if (authLoading || isLoading) return false;
-    
+
     const targetConferenceId = conferenceId || currentConferenceId;
-    
+
     if (!targetConferenceId) return false;
 
     const conferencePermission = conferencePermissions.find(
-      cp => cp.conferenceId === targetConferenceId && cp.isActive
+      (cp) => cp.conferenceId === targetConferenceId && cp.isActive
     );
 
     if (!conferencePermission) return false;
@@ -168,9 +189,9 @@ export function useConferencePermissions() {
   const hasAnyConferencePermission = (permissionCode: string): boolean => {
     // If auth is still loading, return false to prevent premature redirects
     if (authLoading || isLoading) return false;
-    
-    return conferencePermissions.some(cp => 
-      cp.isActive && cp.permissions[permissionCode] === true
+
+    return conferencePermissions.some(
+      (cp) => cp.isActive && cp.permissions[permissionCode] === true
     );
   };
 
@@ -178,11 +199,13 @@ export function useConferencePermissions() {
   const hasAllConferencePermission = (permissionCode: string): boolean => {
     // If auth is still loading, return false to prevent premature redirects
     if (authLoading || isLoading) return false;
-    
-    const activeConferences = conferencePermissions.filter(cp => cp.isActive);
+
+    const activeConferences = conferencePermissions.filter((cp) => cp.isActive);
     if (activeConferences.length === 0) return false;
 
-    return activeConferences.every(cp => cp.permissions[permissionCode] === true);
+    return activeConferences.every(
+      (cp) => cp.permissions[permissionCode] === true
+    );
   };
 
   // Get all permissions for current conference
@@ -190,16 +213,18 @@ export function useConferencePermissions() {
     if (!currentConferenceId) return {};
 
     const conferencePermission = conferencePermissions.find(
-      cp => cp.conferenceId === currentConferenceId && cp.isActive
+      (cp) => cp.conferenceId === currentConferenceId && cp.isActive
     );
 
     return conferencePermission?.permissions || {};
   };
 
   // Get all permissions for specific conference
-  const getConferencePermissions = (conferenceId: number): Record<string, boolean> => {
+  const getConferencePermissions = (
+    conferenceId: number
+  ): Record<string, boolean> => {
     const conferencePermission = conferencePermissions.find(
-      cp => cp.conferenceId === conferenceId && cp.isActive
+      (cp) => cp.conferenceId === conferenceId && cp.isActive
     );
 
     return conferencePermission?.permissions || {};
@@ -207,20 +232,22 @@ export function useConferencePermissions() {
 
   // Get available conferences for user
   const getAvailableConferences = (): ConferencePermission[] => {
-    const available = conferencePermissions.filter(cp => cp.isActive);
+    const available = conferencePermissions.filter((cp) => cp.isActive);
     return available;
   };
 
   // Check if user has access to specific conference
   const hasConferenceAccess = (conferenceId: number): boolean => {
-    return conferencePermissions.some(cp => 
-      cp.conferenceId === conferenceId && cp.isActive
+    return conferencePermissions.some(
+      (cp) => cp.conferenceId === conferenceId && cp.isActive
     );
   };
 
   // Get conference name by ID
   const getConferenceName = (conferenceId: number): string => {
-    const conference = conferencePermissions.find(cp => cp.conferenceId === conferenceId);
+    const conference = conferencePermissions.find(
+      (cp) => cp.conferenceId === conferenceId
+    );
     return conference?.conferenceName || `Hội nghị #${conferenceId}`;
   };
 
@@ -234,54 +261,57 @@ export function useConferencePermissions() {
   // Refresh permissions
   const refreshPermissions = async () => {
     if (!user) return;
-    
+
     try {
       // For admin users, get all conferences and give them all permissions
-      if (user.role === 'admin') {
-        const conferencesResponse = await apiClient.getConferences({ page: 1, limit: 1000 });
-        
-        const permissions: ConferencePermission[] = conferencesResponse.data.map((conference) => ({
-          conferenceId: conference.id,
-          conferenceName: conference.name,
-          permissions: {
-            'conferences.view': true,
-            'conferences.create': true,
-            'conferences.update': true,
-            'conferences.delete': true,
-            'conferences.manage': true,
-            'attendees.view': true,
-            'attendees.manage': true,
-            'checkin.manage': true,
-            'sessions.view': true,
-            'sessions.manage': true,
-            'analytics.view': true,
-            'networking.view': true,
-            'messaging.view': true,
-            'venue.view': true,
-            'badges.view': true,
-            'mobile.view': true
-          },
-          isActive: true
-        }));
-        
+      if (user.role === "admin") {
+        const conferencesResponse = await apiClient.getConferences({
+          page: 1,
+          limit: 1000,
+        });
+
+        const permissions: ConferencePermission[] =
+          conferencesResponse.data.map((conference) => ({
+            conferenceId: conference.id,
+            conferenceName: conference.name,
+            permissions: {
+              "conferences.view": true,
+              "conferences.create": true,
+              "conferences.update": true,
+              "conferences.delete": true,
+              "conferences.manage": true,
+              "attendees.view": true,
+              "attendees.manage": true,
+              "checkin.manage": true,
+              "analytics.view": true,
+              "messaging.view": true,
+            },
+            isActive: true,
+          }));
+
         setConferencePermissions(permissions);
       } else {
         // For staff and attendees, get their conference assignments
         const response = await apiClient.getMyAssignments();
-        
-        const permissions: ConferencePermission[] = response.data.map((assignment: UserConferenceAssignment) => ({
-          conferenceId: assignment.conferenceId,
-          conferenceName: assignment.conferenceName || `Hội nghị #${assignment.conferenceId}`,
-          permissions: typeof assignment.permissions === 'string' 
-            ? JSON.parse(assignment.permissions) 
-            : assignment.permissions || {},
-          isActive: assignment.isActive === 1
-        }));
+
+        const permissions: ConferencePermission[] = response.data.map(
+          (assignment: UserConferenceAssignment) => ({
+            conferenceId: assignment.conferenceId,
+            conferenceName:
+              assignment.conferenceName ||
+              `Hội nghị #${assignment.conferenceId}`,
+            permissions:
+              typeof assignment.permissions === "string"
+                ? JSON.parse(assignment.permissions)
+                : assignment.permissions || {},
+            isActive: assignment.isActive === 1,
+          })
+        );
 
         setConferencePermissions(permissions);
       }
     } catch (error) {
-      console.error('Failed to refresh conference permissions:', error);
+      console.error("Failed to refresh conference permissions:", error);
     }
   };
 

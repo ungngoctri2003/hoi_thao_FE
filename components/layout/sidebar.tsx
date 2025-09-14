@@ -173,14 +173,7 @@ const getNavigationItems = (
     // For admin and staff, show all basic permissions even without conference assignments
     if (userRole === "admin" || userRole === "staff") {
       // For conference-specific features, check if user has basic permission OR conference permission
-      const conferenceSpecificFeatures = [
-        "/checkin",
-        "/networking",
-        "/venue",
-        "/sessions",
-        "/badges",
-        "/analytics",
-      ];
+      const conferenceSpecificFeatures = ["/checkin", "/analytics"];
 
       if (conferenceSpecificFeatures.includes(item.href)) {
         // Admin/staff can access if they have basic permission OR conference permission
@@ -196,14 +189,7 @@ const getNavigationItems = (
     }
 
     // For attendees, require both basic and conference permissions for conference features
-    const conferenceSpecificFeatures = [
-      "/checkin",
-      "/networking",
-      "/venue",
-      "/sessions",
-      "/badges",
-      "/analytics",
-    ];
+    const conferenceSpecificFeatures = ["/checkin", "/analytics"];
 
     if (conferenceSpecificFeatures.includes(item.href)) {
       return (
@@ -268,12 +254,7 @@ export function Sidebar({ userRole }: SidebarProps) {
   const categoryConfig = {
     attendees: { icon: Users, label: "Danh sách tham dự", href: "/attendees" },
     checkin: { icon: QrCode, label: "Check-in QR", href: "/checkin" },
-    networking: { icon: Network, label: "Kết nối mạng", href: "/networking" },
-    venue: { icon: MapPin, label: "Bản đồ địa điểm", href: "/venue" },
-    sessions: { icon: Video, label: "Phiên trực tiếp", href: "/sessions" },
-    badges: { icon: Award, label: "Huy hiệu số", href: "/badges" },
     analytics: { icon: BarChart3, label: "Phân tích AI", href: "/analytics" },
-    mobile: { icon: Smartphone, label: "Ứng dụng di động", href: "/mobile" },
   };
 
   // Toggle conference expansion
