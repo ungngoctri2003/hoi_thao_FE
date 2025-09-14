@@ -507,14 +507,18 @@ class ApiClient {
     if (typeof window !== "undefined") {
       // Try to get from cookies first, then localStorage as fallback
       const cookies = document.cookie.split(";");
+      console.log("All cookies:", document.cookie);
       const tokenCookie = cookies.find((cookie) =>
         cookie.trim().startsWith("accessToken=")
       );
+      console.log("Token cookie found:", tokenCookie);
       if (tokenCookie) {
         const token = tokenCookie.split("=")[1];
+        console.log("Token extracted from cookie:", token ? "EXISTS" : "EMPTY");
         return token;
       }
       const token = localStorage.getItem("accessToken");
+      console.log("Token from localStorage:", token ? "EXISTS" : "NOT FOUND");
       return token;
     }
     return null;
@@ -1598,6 +1602,85 @@ class ApiClient {
     };
   }
 
+  async createSession(
+    conferenceId: number,
+    sessionData: {
+      title: string;
+      description: string;
+      startTime: string;
+      endTime: string;
+      speaker: string;
+      speakerEmail: string;
+      room: string;
+      track: string;
+      capacity: number;
+      tags?: string[];
+    }
+  ): Promise<{ data: SessionInfo }> {
+    // Convert frontend field names to backend expected format
+    const backendSessionData = {
+      TITLE: sessionData.title,
+      DESCRIPTION: sessionData.description || null,
+      START_TIME: sessionData.startTime,
+      END_TIME: sessionData.endTime,
+      SPEAKER: sessionData.speaker || null,
+      ROOM_ID: null, // Will be set later if needed
+      STATUS: "upcoming" as const,
+    };
+
+    const response = await this.request<SessionInfo>(
+      `/conferences/${conferenceId}/sessions`,
+      {
+        method: "POST",
+        body: JSON.stringify(backendSessionData),
+      }
+    );
+
+    return { data: response.data as SessionInfo };
+  }
+
+  async updateSession(
+    sessionId: number,
+    sessionData: Partial<{
+      title: string;
+      description: string;
+      startTime: string;
+      endTime: string;
+      speaker: string;
+      speakerEmail: string;
+      room: string;
+      track: string;
+      capacity: number;
+      tags: string[];
+    }>
+  ): Promise<{ data: SessionInfo }> {
+    // Convert frontend field names to backend expected format
+    const backendSessionData: any = {};
+    if (sessionData.title !== undefined)
+      backendSessionData.TITLE = sessionData.title;
+    if (sessionData.description !== undefined)
+      backendSessionData.DESCRIPTION = sessionData.description;
+    if (sessionData.startTime !== undefined)
+      backendSessionData.START_TIME = sessionData.startTime;
+    if (sessionData.endTime !== undefined)
+      backendSessionData.END_TIME = sessionData.endTime;
+    if (sessionData.speaker !== undefined)
+      backendSessionData.SPEAKER = sessionData.speaker;
+
+    const response = await this.request<SessionInfo>(`/sessions/${sessionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(backendSessionData),
+    });
+
+    return { data: response.data as SessionInfo };
+  }
+
+  async deleteSession(sessionId: number): Promise<void> {
+    await this.request(`/sessions/${sessionId}`, {
+      method: "DELETE",
+    });
+  }
+
   // Roles Management endpoints
   async getRoles(): Promise<{ data: Role[] }> {
     const response = await this.request<Role[]>("/roles", {
@@ -2564,7 +2647,7 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify({ conferenceId, user1Id, user2Id }),
     });
-    return response.data.sessionId;
+    return (response.data as any).sessionId;
   }
 
   async getConversationMessages(

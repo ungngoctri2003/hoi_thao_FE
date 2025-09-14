@@ -61,6 +61,8 @@ export function useConferencePermissions() {
                 "conferences.manage": true,
                 "attendees.view": true,
                 "attendees.manage": true,
+                "sessions.view": true,
+                "sessions.manage": true,
                 "checkin.manage": true,
                 "analytics.view": true,
                 "messaging.view": true,

@@ -60,6 +60,18 @@ const allNavigationItems = [
     description: "Tạo, chỉnh sửa và quản lý các hội nghị",
   },
   {
+    href: "/sessions-management",
+    icon: Calendar,
+    label: "Quản lý phiên",
+    requiredPermissions: [
+      "sessions.manage",
+      "sessions.create",
+      "sessions.edit",
+      "sessions.delete",
+    ],
+    description: "Quản lý tất cả các phiên của các hội nghị",
+  },
+  {
     href: "/attendees",
     icon: Users,
     label: "Danh sách tham dự",
@@ -128,6 +140,11 @@ const getNavigationItems = (
   return allNavigationItems.filter((item) => {
     // Special handling for conference management - only show to admin
     if (item.href === "/conference-management") {
+      return userRole === "admin";
+    }
+
+    // Special handling for sessions management - only show to admin
+    if (item.href === "/sessions-management") {
       return userRole === "admin";
     }
 
@@ -255,6 +272,7 @@ export function Sidebar({ userRole }: SidebarProps) {
     attendees: { icon: Users, label: "Danh sách tham dự", href: "/attendees" },
     checkin: { icon: QrCode, label: "Check-in QR", href: "/checkin" },
     analytics: { icon: BarChart3, label: "Phân tích AI", href: "/analytics" },
+    sessions: { icon: Calendar, label: "Quản lý phiên", href: "/sessions" },
   };
 
   // Toggle conference expansion
@@ -291,6 +309,7 @@ export function Sidebar({ userRole }: SidebarProps) {
     management: items.filter((item) =>
       [
         "/conference-management",
+        "/sessions-management",
         "/attendees",
         "/ai-analytics",
         "/roles",

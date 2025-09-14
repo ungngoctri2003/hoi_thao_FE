@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Session Creation Test</title>
+  </head>
+  <body>
+    <h1>Session Creation Test</h1>
+    <div id="output"></div>
+
+    <button onclick="testSessionCreation()">Test Session Creation</button>
+    <button onclick="checkAuth()">Check Auth Status</button>
+
+    <script>
+      function log(message) {
+        const output = document.getElementById("output");
+        output.innerHTML += "<p>" + message + "</p>";
+        console.log(message);
+      }
+
+      function checkAuth() {
+        log("=== Checking Auth Status ===");
+
+        // Check localStorage
+        const accessToken = localStorage.getItem("accessToken");
+        const refreshToken = localStorage.getItem("refreshToken");
+        log(
+          "localStorage accessToken: " + (accessToken ? "EXISTS" : "NOT FOUND")
+        );
+        log(
+          "localStorage refreshToken: " +
+            (refreshToken ? "EXISTS" : "NOT FOUND")
+        );
+
+        // Check cookies
+        const cookies = document.cookie.split(";");
+        const tokenCookie = cookies.find((cookie) =>
+          cookie.trim().startsWith("accessToken=")
+        );
+        log("Cookie accessToken: " + (tokenCookie ? "EXISTS" : "NOT FOUND"));
+
+        if (tokenCookie) {
+          const token = tokenCookie.split("=")[1];
+          log("Token value: " + (token ? "EXISTS" : "EMPTY"));
+        }
+
+        // Check if token is expired
+        if (accessToken) {
+          try {
+            const payload = JSON.parse(atob(accessToken.split(".")[1]));
+            const isExpired = Date.now() > payload.exp * 1000;
+            log(
+              "Token expires: " + new Date(payload.exp * 1000).toLocaleString()
+            );
+            log("Token expired: " + (isExpired ? "YES" : "NO"));
+          } catch (e) {
+            log("Error parsing token: " + e.message);
+          }
+        }
+      }
+
+      async function testSessionCreation() {
+        log("=== Testing Session Creation ===");
+
+        try {
+          const token =
+            localStorage.getItem("accessToken") ||
+            document.cookie
+              .split(";")
+              .find((c) => c.trim().startsWith("accessToken="))
+              ?.split("=")[1];
+
+          if (!token) {
+            log("ERROR: No token found. Please login first.");
+            return;
+          }
+
+          log("Using token: " + (token ? "EXISTS" : "NOT FOUND"));
+
+          const sessionData = {
+            TITLE: "Test Session from HTML",
+            DESCRIPTION: "Test Description",
+            START_TIME: "2024-12-20T10:00:00.000Z",
+            END_TIME: "2024-12-20T11:00:00.000Z",
+            SPEAKER: "Test Speaker",
+            ROOM_ID: null,
+            STATUS: "upcoming",
+          };
+
+          log("Session data: " + JSON.stringify(sessionData, null, 2));
+
+          const response = await fetch(
+            "http://localhost:4000/api/v1/conferences/1/sessions",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(sessionData),
+            }
+          );
+
+          log("Response status: " + response.status);
+          log(
+            "Response headers: " +
+              JSON.stringify(
+                Object.fromEntries(response.headers.entries()),
+                null,
+                2
+              )
+          );
+
+          const responseText = await response.text();
+          log("Response body: " + responseText);
+
+          if (response.ok) {
+            const data = JSON.parse(responseText);
+            log("SUCCESS! Created session: " + JSON.stringify(data, null, 2));
+          } else {
+            log("ERROR: " + responseText);
+          }
+        } catch (error) {
+          log("ERROR: " + error.message);
+        }
+      }
+
+      // Check auth status when page loads
+      window.onload = checkAuth;
+    </script>
+  </body>
+</html>
