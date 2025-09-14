@@ -124,10 +124,16 @@ export function SessionsSystem({
     tags: [] as string[],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<number | null>(null);
+  const [isReloading, setIsReloading] = useState(false);
 
   // Function to reload sessions data
-  const reloadSessions = async () => {
+  const reloadSessions = async (showLoading = false) => {
     try {
+      if (showLoading) {
+        setIsReloading(true);
+      }
+
       const sessionsResponse = await apiClient.getSessions(conferenceId);
       console.log("Sessions API response:", sessionsResponse);
       console.log("Conference ID:", conferenceId);
@@ -166,6 +172,10 @@ export function SessionsSystem({
     } catch (error: any) {
       console.error("Error reloading sessions:", error);
       toast.error("Không thể tải lại dữ liệu phiên");
+    } finally {
+      if (showLoading) {
+        setIsReloading(false);
+      }
     }
   };
 
@@ -318,12 +328,15 @@ export function SessionsSystem({
   const handleDeleteSession = async (sessionId: number) => {
     if (confirm("Bạn có chắc chắn muốn xóa phiên này?")) {
       try {
+        setIsDeleting(sessionId);
         await apiClient.deleteSession(sessionId);
         await reloadSessions();
         toast.success("Đã xóa phiên thành công");
       } catch (error: any) {
         console.error("Error deleting session:", error);
         toast.error("Không thể xóa phiên. Vui lòng thử lại.");
+      } finally {
+        setIsDeleting(null);
       }
     }
   };
@@ -450,13 +463,20 @@ export function SessionsSystem({
           </p>
         </div>
         <div className="flex space-x-2">
-          <Button onClick={reloadSessions} variant="outline" disabled={loading}>
-            <Activity className="h-4 w-4 mr-2" />
-            {loading ? "Đang tải..." : "Làm mới"}
+          <Button
+            onClick={() => reloadSessions(true)}
+            variant="outline"
+            disabled={loading || isReloading}
+          >
+            <Activity
+              className={`h-4 w-4 mr-2 ${isReloading ? "animate-spin" : ""}`}
+            />
+            {loading || isReloading ? "Đang tải..." : "Làm mới"}
           </Button>
           <Button
             onClick={handleCreateSession}
             className="bg-blue-600 hover:bg-blue-700"
+            disabled={isSubmitting || isDeleting !== null}
           >
             <Plus className="h-4 w-4 mr-2" />
             Tạo phiên mới
@@ -576,7 +596,17 @@ export function SessionsSystem({
             Quản lý và theo dõi các phiên của hội nghị {conference?.name}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative">
+          {(isSubmitting || isDeleting !== null) && (
+            <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center">
+              <div className="bg-white p-4 rounded-lg shadow-lg flex items-center space-x-2">
+                <div className="h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm font-medium">
+                  {isSubmitting ? "Đang xử lý..." : "Đang xóa phiên..."}
+                </span>
+              </div>
+            </div>
+          )}
           <div className="space-y-4">
             {paginatedSessions.map((session) => (
               <Card
@@ -602,6 +632,7 @@ export function SessionsSystem({
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditSession(session)}
+                        disabled={isSubmitting || isDeleting === session.id}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -609,9 +640,14 @@ export function SessionsSystem({
                         variant="outline"
                         size="sm"
                         onClick={() => handleDeleteSession(session.id)}
-                        className="text-red-600 hover:text-red-700"
+                        disabled={isSubmitting || isDeleting === session.id}
+                        className="text-red-600 hover:text-red-700 disabled:opacity-50"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {isDeleting === session.id ? (
+                          <div className="h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -896,7 +932,14 @@ export function SessionsSystem({
               Hủy
             </Button>
             <Button onClick={handleSubmitCreate} disabled={isSubmitting}>
-              {isSubmitting ? "Đang tạo..." : "Tạo phiên"}
+              {isSubmitting ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Đang tạo...
+                </>
+              ) : (
+                "Tạo phiên"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1016,7 +1059,14 @@ export function SessionsSystem({
               Hủy
             </Button>
             <Button onClick={handleSubmitEdit} disabled={isSubmitting}>
-              {isSubmitting ? "Đang cập nhật..." : "Cập nhật"}
+              {isSubmitting ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Đang cập nhật...
+                </>
+              ) : (
+                "Cập nhật"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
