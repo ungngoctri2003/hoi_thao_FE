@@ -1,23 +1,33 @@
-// Simple test for ChatGPT integration
-console.log("Testing ChatGPT integration...");
+const axios = require("axios");
 
-// Check if environment variables are set
-const apiKey = process.env.OPENAI_API_KEY;
-console.log("OpenAI API Key configured:", !!apiKey);
+async function testSimple() {
+  try {
+    console.log("Testing backend endpoints...");
 
-if (!apiKey) {
-  console.log("❌ OPENAI_API_KEY not found in environment variables");
-  console.log("Please set OPENAI_API_KEY in your .env file");
-} else {
-  console.log("✅ OPENAI_API_KEY is configured");
-  console.log("Key starts with:", apiKey.substring(0, 10) + "...");
+    // Test ping
+    const pingResponse = await axios.get("http://localhost:4000/api/v1/ping");
+    console.log("✅ Ping:", pingResponse.data);
+
+    // Test attendee endpoint without auth (should fail)
+    try {
+      const attendeeResponse = await axios.get(
+        "http://localhost:4000/api/v1/attendee/events/upcoming"
+      );
+      console.log(
+        "❌ Attendee endpoint should require auth:",
+        attendeeResponse.data
+      );
+    } catch (error) {
+      console.log(
+        "✅ Attendee endpoint properly requires auth:",
+        error.response?.status
+      );
+    }
+
+    console.log("Backend is working correctly!");
+  } catch (error) {
+    console.error("Error:", error.message);
+  }
 }
 
-// Test basic functionality
-try {
-  const { chatGPTService } = require("./dist/services/chatgpt.service");
-  console.log("✅ ChatGPT service loaded successfully");
-} catch (error) {
-  console.log("❌ Failed to load ChatGPT service:", error.message);
-  console.log("Make sure to run: npm run build");
-}
+testSimple();

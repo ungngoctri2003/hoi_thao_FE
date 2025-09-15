@@ -2841,6 +2841,131 @@ class ApiClient {
     });
     return response.success;
   }
+
+  // Dashboard Analytics API methods
+  async getDashboardOverview(): Promise<{
+    totalConferences: number;
+    totalAttendees: number;
+    totalCheckIns: number;
+    attendanceRate: number;
+    recentActivity: any[];
+    upcomingEvents: any[];
+  }> {
+    const response = await this.request<any>("/analytics/overview", {
+      method: "GET",
+    });
+    const data = response.data || {};
+    return {
+      totalConferences: data.totalConferences || 0,
+      totalAttendees: data.totalAttendees || 0,
+      totalCheckIns: data.totalCheckIns || 0,
+      attendanceRate: data.attendanceRate || 0,
+      recentActivity: data.recentActivity || [],
+      upcomingEvents: data.upcomingEvents || [],
+    };
+  }
+
+  async getConferenceStats(conferenceId?: number): Promise<{
+    totalRegistrations: number;
+    totalCheckIns: number;
+    attendanceRate: number;
+    dailyCheckIns: any[];
+  }> {
+    const url = conferenceId
+      ? `/analytics/conferences/${conferenceId}/attendance`
+      : "/analytics/overview";
+
+    const response = await this.request<any>(url, {
+      method: "GET",
+    });
+    return (
+      response.data || {
+        totalRegistrations: 0,
+        totalCheckIns: 0,
+        attendanceRate: 0,
+        dailyCheckIns: [],
+      }
+    );
+  }
+
+  async getRealtimeData(): Promise<{
+    checkInsToday: number;
+    checkInsLast24h: any[];
+    activeUsers: number;
+    systemAlerts: any[];
+  }> {
+    const response = await this.request<any>("/analytics/overview", {
+      method: "GET",
+    });
+    const data = response.data || {};
+    return {
+      checkInsToday: data.checkInsToday || 0,
+      checkInsLast24h: data.checkInsLast24h || [],
+      activeUsers: data.activeUsers || 0,
+      systemAlerts: data.systemAlerts || [],
+    };
+  }
+
+  async getRecentActivity(limit: number = 10): Promise<any[]> {
+    const response = await this.request<any>(`/analytics/overview`, {
+      method: "GET",
+    });
+    return response.data?.recentActivity || [];
+  }
+
+  async getUpcomingEvents(): Promise<any[]> {
+    const response = await this.request<any>("/attendee/events/upcoming", {
+      method: "GET",
+    });
+    return response.data?.data || [];
+  }
+
+  async getNotifications(): Promise<any[]> {
+    const response = await this.request<any>("/attendee/notifications", {
+      method: "GET",
+    });
+    return response.data?.data || [];
+  }
+
+  async getCertificates(): Promise<any[]> {
+    const response = await this.request<any>("/attendee/certificates", {
+      method: "GET",
+    });
+    return response.data?.data || [];
+  }
+
+  async getRegistrationTrends(days: number = 30): Promise<any[]> {
+    const response = await this.request<any>("/analytics/overview", {
+      method: "GET",
+    });
+    return response.data?.registrationTrends || [];
+  }
+
+  async getAttendanceByEvent(): Promise<
+    {
+      eventName: string;
+      attendanceRate: number;
+      totalRegistrations: number;
+    }[]
+  > {
+    const response = await this.request<any>("/analytics/overview", {
+      method: "GET",
+    });
+    return response.data?.attendanceByEvent || [];
+  }
+
+  async getSystemAlerts(): Promise<
+    {
+      type: "warning" | "info" | "error";
+      message: string;
+      timestamp: string;
+    }[]
+  > {
+    const response = await this.request<any>("/analytics/overview", {
+      method: "GET",
+    });
+    return response.data?.systemAlerts || [];
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
