@@ -72,6 +72,18 @@ const allNavigationItems = [
     description: "Quản lý tất cả các phiên của các hội nghị",
   },
   {
+    href: "/rooms-management",
+    icon: Building,
+    label: "Quản lý phòng",
+    requiredPermissions: [
+      "rooms.manage",
+      "rooms.create",
+      "rooms.edit",
+      "rooms.delete",
+    ],
+    description: "Quản lý tất cả các phòng họp và không gian sự kiện",
+  },
+  {
     href: "/attendees",
     icon: Users,
     label: "Danh sách tham dự",
@@ -145,6 +157,11 @@ const getNavigationItems = (
 
     // Special handling for sessions management - only show to admin
     if (item.href === "/sessions-management") {
+      return userRole === "admin";
+    }
+
+    // Special handling for rooms management - only show to admin
+    if (item.href === "/rooms-management") {
       return userRole === "admin";
     }
 
@@ -310,6 +327,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       [
         "/conference-management",
         "/sessions-management",
+        "/rooms-management",
         "/attendees",
         "/ai-analytics",
         "/roles",

@@ -271,6 +271,8 @@ export interface SessionInfo {
   startTime: string;
   endTime: string;
   location?: string;
+  roomId?: number;
+  roomName?: string;
   speaker?: string;
   createdAt: string;
 }
@@ -876,6 +878,11 @@ class ApiClient {
             "networking.view",
             "venue.view",
             "sessions.view",
+            "rooms.view",
+            "rooms.manage",
+            "rooms.create",
+            "rooms.edit",
+            "rooms.delete",
             "badges.view",
             "mobile.view",
             "my-events.view",
@@ -895,6 +902,7 @@ class ApiClient {
             "networking.view",
             "venue.view",
             "sessions.view",
+            "rooms.view",
             "badges.view",
             "mobile.view",
           ];
@@ -905,6 +913,7 @@ class ApiClient {
             "networking.view",
             "venue.view",
             "sessions.view",
+            "rooms.view",
             "badges.view",
             "mobile.view",
             "my-events.view",
@@ -1049,6 +1058,11 @@ class ApiClient {
             "networking.view",
             "venue.view",
             "sessions.view",
+            "rooms.view",
+            "rooms.manage",
+            "rooms.create",
+            "rooms.edit",
+            "rooms.delete",
             "badges.view",
             "mobile.view",
             "my-events.view",
@@ -1068,6 +1082,7 @@ class ApiClient {
             "networking.view",
             "venue.view",
             "sessions.view",
+            "rooms.view",
             "badges.view",
             "mobile.view",
           ];
@@ -1078,6 +1093,7 @@ class ApiClient {
             "networking.view",
             "venue.view",
             "sessions.view",
+            "rooms.view",
             "badges.view",
             "mobile.view",
             "my-events.view",
@@ -1592,6 +1608,8 @@ class ApiClient {
       startTime: row.START_TIME ?? row.startTime,
       endTime: row.END_TIME ?? row.endTime,
       location: row.LOCATION ?? row.location,
+      roomId: row.ROOM_ID ?? row.roomId,
+      roomName: row.ROOM_NAME ?? row.roomName,
       speaker: row.SPEAKER ?? row.speaker,
       createdAt: row.CREATED_AT ?? row.createdAt,
     }));
@@ -1612,6 +1630,7 @@ class ApiClient {
       speaker: string;
       speakerEmail: string;
       room: string;
+      roomId?: number;
       track: string;
       capacity: number;
       tags?: string[];
@@ -1624,7 +1643,7 @@ class ApiClient {
       START_TIME: sessionData.startTime,
       END_TIME: sessionData.endTime,
       SPEAKER: sessionData.speaker || null,
-      ROOM_ID: null, // Will be set later if needed
+      ROOM_ID: sessionData.roomId || null,
       STATUS: "upcoming" as const,
     };
 
@@ -1649,6 +1668,7 @@ class ApiClient {
       speaker: string;
       speakerEmail: string;
       room: string;
+      roomId?: number;
       track: string;
       capacity: number;
       tags: string[];
@@ -1666,6 +1686,8 @@ class ApiClient {
       backendSessionData.END_TIME = sessionData.endTime;
     if (sessionData.speaker !== undefined)
       backendSessionData.SPEAKER = sessionData.speaker;
+    if (sessionData.roomId !== undefined)
+      backendSessionData.ROOM_ID = sessionData.roomId;
 
     const response = await this.request<SessionInfo>(`/sessions/${sessionId}`, {
       method: "PATCH",
@@ -2696,6 +2718,128 @@ class ApiClient {
       method: "GET",
     });
     return response.data;
+  }
+
+  // Rooms Management API
+  async getRooms(conferenceId?: number) {
+    // For now, always get all rooms since there's no conference-specific endpoint
+    const url = `/venue/rooms`;
+
+    console.log("API getRooms called with URL:", url);
+    const response = await this.request(url, {
+      method: "GET",
+    });
+    console.log("API getRooms response:", response);
+
+    // Filter rooms by conference if conferenceId is provided
+    if (conferenceId && response.data && Array.isArray(response.data)) {
+      const filteredRooms = response.data.filter(
+        (room: any) =>
+          room.CONFERENCE_ID === conferenceId ||
+          room.conferenceId === conferenceId
+      );
+      console.log(
+        `Filtered ${filteredRooms.length} rooms for conference ${conferenceId}`
+      );
+      return { data: filteredRooms };
+    }
+
+    return response.data;
+  }
+
+  async getRoom(roomId: number) {
+    const response = await this.request(`/venue/rooms/${roomId}`, {
+      method: "GET",
+    });
+    return response.data;
+  }
+
+  async createRoom(
+    floorId: number,
+    roomData: {
+      name: string;
+      capacity: number;
+      description?: string;
+      roomType?: string;
+      features?: string[];
+      status?: string;
+    }
+  ) {
+    const response = await this.request(`/venue/floors/${floorId}/rooms`, {
+      method: "POST",
+      body: JSON.stringify(roomData),
+    });
+    return response.data;
+  }
+
+  async updateRoom(
+    roomId: number,
+    roomData: {
+      name: string;
+      capacity: number;
+      description?: string;
+      roomType?: string;
+      features?: string[];
+      status?: string;
+    }
+  ) {
+    const response = await this.request(`/venue/rooms/${roomId}`, {
+      method: "PUT",
+      body: JSON.stringify(roomData),
+    });
+    return response.data;
+  }
+
+  async deleteRoom(roomId: number) {
+    const response = await this.request(`/venue/rooms/${roomId}`, {
+      method: "DELETE",
+    });
+    return response.success;
+  }
+
+  // Floors Management API
+  async getFloors(conferenceId?: number) {
+    const url = conferenceId
+      ? `/venue/conferences/${conferenceId}/floors`
+      : `/venue/floors`;
+
+    const response = await this.request(url, {
+      method: "GET",
+    });
+    return response.data;
+  }
+
+  async getFloor(floorId: number) {
+    const response = await this.request(`/venue/floors/${floorId}`, {
+      method: "GET",
+    });
+    return response.data;
+  }
+
+  async createFloor(conferenceId: number, floorData: { name: string }) {
+    const response = await this.request(
+      `/venue/conferences/${conferenceId}/floors`,
+      {
+        method: "POST",
+        body: JSON.stringify(floorData),
+      }
+    );
+    return response.data;
+  }
+
+  async updateFloor(floorId: number, floorData: { name: string }) {
+    const response = await this.request(`/venue/floors/${floorId}`, {
+      method: "PUT",
+      body: JSON.stringify(floorData),
+    });
+    return response.data;
+  }
+
+  async deleteFloor(floorId: number) {
+    const response = await this.request(`/venue/floors/${floorId}`, {
+      method: "DELETE",
+    });
+    return response.success;
   }
 }
 

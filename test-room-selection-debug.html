@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Debug Room Selection</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .debug-section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+      }
+      .success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+      }
+      .error {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+      }
+      .info {
+        background-color: #d1ecf1;
+        border-color: #bee5eb;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      select,
+      input {
+        padding: 8px;
+        margin: 5px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        min-width: 200px;
+      }
+      .form-group {
+        margin: 10px 0;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      .debug-info {
+        font-family: monospace;
+        font-size: 12px;
+        background-color: #f0f0f0;
+        padding: 10px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔍 Debug Room Selection</h1>
+
+      <div class="debug-section info">
+        <h3>Mô tả vấn đề</h3>
+        <p>Danh sách phòng không hiển thị trong dropdown. Cần kiểm tra:</p>
+        <ul>
+          <li>API có trả về dữ liệu không</li>
+          <li>Format dữ liệu có đúng không</li>
+          <li>Component có render đúng không</li>
+        </ul>
+      </div>
+
+      <div class="debug-section">
+        <h3>Test API Calls</h3>
+        <button onclick="testAPICall()">Test API Call</button>
+        <button onclick="testDataFormat()">Test Data Format</button>
+        <button onclick="testComponent()">Test Component</button>
+        <div id="apiResults" class="debug-info"></div>
+      </div>
+
+      <div class="debug-section">
+        <h3>Mock Form Test</h3>
+        <form id="testForm">
+          <div class="form-group">
+            <label for="conference">Hội nghị</label>
+            <select id="conference" onchange="loadRooms()">
+              <option value="">Chọn hội nghị</option>
+              <option value="1">Hội nghị 1</option>
+              <option value="2">Hội nghị 2</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="room">Phòng</label>
+            <select id="room">
+              <option value="">Chọn phòng</option>
+            </select>
+          </div>
+        </form>
+        <div id="formResults" class="debug-info"></div>
+      </div>
+
+      <div class="debug-section">
+        <h3>Debug Logs</h3>
+        <div id="debugLogs" class="debug-info"></div>
+      </div>
+    </div>
+
+    <script>
+      // Mock data để test
+      const mockRoomsData = {
+        all: [
+          {
+            ID: 1,
+            NAME: "Phòng A1",
+            CAPACITY: 50,
+            CONFERENCE_ID: 1,
+            STATUS: "active",
+          },
+          {
+            ID: 2,
+            NAME: "Phòng A2",
+            CAPACITY: 100,
+            CONFERENCE_ID: 1,
+            STATUS: "active",
+          },
+          {
+            ID: 3,
+            NAME: "Phòng B1",
+            CAPACITY: 30,
+            CONFERENCE_ID: 2,
+            STATUS: "active",
+          },
+          {
+            ID: 4,
+            NAME: "Phòng B2",
+            CAPACITY: 80,
+            CONFERENCE_ID: 2,
+            STATUS: "active",
+          },
+        ],
+      };
+
+      function log(message) {
+        const logsDiv = document.getElementById("debugLogs");
+        const timestamp = new Date().toLocaleTimeString();
+        logsDiv.textContent += `[${timestamp}] ${message}\n`;
+        console.log(message);
+      }
+
+      function testAPICall() {
+        log("Testing API call...");
+
+        // Simulate API call
+        fetch("http://localhost:4000/api/v1/venue/rooms")
+          .then((response) => {
+            log(`API Response Status: ${response.status}`);
+            return response.json();
+          })
+          .then((data) => {
+            log(`API Response Data: ${JSON.stringify(data, null, 2)}`);
+            document.getElementById("apiResults").textContent = JSON.stringify(
+              data,
+              null,
+              2
+            );
+          })
+          .catch((error) => {
+            log(`API Error: ${error.message}`);
+            document.getElementById(
+              "apiResults"
+            ).textContent = `Error: ${error.message}`;
+          });
+      }
+
+      function testDataFormat() {
+        log("Testing data format conversion...");
+
+        const backendData = mockRoomsData.all;
+        log(`Backend data: ${JSON.stringify(backendData, null, 2)}`);
+
+        // Convert backend format to frontend format
+        const formattedRooms = backendData.map((room) => ({
+          id: room.ID,
+          name: room.NAME,
+          capacity: room.CAPACITY,
+          description: room.DESCRIPTION || "",
+          roomType: room.ROOM_TYPE || "",
+          features: room.FEATURES || [],
+          status: room.STATUS || "active",
+        }));
+
+        log(`Formatted data: ${JSON.stringify(formattedRooms, null, 2)}`);
+        document.getElementById("apiResults").textContent = JSON.stringify(
+          formattedRooms,
+          null,
+          2
+        );
+      }
+
+      function testComponent() {
+        log("Testing component rendering...");
+
+        const roomSelect = document.getElementById("room");
+        const formattedRooms = mockRoomsData.all.map((room) => ({
+          id: room.ID,
+          name: room.NAME,
+          capacity: room.CAPACITY,
+          status: room.STATUS,
+        }));
+
+        // Clear existing options
+        roomSelect.innerHTML = '<option value="">Chọn phòng</option>';
+
+        if (formattedRooms.length > 0) {
+          formattedRooms.forEach((room) => {
+            const option = document.createElement("option");
+            option.value = room.id;
+            option.textContent = `${room.name} (${room.capacity} chỗ)`;
+            roomSelect.appendChild(option);
+          });
+          log(`✅ Added ${formattedRooms.length} rooms to dropdown`);
+        } else {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "Không có phòng nào";
+          option.disabled = true;
+          roomSelect.appendChild(option);
+          log("⚠️ No rooms available");
+        }
+
+        document.getElementById(
+          "formResults"
+        ).textContent = `Rendered ${formattedRooms.length} rooms`;
+      }
+
+      function loadRooms() {
+        const conferenceId = document.getElementById("conference").value;
+        log(`Loading rooms for conference: ${conferenceId}`);
+
+        if (!conferenceId) {
+          document.getElementById("room").innerHTML =
+            '<option value="">Chọn phòng</option>';
+          return;
+        }
+
+        // Filter rooms by conference
+        const filteredRooms = mockRoomsData.all.filter(
+          (room) => room.CONFERENCE_ID == conferenceId
+        );
+
+        log(
+          `Found ${filteredRooms.length} rooms for conference ${conferenceId}`
+        );
+
+        const roomSelect = document.getElementById("room");
+        roomSelect.innerHTML = '<option value="">Chọn phòng</option>';
+
+        if (filteredRooms.length > 0) {
+          filteredRooms.forEach((room) => {
+            const option = document.createElement("option");
+            option.value = room.ID;
+            option.textContent = `${room.NAME} (${room.CAPACITY} chỗ)`;
+            roomSelect.appendChild(option);
+          });
+          log(`✅ Loaded ${filteredRooms.length} rooms`);
+        } else {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "Không có phòng nào cho hội nghị này";
+          option.disabled = true;
+          roomSelect.appendChild(option);
+          log("⚠️ No rooms for this conference");
+        }
+
+        document.getElementById(
+          "formResults"
+        ).textContent = `Conference ${conferenceId}: ${filteredRooms.length} rooms loaded`;
+      }
+
+      // Initialize
+      window.addEventListener("load", function () {
+        log("Debug page loaded");
+        log("Ready to test room selection functionality");
+      });
+    </script>
+  </body>
+</html>

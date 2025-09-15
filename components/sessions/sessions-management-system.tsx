@@ -82,9 +82,20 @@ interface Conference {
   status: string;
 }
 
+interface Room {
+  id: number;
+  name: string;
+  capacity: number;
+  description?: string;
+  roomType?: string;
+  features?: string[];
+  status: string;
+}
+
 export function SessionsManagementSystem() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [conferences, setConferences] = useState<Conference[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedConference, setSelectedConference] = useState<string>("all");
@@ -107,12 +118,69 @@ export function SessionsManagementSystem() {
     startTime: "",
     endTime: "",
     room: "",
+    roomId: "",
     track: "",
     conferenceId: "",
     capacity: "",
     tags: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load rooms for selected conference
+  const loadRoomsForConference = async (conferenceId: number) => {
+    try {
+      console.log("Loading rooms for conference:", conferenceId);
+      const roomsResponse = await apiClient.getRooms(conferenceId);
+      console.log("Rooms response:", roomsResponse);
+
+      // Handle different response formats
+      const roomsData = (roomsResponse as any)?.data || roomsResponse || [];
+      console.log("Rooms data:", roomsData);
+
+      // Convert backend format to frontend format
+      const formattedRooms = Array.isArray(roomsData)
+        ? roomsData.map((room) => ({
+            id: room.ID || room.id,
+            name: room.NAME || room.name,
+            capacity: room.CAPACITY || room.capacity,
+            description: room.DESCRIPTION || room.description,
+            roomType: room.ROOM_TYPE || room.roomType,
+            features: room.FEATURES || room.features || [],
+            status: room.STATUS || room.status || "active",
+          }))
+        : [];
+
+      console.log("Formatted rooms:", formattedRooms);
+      setRooms(formattedRooms);
+    } catch (error) {
+      console.error("Error loading rooms:", error);
+      // Fallback: try to load all rooms
+      try {
+        console.log("Falling back to load all rooms");
+        const allRoomsResponse = await apiClient.getRooms();
+        const allRoomsData =
+          (allRoomsResponse as any)?.data || allRoomsResponse || [];
+
+        // Convert backend format to frontend format
+        const formattedRooms = Array.isArray(allRoomsData)
+          ? allRoomsData.map((room) => ({
+              id: room.ID || room.id,
+              name: room.NAME || room.name,
+              capacity: room.CAPACITY || room.capacity,
+              description: room.DESCRIPTION || room.description,
+              roomType: room.ROOM_TYPE || room.roomType,
+              features: room.FEATURES || room.features || [],
+              status: room.STATUS || room.status || "active",
+            }))
+          : [];
+
+        setRooms(formattedRooms);
+      } catch (fallbackError) {
+        console.error("Error loading all rooms:", fallbackError);
+        setRooms([]);
+      }
+    }
+  };
 
   // Load data from API
   const loadData = async () => {
@@ -122,6 +190,32 @@ export function SessionsManagementSystem() {
       // Load conferences
       const conferencesResponse = await apiClient.getConferences();
       setConferences(conferencesResponse.data);
+
+      // Load rooms
+      try {
+        const roomsResponse = await apiClient.getRooms();
+        console.log("Initial rooms response:", roomsResponse);
+        const roomsData = (roomsResponse as any)?.data || roomsResponse || [];
+
+        // Convert backend format to frontend format
+        const formattedRooms = Array.isArray(roomsData)
+          ? roomsData.map((room) => ({
+              id: room.ID || room.id,
+              name: room.NAME || room.name,
+              capacity: room.CAPACITY || room.capacity,
+              description: room.DESCRIPTION || room.description,
+              roomType: room.ROOM_TYPE || room.roomType,
+              features: room.FEATURES || room.features || [],
+              status: room.STATUS || room.status || "active",
+            }))
+          : [];
+
+        console.log("Initial formatted rooms:", formattedRooms);
+        setRooms(formattedRooms);
+      } catch (error) {
+        console.error("Error loading initial rooms:", error);
+        setRooms([]);
+      }
 
       // Load sessions
       const sessionsResponse = await apiClient.getSessions();
@@ -134,8 +228,8 @@ export function SessionsManagementSystem() {
           speakerEmail: undefined, // Not provided by API
           startTime: session.startTime,
           endTime: session.endTime,
-          room: session.location, // API returns 'location' but we need 'room'
-          roomId: undefined, // Not provided by API
+          room: session.roomName || session.location || "Chưa có phòng", // Use room name if available
+          roomId: session.roomId, // Now provided by API
           track: undefined, // Not provided by API
           conferenceId: session.conferenceId,
           conferenceName:
@@ -310,6 +404,7 @@ export function SessionsManagementSystem() {
       startTime: "",
       endTime: "",
       room: "",
+      roomId: "none",
       track: "",
       conferenceId: "",
       capacity: "",
@@ -332,11 +427,18 @@ export function SessionsManagementSystem() {
         ? new Date(session.endTime).toISOString().slice(0, 16)
         : "",
       room: session.room || "",
+      roomId: session.roomId?.toString() || "none",
       track: session.track || "",
       conferenceId: session.conferenceId.toString(),
       capacity: session.capacity?.toString() || "",
       tags: session.tags?.join(", ") || "",
     });
+
+    // Load rooms for the conference when editing
+    if (session.conferenceId) {
+      loadRoomsForConference(session.conferenceId);
+    }
+
     setIsEditDialogOpen(true);
   };
 
@@ -378,6 +480,12 @@ export function SessionsManagementSystem() {
         speaker: formData.speaker || "",
         speakerEmail: formData.speakerEmail || "",
         room: formData.room || "",
+        roomId:
+          formData.roomId &&
+          formData.roomId !== "" &&
+          formData.roomId !== "none"
+            ? parseInt(formData.roomId)
+            : undefined,
         track: formData.track || "",
         capacity: formData.capacity ? parseInt(formData.capacity) : 100,
         tags: formData.tags
@@ -428,6 +536,12 @@ export function SessionsManagementSystem() {
         speaker: formData.speaker || "",
         speakerEmail: formData.speakerEmail || "",
         room: formData.room || "",
+        roomId:
+          formData.roomId &&
+          formData.roomId !== "" &&
+          formData.roomId !== "none"
+            ? parseInt(formData.roomId)
+            : undefined,
         track: formData.track || "",
         capacity: formData.capacity ? parseInt(formData.capacity) : 100,
         tags: formData.tags
@@ -842,6 +956,35 @@ export function SessionsManagementSystem() {
         </CardContent>
       </Card>
 
+      {/* Debug Panel - Remove in production */}
+      {process.env.NODE_ENV === "development" && (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle className="text-sm">Debug Info</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xs space-y-1">
+              <p>Rooms loaded: {rooms.length}</p>
+              <p>Conferences loaded: {conferences.length}</p>
+              <p>Selected conference: {formData.conferenceId}</p>
+              <p>Selected room: {formData.roomId}</p>
+              {rooms.length > 0 && (
+                <div>
+                  <p>Available rooms:</p>
+                  <ul className="ml-4">
+                    {rooms.map((room) => (
+                      <li key={room.id}>
+                        - {room.name} (ID: {room.id}, Capacity: {room.capacity})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Create Session Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="max-w-2xl">
@@ -913,13 +1056,51 @@ export function SessionsManagementSystem() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Phòng</label>
-                <Input
-                  placeholder="Tên phòng"
-                  value={formData.room}
-                  onChange={(e) =>
-                    setFormData({ ...formData, room: e.target.value })
-                  }
-                />
+                <Select
+                  value={formData.roomId || "none"}
+                  onValueChange={(value) => {
+                    if (value === "loading") return; // Ignore disabled option
+
+                    if (value === "none") {
+                      // No room selected
+                      setFormData({
+                        ...formData,
+                        roomId: "",
+                        room: "",
+                      });
+                      return;
+                    }
+
+                    const selectedRoom = rooms.find(
+                      (room) => room.id.toString() === value
+                    );
+                    setFormData({
+                      ...formData,
+                      roomId: value,
+                      room: selectedRoom?.name || "",
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn phòng" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Không chọn phòng</SelectItem>
+                    {rooms.length > 0 ? (
+                      rooms.map((room) => (
+                        <SelectItem key={room.id} value={room.id.toString()}>
+                          {room.name} ({room.capacity} chỗ)
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="loading" disabled>
+                        {rooms.length === 0
+                          ? "Không có phòng nào"
+                          : "Đang tải..."}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="text-sm font-medium">Sức chứa</label>
@@ -938,9 +1119,17 @@ export function SessionsManagementSystem() {
                 <label className="text-sm font-medium">Hội nghị *</label>
                 <Select
                   value={formData.conferenceId}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, conferenceId: value })
-                  }
+                  onValueChange={(value) => {
+                    setFormData({
+                      ...formData,
+                      conferenceId: value,
+                      roomId: "none",
+                      room: "",
+                    });
+                    if (value) {
+                      loadRoomsForConference(parseInt(value));
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn hội nghị" />
@@ -1074,13 +1263,51 @@ export function SessionsManagementSystem() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Phòng</label>
-                <Input
-                  placeholder="Tên phòng"
-                  value={formData.room}
-                  onChange={(e) =>
-                    setFormData({ ...formData, room: e.target.value })
-                  }
-                />
+                <Select
+                  value={formData.roomId || "none"}
+                  onValueChange={(value) => {
+                    if (value === "loading") return; // Ignore disabled option
+
+                    if (value === "none") {
+                      // No room selected
+                      setFormData({
+                        ...formData,
+                        roomId: "",
+                        room: "",
+                      });
+                      return;
+                    }
+
+                    const selectedRoom = rooms.find(
+                      (room) => room.id.toString() === value
+                    );
+                    setFormData({
+                      ...formData,
+                      roomId: value,
+                      room: selectedRoom?.name || "",
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn phòng" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Không chọn phòng</SelectItem>
+                    {rooms.length > 0 ? (
+                      rooms.map((room) => (
+                        <SelectItem key={room.id} value={room.id.toString()}>
+                          {room.name} ({room.capacity} chỗ)
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="loading" disabled>
+                        {rooms.length === 0
+                          ? "Không có phòng nào"
+                          : "Đang tải..."}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="text-sm font-medium">Sức chứa</label>
@@ -1099,9 +1326,17 @@ export function SessionsManagementSystem() {
                 <label className="text-sm font-medium">Hội nghị *</label>
                 <Select
                   value={formData.conferenceId}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, conferenceId: value })
-                  }
+                  onValueChange={(value) => {
+                    setFormData({
+                      ...formData,
+                      conferenceId: value,
+                      roomId: "none",
+                      room: "",
+                    });
+                    if (value) {
+                      loadRoomsForConference(parseInt(value));
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn hội nghị" />
