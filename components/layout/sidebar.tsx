@@ -30,7 +30,6 @@ import {
   Building,
   ChevronRight,
   ChevronDown,
-  MessageCircle,
   Brain,
 } from "lucide-react";
 
@@ -128,13 +127,6 @@ const allNavigationItems = [
     description: "Xem các sự kiện đã đăng ký",
   },
   {
-    href: "/messaging",
-    icon: MessageCircle,
-    label: "Tin nhắn",
-    requiredPermissions: ["messaging.view"],
-    description: "Nhắn tin với những người tham dự hội nghị",
-  },
-  {
     href: "/profile",
     icon: UserCheck,
     label: "Thông tin cá nhân",
@@ -189,13 +181,6 @@ const getNavigationItems = (
     const hasBasicPermission = item.requiredPermissions.every((permission) =>
       hasPermission(permission)
     );
-
-    // Special handling for messaging - it's a general feature, not conference-specific
-    if (item.href === "/messaging") {
-      // All roles (admin, staff, attendee) should have messaging.view permission
-      // If permission check fails, still show it as it's a core feature
-      return true;
-    }
 
     // Special handling for my-events - it's a general feature, not conference-specific
     if (item.href === "/my-events") {
@@ -336,7 +321,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       ].includes(item.href)
     ),
     features: items.filter((item) =>
-      ["/dashboard", "/profile", "/my-events", "/messaging"].includes(item.href)
+      ["/dashboard", "/profile", "/my-events"].includes(item.href)
     ),
   };
 

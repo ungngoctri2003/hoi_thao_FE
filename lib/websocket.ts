@@ -28,17 +28,14 @@ class WebSocketService {
 
   public async connect(): Promise<void> {
     if (this.socket?.connected) {
-      console.log("WebSocket already connected");
       return;
     }
 
     if (this.isConnecting) {
-      console.log("WebSocket connection already in progress");
       return;
     }
 
     if (this.isPaused) {
-      console.log("WebSocket is paused due to repeated failures");
       return;
     }
 
@@ -47,11 +44,8 @@ class WebSocketService {
     try {
       let token = this.getToken();
       if (!token) {
-        console.log("No valid access token found, attempting to refresh...");
-
         // Try to refresh token if no valid token is found
         if (!this.hasAttemptedTokenRefresh) {
-          console.log("No valid token found, attempting token refresh...");
           const refreshSuccess = await this.attemptTokenRefresh();
           if (refreshSuccess) {
             // Wait a bit for token to be properly set
@@ -64,9 +58,6 @@ class WebSocketService {
               this.isConnecting = false;
               return;
             } else {
-              console.log(
-                "Token refresh successful, proceeding with connection"
-              );
             }
           } else {
             console.error(
@@ -85,19 +76,6 @@ class WebSocketService {
       }
 
       console.log("Connecting to WebSocket...");
-      console.log(
-        "Token being sent:",
-        token ? `${token.substring(0, 20)}...` : "none"
-      );
-      console.log("Token length:", token?.length || 0);
-      console.log(
-        "Token format check:",
-        token
-          ? token.split(".").length === 3
-            ? "Valid JWT format"
-            : "Invalid JWT format"
-          : "No token"
-      );
 
       // Additional token debugging
       if (token) {
@@ -105,16 +83,6 @@ class WebSocketService {
           const parts = token.split(".");
           if (parts.length === 3) {
             const payload = JSON.parse(atob(parts[1]));
-            console.log("Token payload:", {
-              userId: payload.userId,
-              email: payload.email,
-              role: payload.role,
-              exp: payload.exp,
-              iat: payload.iat,
-              expDate: new Date(payload.exp * 1000).toISOString(),
-              currentTime: new Date().toISOString(),
-              isExpired: Date.now() >= payload.exp * 1000,
-            });
           }
         } catch (error) {
           console.error("Failed to parse token payload:", error);
@@ -128,12 +96,6 @@ class WebSocketService {
           const payload = JSON.parse(atob(token.split(".")[1]));
           const now = Math.floor(Date.now() / 1000);
           const timeUntilExpiry = payload.exp - now;
-
-          console.log("Token validation:", {
-            expiresAt: new Date(payload.exp * 1000),
-            timeUntilExpiry: timeUntilExpiry,
-            isExpired: now >= payload.exp,
-          });
 
           if (now >= payload.exp) {
             console.warn("Token is expired, attempting to refresh...");
@@ -163,14 +125,12 @@ class WebSocketService {
               if (refreshSuccess) {
                 const newToken = this.getToken();
                 if (newToken) {
-                  console.log("Token refreshed proactively, reconnecting...");
                   this.connect().catch(console.error);
                   return;
                 }
               }
             }
           }
-          console.log("Token is valid, proceeding with connection");
         } catch (error) {
           console.error("Invalid token format:", error);
           return;
@@ -211,7 +171,6 @@ class WebSocketService {
 
   public disconnect(): void {
     if (this.socket) {
-      console.log("Disconnecting WebSocket...");
       this.socket.disconnect();
       this.socket = null;
       this.isConnected = false;

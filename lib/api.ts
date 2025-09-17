@@ -333,11 +333,9 @@ class ApiClient {
 
     // Add authorization header if token exists
     const token = this.getToken();
-    console.log("API request token:", token ? "exists" : "missing");
     if (token) {
       // Check if token is expired before sending request
       if (this.isTokenExpired(token)) {
-        console.log("Token is expired, attempting refresh before request...");
         try {
           const refreshSuccess = await this.attemptTokenRefresh();
           if (refreshSuccess) {
@@ -401,7 +399,6 @@ class ApiClient {
         ) {
           // Check if this is an account disabled error
           if (data.error && data.error.code === "ACCOUNT_DISABLED") {
-            console.log("Account is disabled, not attempting token refresh");
             // Clear tokens and handle account disabled
             this.removeTokens();
             this.handleAccountDisabled();
@@ -410,17 +407,12 @@ class ApiClient {
             );
           }
 
-          console.log("Access token expired, attempting to refresh...");
           try {
             const refreshSuccess = await this.attemptTokenRefresh();
             if (refreshSuccess) {
-              console.log("Token refresh successful, retrying request...");
               // Retry the original request with new token
               return this.request<T>(endpoint, options, true);
             } else {
-              console.log(
-                "Token refresh failed, clearing tokens and redirecting to login"
-              );
               this.removeTokens();
               this.handleSessionExpiration();
               throw new Error(
@@ -509,18 +501,14 @@ class ApiClient {
     if (typeof window !== "undefined") {
       // Try to get from cookies first, then localStorage as fallback
       const cookies = document.cookie.split(";");
-      console.log("All cookies:", document.cookie);
       const tokenCookie = cookies.find((cookie) =>
         cookie.trim().startsWith("accessToken=")
       );
-      console.log("Token cookie found:", tokenCookie);
       if (tokenCookie) {
         const token = tokenCookie.split("=")[1];
-        console.log("Token extracted from cookie:", token ? "EXISTS" : "EMPTY");
         return token;
       }
       const token = localStorage.getItem("accessToken");
-      console.log("Token from localStorage:", token ? "EXISTS" : "NOT FOUND");
       return token;
     }
     return null;
@@ -532,7 +520,6 @@ class ApiClient {
       const now = Math.floor(Date.now() / 1000);
       return now >= payload.exp;
     } catch (error) {
-      console.error("Error parsing token:", error);
       return true; // Consider invalid token as expired
     }
   }
@@ -571,14 +558,11 @@ class ApiClient {
   private async attemptTokenRefresh(): Promise<boolean> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) {
-      console.log("No refresh token available");
       return false;
     }
 
     try {
-      console.log("Attempting to refresh token...");
       const response = await this.refreshToken({ refreshToken });
-      console.log("Token refresh successful");
       return true;
     } catch (error) {
       console.error("Token refresh failed:", error);
@@ -846,13 +830,11 @@ class ApiClient {
       );
 
       const userData = response.data.user;
-      console.log("Refreshed permissions response:", userData);
 
       // Get role from the refreshed data
       let role = "attendee";
       if (userData.role) {
         role = userData.role;
-        console.log("Role from refreshed permissions:", role);
       }
 
       // Generate permissions based on role if not provided
@@ -950,7 +932,6 @@ class ApiClient {
         });
         userData = profileResponse.data.user;
         attendeeData = profileResponse.data.attendee;
-        console.log("Profile response:", { userData, attendeeData });
       } catch (profileError) {
         console.warn("Profile endpoint failed, trying users/me:", profileError);
         // Fallback to users/me endpoint
@@ -962,7 +943,6 @@ class ApiClient {
           meResponse.data.user?.permissions ||
           meResponse.data.permissions ||
           [];
-        console.log("Users/me response:", { userData, permissions });
       }
 
       // If we still don't have user data, try a simple auth check
@@ -1003,17 +983,14 @@ class ApiClient {
       // Priority 1: Check ROLE_CODE from user data (most reliable - from backend)
       if (userData.ROLE_CODE) {
         role = userData.ROLE_CODE;
-        console.log("Role determined from ROLE_CODE (backend):", role);
       }
       // Priority 2: Check role field from users/me endpoint
       else if (userData.role) {
         role = userData.role;
-        console.log("Role determined from user.role (backend):", role);
       }
       // Priority 3: Check permissions for admin role
       else if (permissions.includes("roles.admin")) {
         role = "admin";
-        console.log("Role determined from permissions (admin):", role);
       }
       // Priority 4: Check permissions for staff role
       else if (
@@ -1021,7 +998,6 @@ class ApiClient {
         permissions.includes("conferences.update")
       ) {
         role = "staff";
-        console.log("Role determined from permissions (staff):", role);
       }
       // Priority 5: Check email pattern for admin (fallback)
       else if (
@@ -1029,15 +1005,10 @@ class ApiClient {
         userData.EMAIL.toLowerCase().includes("admin")
       ) {
         role = "admin";
-        console.log("Role determined from email pattern (admin):", role);
       }
 
       // If we have a role but no permissions, generate permissions based on role
       if (role && permissions.length === 0) {
-        console.log(
-          "No permissions from backend, generating based on role:",
-          role
-        );
         if (role === "admin") {
           permissions = [
             "dashboard.view",
