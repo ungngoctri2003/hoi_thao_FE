@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,15 +21,16 @@ import { CheckInRecordsList } from "./components/checkin-records-list";
 import { ConferenceInfo } from "./components/conference-info";
 import { UsageGuide } from "./components/usage-guide";
 import { ToastNotification } from "./components/toast-notification";
+import { QRAttendeeInfo } from "@/components/attendees/qr-attendee-info";
 import { checkInAPI, type CheckInResponse } from "./lib/checkin-api";
 import { type CheckInRecord, type Attendee, type Conference } from "./types";
-import { 
-  QrCode, 
+import {
+  QrCode,
   CheckCircle,
   XCircle,
   ArrowLeft,
   Users,
-  Calendar
+  Calendar,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -37,13 +44,15 @@ export default function PublicCheckInPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [toast, setToast] = useState<{
     message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
+    type: "success" | "error" | "warning" | "info";
     isVisible: boolean;
   }>({
-    message: '',
-    type: 'info',
-    isVisible: false
+    message: "",
+    type: "info",
+    isVisible: false,
   });
+  const [scannedQRData, setScannedQRData] = useState<any>(null);
+  const [showQRInfo, setShowQRInfo] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -65,7 +74,7 @@ export default function PublicCheckInPage() {
       const conferencesData = await checkInAPI.getConferences();
       setConferences(conferencesData);
     } catch (err) {
-      console.error('Error loading initial data:', err);
+      console.error("Error loading initial data:", err);
       setError("Lỗi khi tải dữ liệu");
     } finally {
       setIsLoading(false);
@@ -78,13 +87,12 @@ export default function PublicCheckInPage() {
       const recordsData = await checkInAPI.getCheckInRecords(conferenceId);
       setCheckInRecords(recordsData);
     } catch (err) {
-      console.error('Error loading checkin records:', err);
+      console.error("Error loading checkin records:", err);
       setError("Lỗi khi tải lịch sử check-in");
     } finally {
       setIsLoading(false);
     }
   };
-
 
   const handleQRScanSuccess = async (qrData: string) => {
     if (!selectedConference) {
@@ -95,13 +103,43 @@ export default function PublicCheckInPage() {
     try {
       setIsScanning(false);
       setError("");
-      
+      setSuccessMessage("");
+
+      console.log("🔍 Processing QR code:", qrData);
+
+      // Show processing message
+      setSuccessMessage("Đang xử lý mã QR...");
+
+      // Parse QR data to check if it contains full information
+      let parsedQRData = null;
+      try {
+        parsedQRData = JSON.parse(qrData);
+        console.log("📱 Parsed QR data:", parsedQRData);
+      } catch (e) {
+        console.log("📱 QR data is not JSON format");
+      }
+
+      // Store QR data for display
+      setScannedQRData(parsedQRData);
+
       // Validate QR code first
-      const validation = await checkInAPI.validateQRCode(qrData, parseInt(selectedConference));
-      
+      const validation = await checkInAPI.validateQRCode(
+        qrData,
+        parseInt(selectedConference)
+      );
+
       if (!validation.valid || !validation.attendee) {
         setError("Mã QR không hợp lệ hoặc không thuộc hội nghị này");
+        setSuccessMessage("");
         return;
+      }
+
+      console.log("✅ QR validation successful:", validation.attendee);
+      setSuccessMessage(`Tìm thấy tham dự viên: ${validation.attendee.name}`);
+
+      // Show QR info if available
+      if (parsedQRData && parsedQRData.attendee) {
+        setShowQRInfo(true);
       }
 
       // Perform check-in
@@ -109,7 +147,7 @@ export default function PublicCheckInPage() {
         attendeeId: validation.attendee.id,
         qrCode: qrData,
         conferenceId: parseInt(selectedConference),
-        checkInMethod: 'qr'
+        checkInMethod: "qr",
       });
 
       if (response.success && response.data) {
@@ -117,24 +155,34 @@ export default function PublicCheckInPage() {
         if (selectedConference) {
           await loadCheckInRecords(parseInt(selectedConference));
         }
+
+        // Clear success message and show final result
+        setSuccessMessage("");
         setToast({
-          message: `Check-in thành công cho ${response.data.attendeeName}`,
-          type: 'success',
-          isVisible: true
+          message: `✅ Check-in thành công cho ${response.data.attendeeName}`,
+          type: "success",
+          isVisible: true,
         });
+
+        // Auto-hide success message after 3 seconds
+        setTimeout(() => {
+          setSuccessMessage("");
+        }, 3000);
       } else {
+        setSuccessMessage("");
         setToast({
           message: response.message || "Lỗi khi check-in",
-          type: 'error',
-          isVisible: true
+          type: "error",
+          isVisible: true,
         });
       }
     } catch (err) {
-      console.error('QR scan error:', err);
+      console.error("QR scan error:", err);
+      setSuccessMessage("");
       setToast({
         message: "Lỗi khi xử lý mã QR",
-        type: 'error',
-        isVisible: true
+        type: "error",
+        isVisible: true,
       });
     }
   };
@@ -147,16 +195,16 @@ export default function PublicCheckInPage() {
   const handleManualCheckInSuccess = async (attendee: Attendee) => {
     try {
       setError("");
-      
+
       // Create check-in record from attendee data
       const checkInRecord: CheckInRecord = {
         id: Date.now(),
         attendeeName: attendee.name,
         attendeeEmail: attendee.email,
-        checkInTime: new Date().toLocaleString('vi-VN'),
-        status: 'success',
+        checkInTime: new Date().toLocaleString("vi-VN"),
+        status: "success",
         qrCode: attendee.qrCode,
-        conferenceId: attendee.conferenceId
+        conferenceId: attendee.conferenceId,
       };
 
       // Reload checkin records for the current conference
@@ -165,15 +213,15 @@ export default function PublicCheckInPage() {
       }
       setToast({
         message: `Check-in thành công cho ${attendee.name}`,
-        type: 'success',
-        isVisible: true
+        type: "success",
+        isVisible: true,
       });
     } catch (err) {
-      console.error('Manual check-in error:', err);
+      console.error("Manual check-in error:", err);
       setToast({
         message: "Lỗi khi check-in thủ công",
-        type: 'error',
-        isVisible: true
+        type: "error",
+        isVisible: true,
       });
     }
   };
@@ -185,40 +233,39 @@ export default function PublicCheckInPage() {
   const handleDeleteRecord = async (recordId: number, qrCode: string) => {
     try {
       const response = await checkInAPI.deleteCheckInRecord(recordId, qrCode);
-      
+
       if (response.success) {
         // Reload checkin records
         if (selectedConference) {
           await loadCheckInRecords(parseInt(selectedConference));
         }
-        
+
         setToast({
           message: response.message,
-          type: 'success',
-          isVisible: true
+          type: "success",
+          isVisible: true,
         });
       } else {
         setToast({
           message: response.message,
-          type: 'error',
-          isVisible: true
+          type: "error",
+          isVisible: true,
         });
       }
     } catch (err) {
-      console.error('Delete record error:', err);
+      console.error("Delete record error:", err);
       setToast({
         message: "Lỗi khi xóa check-in",
-        type: 'error',
-        isVisible: true
+        type: "error",
+        isVisible: true,
       });
     }
   };
 
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <PublicHeader />
-      
+
       <div className="container mx-auto px-4 py-8">
         {/* Back to Home */}
         <div className="mb-6">
@@ -233,7 +280,7 @@ export default function PublicCheckInPage() {
         <div className="space-y-6">
           {/* API Status */}
           {/* <APIStatus onRetry={loadInitialData} /> */}
-          
+
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -255,7 +302,9 @@ export default function PublicCheckInPage() {
                   <Calendar className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg text-primary">Bước 1: Chọn Hội nghị</CardTitle>
+                  <CardTitle className="text-lg text-primary">
+                    Bước 1: Chọn Hội nghị
+                  </CardTitle>
                   <CardDescription className="text-sm">
                     Vui lòng chọn hội nghị để bắt đầu quá trình check-in
                   </CardDescription>
@@ -276,30 +325,36 @@ export default function PublicCheckInPage() {
                     >
                       <option value="">-- Vui lòng chọn hội nghị --</option>
                       {conferences
-                        .filter(conference => conference.id !== undefined && conference.id !== null)
+                        .filter(
+                          (conference) =>
+                            conference.id !== undefined &&
+                            conference.id !== null
+                        )
                         .map((conference) => (
-                          <option 
-                            key={conference.id} 
+                          <option
+                            key={conference.id}
                             value={conference.id.toString()}
                           >
-                            {conference.name || 'Unknown Conference'} - {conference.date || 'N/A'}
+                            {conference.name || "Unknown Conference"} -{" "}
+                            {conference.date || "N/A"}
                           </option>
                         ))}
                     </select>
                   </div>
                 </div>
-                
+
                 {!selectedConference && (
                   <div className="flex items-center space-x-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                     <div className="w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center">
                       <span className="text-white text-xs font-bold">!</span>
                     </div>
                     <p className="text-sm text-amber-700 font-medium">
-                      ⚠️ Bạn cần chọn hội nghị trước khi có thể thực hiện check-in
+                      ⚠️ Bạn cần chọn hội nghị trước khi có thể thực hiện
+                      check-in
                     </p>
                   </div>
                 )}
-                
+
                 {selectedConference && (
                   <div className="flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <CheckCircle className="h-5 w-5 text-green-600" />
@@ -313,10 +368,15 @@ export default function PublicCheckInPage() {
           </Card>
 
           {/* Conference Info */}
-          <ConferenceInfo 
-            conference={conferences.find(c => c.id === parseInt(selectedConference)) || null}
+          <ConferenceInfo
+            conference={
+              conferences.find((c) => c.id === parseInt(selectedConference)) ||
+              null
+            }
             totalAttendees={conferences.length * 10} // Mock data
-            checkedInCount={checkInRecords.filter(r => r.status === 'success').length}
+            checkedInCount={
+              checkInRecords.filter((r) => r.status === "success").length
+            }
           />
 
           {/* Success/Error Messages */}
@@ -335,7 +395,7 @@ export default function PublicCheckInPage() {
           )}
 
           {/* Stats Cards */}
-          <StatsCards 
+          <StatsCards
             records={checkInRecords}
             conferences={conferences}
             selectedConference={selectedConference}
@@ -349,33 +409,64 @@ export default function PublicCheckInPage() {
                   <span className="text-white text-sm font-bold">2</span>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Bước 2: Chọn Phương thức Check-in</h3>
-                  <p className="text-sm text-gray-600">Chọn một trong hai phương thức dưới đây</p>
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Bước 2: Chọn Phương thức Check-in
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Chọn một trong hai phương thức dưới đây
+                  </p>
                 </div>
               </div>
-              
+
               <Tabs defaultValue="qr" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 h-12">
-                  <TabsTrigger value="qr" className="flex items-center space-x-2 text-base font-medium">
+                  <TabsTrigger
+                    value="qr"
+                    className="flex items-center space-x-2 text-base font-medium"
+                  >
                     <QrCode className="h-5 w-5" />
                     <span>Quét QR Code</span>
                   </TabsTrigger>
-                  <TabsTrigger value="manual" className="flex items-center space-x-2 text-base font-medium">
+                  <TabsTrigger
+                    value="manual"
+                    className="flex items-center space-x-2 text-base font-medium"
+                  >
                     <Users className="h-5 w-5" />
                     <span>Check-in Thủ công</span>
                   </TabsTrigger>
                 </TabsList>
-            
-            <TabsContent value="qr" className="mt-6">
-              <QRScanner
-                onScanSuccess={handleQRScanSuccess}
-                onScanError={handleQRScanError}
-                isScanning={isScanning}
-                onStartScan={() => setIsScanning(true)}
-                onStopScan={() => setIsScanning(false)}
-              />
-            </TabsContent>
-            
+
+                <TabsContent value="qr" className="mt-6">
+                  <div className="space-y-6">
+                    <QRScanner
+                      onScanSuccess={handleQRScanSuccess}
+                      onScanError={handleQRScanError}
+                      isScanning={isScanning}
+                      onStartScan={() => setIsScanning(true)}
+                      onStopScan={() => setIsScanning(false)}
+                    />
+
+                    {/* QR Attendee Info */}
+                    {showQRInfo && scannedQRData && (
+                      <div className="mt-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            Thông tin từ QR Code
+                          </h3>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowQRInfo(false)}
+                          >
+                            Ẩn thông tin
+                          </Button>
+                        </div>
+                        <QRAttendeeInfo qrData={scannedQRData} />
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
                 <TabsContent value="manual" className="mt-6">
                   <ManualCheckInForm
                     onCheckInSuccess={handleManualCheckInSuccess}
@@ -423,7 +514,7 @@ export default function PublicCheckInPage() {
         message={toast.message}
         type={toast.type}
         isVisible={toast.isVisible}
-        onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
+        onClose={() => setToast((prev) => ({ ...prev, isVisible: false }))}
       />
     </div>
   );

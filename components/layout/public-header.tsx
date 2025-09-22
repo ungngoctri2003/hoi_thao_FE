@@ -17,6 +17,7 @@ import {
   Moon,
   Sun,
   Star,
+  LogIn,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -60,6 +61,13 @@ export function PublicHeader() {
       icon: MapPin,
       description: "Xem bản đồ và địa điểm",
       badge: "3D",
+    },
+    {
+      name: "Đăng nhập",
+      href: "/login",
+      icon: LogIn,
+      description: "Đăng nhập vào hệ thống",
+      badge: "Admin",
     },
   ];
 
@@ -122,6 +130,8 @@ export function PublicHeader() {
                             ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
                             : item.badge === "3D"
                             ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+                            : item.badge === "Admin"
+                            ? "bg-gradient-to-r from-red-500 to-orange-500 text-white"
                             : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
                         }`}
                       >
@@ -228,6 +238,8 @@ export function PublicHeader() {
                                     ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
                                     : item.badge === "3D"
                                     ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+                                    : item.badge === "Admin"
+                                    ? "bg-gradient-to-r from-red-500 to-orange-500 text-white"
                                     : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
                                 }`}
                               >
