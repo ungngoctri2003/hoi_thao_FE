@@ -204,3 +204,5 @@ interface QRNameCardGeneratorProps {
 - [ ] Thêm batch export cho nhiều hội nghị
 - [ ] Tích hợp với real API
 - [ ] Thêm analytics cho QR usage
+
+

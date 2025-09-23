@@ -186,3 +186,5 @@ Test page sử dụng mock data để demo:
 - [ ] Batch QR generation
 - [ ] QR code analytics
 - [ ] Mobile app integration
+
+
