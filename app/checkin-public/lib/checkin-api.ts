@@ -375,9 +375,11 @@ class CheckInAPI {
       // Try to parse as JSON first (from name card)
       try {
         qrData = JSON.parse(qrCode);
-        if (qrData.type === "attendee_registration" && qrData.attendeeId) {
-          attendeeId = qrData.attendeeId;
-          qrConferenceId = qrData.conferenceId;
+        console.log("📱 Parsed QR data:", qrData);
+
+        if (qrData.id) {
+          attendeeId = qrData.id;
+          qrConferenceId = qrData.conf;
           console.log("📱 Parsed name card QR code:", {
             attendeeId,
             qrConferenceId,
@@ -385,19 +387,18 @@ class CheckInAPI {
           });
 
           // If QR code contains full attendee data, use it directly
-          if (qrData.attendee) {
+          if (qrData.a) {
             console.log(
               "✅ QR code contains full attendee data, using it directly"
             );
             const attendee: Attendee = {
-              id: qrData.attendee.id,
-              name: qrData.attendee.name,
-              email: qrData.attendee.email,
-              phone: qrData.attendee.phone,
+              id: qrData.a.id,
+              name: qrData.a.n,
+              email: qrData.a.e,
+              phone: qrData.a.p,
               qrCode: qrCode,
               conferenceId: qrConferenceId || conferenceId,
-              isRegistered:
-                qrData.registration?.status === "registered" || true,
+              isRegistered: true,
             };
 
             // Validate checksum if present
@@ -414,8 +415,14 @@ class CheckInAPI {
 
             return { valid: true, attendee, qrData };
           }
+        } else {
+          console.log("📱 QR data doesn't match expected format:", {
+            id: qrData.id,
+            hasId: !!qrData.id,
+          });
         }
       } catch (e) {
+        console.log("📱 QR data is not JSON format, trying string format");
         // Not JSON, try to parse as string format
         const parts = qrCode.split(":");
         if (parts.length >= 2 && parts[0] === "ATTENDEE") {
@@ -442,6 +449,23 @@ class CheckInAPI {
           conferenceId,
         });
         return { valid: false };
+      }
+
+      // If we have attendeeId but no full attendee data, try to find from mock data
+      if (attendeeId && !qrData?.attendee) {
+        console.log(
+          "📱 Looking up attendee from mock data for ID:",
+          attendeeId
+        );
+        const mockAttendees = MOCK_DATA.ATTENDEES.filter(
+          (attendee) => attendee.conferenceId === conferenceId
+        );
+
+        const attendee = mockAttendees.find((a) => a.id === attendeeId);
+        if (attendee) {
+          console.log("✅ Found attendee in mock data:", attendee);
+          return { valid: true, attendee, qrData };
+        }
       }
 
       const response = await fetch(
@@ -476,7 +500,7 @@ class CheckInAPI {
 
         if (attendee) {
           console.log("✅ Mock validation successful:", attendee);
-          return { valid: true, attendee };
+          return { valid: true, attendee, qrData };
         } else {
           console.warn("❌ Mock validation failed: attendee not found");
           return { valid: false };

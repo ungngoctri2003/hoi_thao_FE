@@ -72,13 +72,14 @@ export function QRNameCardGenerator({
       try {
         const qrData = qrCode || generatedQR;
         const dataUrl = await QRCode.toDataURL(qrData, {
-          width: 400, // Tăng độ phân giải QR code
-          margin: 4,
+          width: 600, // Tăng độ phân giải QR code
+          margin: 0,
           color: {
             dark: "#000000",
             light: "#FFFFFF",
           },
-          errorCorrectionLevel: "M", // Thêm error correction
+          errorCorrectionLevel: "L", // Giảm error correction để QR mỏng hơn
+          scale: 1,
         });
         setQrCodeDataUrl(dataUrl);
       } catch (error) {
@@ -96,44 +97,43 @@ export function QRNameCardGenerator({
     try {
       // Create comprehensive QR data with all necessary information for checkin
       const qrData = {
-        type: "attendee_registration",
-        attendeeId: attendee.ID,
-        conferenceId: selectedConference.ID,
-        registrationId: selectedRegistration?.ID || null,
-        timestamp: Date.now(),
-        // Attendee information
-        attendee: {
+        id: attendee.ID,
+        conf: selectedConference.ID,
+        rid: selectedRegistration?.ID || null,
+        t: Date.now(),
+        // Attendee information - simplified
+        a: {
           id: attendee.ID,
-          name: attendee.NAME,
-          email: attendee.EMAIL,
-          phone: attendee.PHONE,
-          company: attendee.COMPANY,
-          position: attendee.POSITION,
-          avatarUrl: attendee.AVATAR_URL,
+          n: attendee.NAME,
+          e: attendee.EMAIL,
+          p: attendee.PHONE,
+          c: attendee.COMPANY,
+          pos: attendee.POSITION,
+          av: attendee.AVATAR_URL,
         },
-        // Conference information
-        conference: {
+        // Conference information - simplified
+        c: {
           id: selectedConference.ID,
-          name: selectedConference.NAME,
-          description: selectedConference.DESCRIPTION,
-          startDate: selectedConference.START_DATE,
-          endDate: selectedConference.END_DATE,
-          venue: selectedConference.VENUE,
-          status: selectedConference.STATUS,
+          n: selectedConference.NAME,
+          d: selectedConference.DESCRIPTION,
+          sd: selectedConference.START_DATE,
+          ed: selectedConference.END_DATE,
+          v: selectedConference.VENUE,
+          s: selectedConference.STATUS,
         },
-        // Registration information
-        registration: selectedRegistration
+        // Registration information - simplified
+        r: selectedRegistration
           ? {
               id: selectedRegistration.ID,
-              status: selectedRegistration.STATUS,
-              registrationDate: selectedRegistration.REGISTRATION_DATE,
-              checkinTime: selectedRegistration.CHECKIN_TIME,
-              checkoutTime: selectedRegistration.CHECKOUT_TIME,
+              s: selectedRegistration.STATUS,
+              rd: selectedRegistration.REGISTRATION_DATE,
+              ct: selectedRegistration.CHECKIN_TIME,
+              cot: selectedRegistration.CHECKOUT_TIME,
             }
           : null,
         // Security and validation
-        checksum: generateChecksum(attendee.ID, selectedConference.ID),
-        version: "1.0",
+        cs: generateChecksum(attendee.ID, selectedConference.ID),
+        v: "1.0",
       };
 
       const qrString = JSON.stringify(qrData);
@@ -141,34 +141,35 @@ export function QRNameCardGenerator({
 
       // Generate QR code image
       const qrDataUrl = await QRCode.toDataURL(qrString, {
-        width: 400, // Tăng độ phân giải QR code
-        margin: 4,
+        width: 600, // Tăng độ phân giải QR code
+        margin: 0,
         color: {
           dark: "#000000",
           light: "#FFFFFF",
         },
-        errorCorrectionLevel: "M",
+        errorCorrectionLevel: "L",
+        scale: 1,
       });
       setQrCodeDataUrl(qrDataUrl);
     } catch (error) {
       console.error("Error generating QR code:", error);
       // Generate a fallback QR code
       const fallbackQR = JSON.stringify({
-        attendeeId: attendee.ID,
-        conferenceId: selectedConference.ID,
-        timestamp: Date.now(),
-        type: "attendee_registration",
+        id: attendee.ID,
+        conf: selectedConference.ID,
+        t: Date.now(),
       });
       setGeneratedQR(fallbackQR);
 
       const qrDataUrl = await QRCode.toDataURL(fallbackQR, {
-        width: 400, // Tăng độ phân giải QR code
-        margin: 4,
+        width: 600, // Tăng độ phân giải QR code
+        margin: 0,
         color: {
           dark: "#000000",
           light: "#FFFFFF",
         },
-        errorCorrectionLevel: "M",
+        errorCorrectionLevel: "L",
+        scale: 1,
       });
       setQrCodeDataUrl(qrDataUrl);
     } finally {

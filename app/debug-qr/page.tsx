@@ -23,12 +23,14 @@ export default function DebugQRPage() {
 
     try {
       const qrImageUrl = await QRCode.toDataURL(qrData, {
-        width: 300,
-        margin: 2,
+        width: 600,
+        margin: 0,
         color: {
           dark: "#000000",
           light: "#FFFFFF",
         },
+        errorCorrectionLevel: "L",
+        scale: 1,
       });
       setQrImage(qrImageUrl);
     } catch (error) {
@@ -184,6 +186,3 @@ export default function DebugQRPage() {
     </div>
   );
 }
-
-
-

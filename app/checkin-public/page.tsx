@@ -24,15 +24,7 @@ import { ToastNotification } from "./components/toast-notification";
 import { QRAttendeeInfo } from "@/components/attendees/qr-attendee-info";
 import { checkInAPI, type CheckInResponse } from "./lib/checkin-api";
 import { type CheckInRecord, type Attendee, type Conference } from "./types";
-import {
-  QrCode,
-  CheckCircle,
-  XCircle,
-  ArrowLeft,
-  Users,
-  Calendar,
-} from "lucide-react";
-import Link from "next/link";
+import { QrCode, CheckCircle, XCircle, Users, Calendar } from "lucide-react";
 
 export default function PublicCheckInPage() {
   const [checkInRecords, setCheckInRecords] = useState<CheckInRecord[]>([]);
@@ -40,9 +32,21 @@ export default function PublicCheckInPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [selectedConference, setSelectedConference] = useState<string>("");
+  const [currentConference, setCurrentConference] = useState<Conference | null>(
+    null
+  );
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error" | "warning" | "info";
+    isVisible: boolean;
+  }>({
+    message: "",
+    type: "info",
+    isVisible: false,
+  });
+  const [popupMessage, setPopupMessage] = useState<{
     message: string;
     type: "success" | "error" | "warning" | "info";
     isVisible: boolean;
@@ -75,7 +79,16 @@ export default function PublicCheckInPage() {
       setConferences(conferencesData);
     } catch (err) {
       console.error("Error loading initial data:", err);
-      setError("Lỗi khi tải dữ liệu");
+      setPopupMessage({
+        message: "Lỗi khi tải dữ liệu",
+        type: "error",
+        isVisible: true,
+      });
+
+      // Auto-hide popup after 5 seconds
+      setTimeout(() => {
+        setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+      }, 5000);
     } finally {
       setIsLoading(false);
     }
@@ -88,33 +101,46 @@ export default function PublicCheckInPage() {
       setCheckInRecords(recordsData);
     } catch (err) {
       console.error("Error loading checkin records:", err);
-      setError("Lỗi khi tải lịch sử check-in");
+      setPopupMessage({
+        message: "Lỗi khi tải lịch sử check-in",
+        type: "error",
+        isVisible: true,
+      });
+
+      // Auto-hide popup after 5 seconds
+      setTimeout(() => {
+        setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+      }, 5000);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleQRScanSuccess = async (qrData: string) => {
-    if (!selectedConference) {
-      setError("Vui lòng chọn hội nghị trước khi quét QR");
-      return;
-    }
-
     try {
       setIsScanning(false);
-      setError("");
-      setSuccessMessage("");
 
       console.log("🔍 Processing QR code:", qrData);
 
       // Show processing message
-      setSuccessMessage("Đang xử lý mã QR...");
+      setPopupMessage({
+        message: "Đang xử lý mã QR...",
+        type: "info",
+        isVisible: true,
+      });
 
       // Parse QR data to check if it contains full information
       let parsedQRData = null;
+      let conferenceId: number | null = null;
+
       try {
         parsedQRData = JSON.parse(qrData);
         console.log("📱 Parsed QR data:", parsedQRData);
+
+        // Extract conference ID from QR data
+        if (parsedQRData.conferenceId) {
+          conferenceId = parsedQRData.conferenceId;
+        }
       } catch (e) {
         console.log("📱 QR data is not JSON format");
       }
@@ -122,20 +148,48 @@ export default function PublicCheckInPage() {
       // Store QR data for display
       setScannedQRData(parsedQRData);
 
+      // If no conference ID in QR, try to find from conferences list
+      if (!conferenceId && conferences.length > 0) {
+        // Use the first active conference as default
+        const activeConference =
+          conferences.find((c) => c.status === "active") || conferences[0];
+        conferenceId = activeConference.id;
+        setCurrentConference(activeConference);
+        setSelectedConference(conferenceId.toString());
+      }
+
+      if (!conferenceId) {
+        setPopupMessage({
+          message: "Không thể xác định hội nghị từ mã QR",
+          type: "error",
+          isVisible: true,
+        });
+
+        // Auto-hide popup after 5 seconds
+        setTimeout(() => {
+          setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+        }, 5000);
+        return;
+      }
+
       // Validate QR code first
-      const validation = await checkInAPI.validateQRCode(
-        qrData,
-        parseInt(selectedConference)
-      );
+      const validation = await checkInAPI.validateQRCode(qrData, conferenceId);
 
       if (!validation.valid || !validation.attendee) {
-        setError("Mã QR không hợp lệ hoặc không thuộc hội nghị này");
-        setSuccessMessage("");
+        setPopupMessage({
+          message: "Mã QR không hợp lệ",
+          type: "error",
+          isVisible: true,
+        });
+
+        // Auto-hide popup after 5 seconds
+        setTimeout(() => {
+          setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+        }, 5000);
         return;
       }
 
       console.log("✅ QR validation successful:", validation.attendee);
-      setSuccessMessage(`Tìm thấy tham dự viên: ${validation.attendee.name}`);
 
       // Show QR info if available
       if (parsedQRData && parsedQRData.attendee) {
@@ -146,55 +200,78 @@ export default function PublicCheckInPage() {
       const response = await checkInAPI.checkInAttendee({
         attendeeId: validation.attendee.id,
         qrCode: qrData,
-        conferenceId: parseInt(selectedConference),
+        conferenceId: conferenceId,
         checkInMethod: "qr",
       });
 
       if (response.success && response.data) {
         // Reload checkin records for the current conference
-        if (selectedConference) {
-          await loadCheckInRecords(parseInt(selectedConference));
-        }
+        await loadCheckInRecords(conferenceId);
 
-        // Clear success message and show final result
-        setSuccessMessage("");
-        setToast({
+        // Show popup success message
+        setPopupMessage({
           message: `✅ Check-in thành công cho ${response.data.attendeeName}`,
           type: "success",
           isVisible: true,
         });
 
-        // Auto-hide success message after 3 seconds
+        // Auto-hide popup after 5 seconds
         setTimeout(() => {
-          setSuccessMessage("");
-        }, 3000);
+          setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+        }, 5000);
       } else {
-        setSuccessMessage("");
-        setToast({
+        setPopupMessage({
           message: response.message || "Lỗi khi check-in",
           type: "error",
           isVisible: true,
         });
+
+        // Auto-hide popup after 5 seconds
+        setTimeout(() => {
+          setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+        }, 5000);
       }
     } catch (err) {
       console.error("QR scan error:", err);
-      setSuccessMessage("");
-      setToast({
+      setPopupMessage({
         message: "Lỗi khi xử lý mã QR",
         type: "error",
         isVisible: true,
       });
+
+      // Auto-hide popup after 5 seconds
+      setTimeout(() => {
+        setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+      }, 5000);
     }
   };
 
   const handleQRScanError = (error: string) => {
-    setError(error);
     setIsScanning(false);
+    setPopupMessage({
+      message: error,
+      type: "error",
+      isVisible: true,
+    });
+
+    // Auto-hide popup after 5 seconds
+    setTimeout(() => {
+      setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+    }, 5000);
   };
 
   const handleManualCheckInSuccess = async (attendee: Attendee) => {
     try {
-      setError("");
+      // Set current conference if not set
+      if (!selectedConference && attendee.conferenceId) {
+        setSelectedConference(attendee.conferenceId.toString());
+        const conference = conferences.find(
+          (c) => c.id === attendee.conferenceId
+        );
+        if (conference) {
+          setCurrentConference(conference);
+        }
+      }
 
       // Create check-in record from attendee data
       const checkInRecord: CheckInRecord = {
@@ -208,26 +285,46 @@ export default function PublicCheckInPage() {
       };
 
       // Reload checkin records for the current conference
-      if (selectedConference) {
-        await loadCheckInRecords(parseInt(selectedConference));
+      if (attendee.conferenceId) {
+        await loadCheckInRecords(attendee.conferenceId);
       }
-      setToast({
+
+      setPopupMessage({
         message: `Check-in thành công cho ${attendee.name}`,
         type: "success",
         isVisible: true,
       });
+
+      // Auto-hide popup after 5 seconds
+      setTimeout(() => {
+        setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+      }, 5000);
     } catch (err) {
       console.error("Manual check-in error:", err);
-      setToast({
+      setPopupMessage({
         message: "Lỗi khi check-in thủ công",
         type: "error",
         isVisible: true,
       });
+
+      // Auto-hide popup after 5 seconds
+      setTimeout(() => {
+        setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+      }, 5000);
     }
   };
 
   const handleManualCheckInError = (error: string) => {
-    setError(error);
+    setPopupMessage({
+      message: error,
+      type: "error",
+      isVisible: true,
+    });
+
+    // Auto-hide popup after 5 seconds
+    setTimeout(() => {
+      setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+    }, 5000);
   };
 
   const handleDeleteRecord = async (recordId: number, qrCode: string) => {
@@ -240,25 +337,40 @@ export default function PublicCheckInPage() {
           await loadCheckInRecords(parseInt(selectedConference));
         }
 
-        setToast({
+        setPopupMessage({
           message: response.message,
           type: "success",
           isVisible: true,
         });
+
+        // Auto-hide popup after 5 seconds
+        setTimeout(() => {
+          setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+        }, 5000);
       } else {
-        setToast({
+        setPopupMessage({
           message: response.message,
           type: "error",
           isVisible: true,
         });
+
+        // Auto-hide popup after 5 seconds
+        setTimeout(() => {
+          setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+        }, 5000);
       }
     } catch (err) {
       console.error("Delete record error:", err);
-      setToast({
+      setPopupMessage({
         message: "Lỗi khi xóa check-in",
         type: "error",
         isVisible: true,
       });
+
+      // Auto-hide popup after 5 seconds
+      setTimeout(() => {
+        setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+      }, 5000);
     }
   };
 
@@ -267,16 +379,6 @@ export default function PublicCheckInPage() {
       <PublicHeader />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Back to Home */}
-        <div className="mb-6">
-          <Link href="/">
-            <Button variant="outline" className="mb-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Về trang chủ
-            </Button>
-          </Link>
-        </div>
-
         <div className="space-y-6">
           {/* API Status */}
           {/* <APIStatus onRetry={loadInitialData} /> */}
@@ -294,104 +396,36 @@ export default function PublicCheckInPage() {
             </div>
           </div>
 
-          {/* Conference Selection */}
-          <Card className="border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-blue-50">
-            <CardHeader className="pb-3">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                  <Calendar className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg text-primary">
-                    Bước 1: Chọn Hội nghị
-                  </CardTitle>
-                  <CardDescription className="text-sm">
-                    Vui lòng chọn hội nghị để bắt đầu quá trình check-in
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Chọn hội nghị từ danh sách:
-                    </label>
-                    <select
-                      value={selectedConference}
-                      onChange={(e) => setSelectedConference(e.target.value)}
-                      className="w-full px-4 py-3 text-lg border-2 border-primary/30 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 bg-white shadow-sm"
-                    >
-                      <option value="">-- Vui lòng chọn hội nghị --</option>
-                      {conferences
-                        .filter(
-                          (conference) =>
-                            conference.id !== undefined &&
-                            conference.id !== null
-                        )
-                        .map((conference) => (
-                          <option
-                            key={conference.id}
-                            value={conference.id.toString()}
-                          >
-                            {conference.name || "Unknown Conference"} -{" "}
-                            {conference.date || "N/A"}
-                          </option>
-                        ))}
-                    </select>
+          {/* Current Conference Info */}
+          {currentConference && (
+            <Card className="border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                    <Calendar className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg text-green-700">
+                      Hội nghị hiện tại
+                    </CardTitle>
+                    <CardDescription className="text-sm">
+                      {currentConference.name} - {currentConference.date}
+                    </CardDescription>
                   </div>
                 </div>
-
-                {!selectedConference && (
-                  <div className="flex items-center space-x-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <div className="w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">!</span>
-                    </div>
-                    <p className="text-sm text-amber-700 font-medium">
-                      ⚠️ Bạn cần chọn hội nghị trước khi có thể thực hiện
-                      check-in
-                    </p>
-                  </div>
-                )}
-
-                {selectedConference && (
-                  <div className="flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <p className="text-sm text-green-700 font-medium">
-                      ✅ Đã chọn hội nghị. Bạn có thể bắt đầu check-in!
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Conference Info */}
-          <ConferenceInfo
-            conference={
-              conferences.find((c) => c.id === parseInt(selectedConference)) ||
-              null
-            }
-            totalAttendees={conferences.length * 10} // Mock data
-            checkedInCount={
-              checkInRecords.filter((r) => r.status === "success").length
-            }
-          />
-
-          {/* Success/Error Messages */}
-          {successMessage && (
-            <div className="flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <p className="text-sm text-green-600">{successMessage}</p>
-            </div>
+              </CardHeader>
+            </Card>
           )}
 
-          {error && (
-            <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <XCircle className="h-4 w-4 text-red-600" />
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
+          {/* Conference Info */}
+          {currentConference && (
+            <ConferenceInfo
+              conference={currentConference}
+              totalAttendees={conferences.length * 10} // Mock data
+              checkedInCount={
+                checkInRecords.filter((r) => r.status === "success").length
+              }
+            />
           )}
 
           {/* Stats Cards */}
@@ -402,99 +436,79 @@ export default function PublicCheckInPage() {
           />
 
           {/* Check-in Methods Tabs */}
-          {selectedConference ? (
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">2</span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    Bước 2: Chọn Phương thức Check-in
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    Chọn một trong hai phương thức dưới đây
-                  </p>
-                </div>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-bold">1</span>
               </div>
-
-              <Tabs defaultValue="qr" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 h-12">
-                  <TabsTrigger
-                    value="qr"
-                    className="flex items-center space-x-2 text-base font-medium"
-                  >
-                    <QrCode className="h-5 w-5" />
-                    <span>Quét QR Code</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="manual"
-                    className="flex items-center space-x-2 text-base font-medium"
-                  >
-                    <Users className="h-5 w-5" />
-                    <span>Check-in Thủ công</span>
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="qr" className="mt-6">
-                  <div className="space-y-6">
-                    <QRScanner
-                      onScanSuccess={handleQRScanSuccess}
-                      onScanError={handleQRScanError}
-                      isScanning={isScanning}
-                      onStartScan={() => setIsScanning(true)}
-                      onStopScan={() => setIsScanning(false)}
-                    />
-
-                    {/* QR Attendee Info */}
-                    {showQRInfo && scannedQRData && (
-                      <div className="mt-6">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            Thông tin từ QR Code
-                          </h3>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowQRInfo(false)}
-                          >
-                            Ẩn thông tin
-                          </Button>
-                        </div>
-                        <QRAttendeeInfo qrData={scannedQRData} />
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="manual" className="mt-6">
-                  <ManualCheckInForm
-                    onCheckInSuccess={handleManualCheckInSuccess}
-                    onCheckInError={handleManualCheckInError}
-                    conferences={conferences}
-                  />
-                </TabsContent>
-              </Tabs>
-            </div>
-          ) : (
-            <Card className="border-2 border-amber-200 bg-amber-50">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Calendar className="h-8 w-8 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-amber-800 mb-2">
-                  Chưa chọn hội nghị
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Chọn Phương thức Check-in
                 </h3>
-                <p className="text-amber-700 mb-4">
-                  Vui lòng chọn hội nghị ở bước 1 để có thể thực hiện check-in
+                <p className="text-sm text-gray-600">
+                  Chọn một trong hai phương thức dưới đây
                 </p>
-                <div className="flex items-center justify-center space-x-2 text-sm text-amber-600">
-                  <span>👆</span>
-                  <span>Cuộn lên trên để chọn hội nghị</span>
+              </div>
+            </div>
+
+            <Tabs defaultValue="qr" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 h-12">
+                <TabsTrigger
+                  value="qr"
+                  className="flex items-center space-x-2 text-base font-medium"
+                >
+                  <QrCode className="h-5 w-5" />
+                  <span>Quét QR Code</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="manual"
+                  className="flex items-center space-x-2 text-base font-medium"
+                >
+                  <Users className="h-5 w-5" />
+                  <span>Check-in Thủ công</span>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="qr" className="mt-6">
+                <div className="space-y-6">
+                  <QRScanner
+                    onScanSuccess={handleQRScanSuccess}
+                    onScanError={handleQRScanError}
+                    isScanning={isScanning}
+                    onStartScan={() => setIsScanning(true)}
+                    onStopScan={() => setIsScanning(false)}
+                  />
+
+                  {/* QR Attendee Info */}
+                  {showQRInfo && scannedQRData && (
+                    <div className="mt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Thông tin từ QR Code
+                        </h3>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowQRInfo(false)}
+                        >
+                          Ẩn thông tin
+                        </Button>
+                      </div>
+                      <QRAttendeeInfo qrData={scannedQRData} />
+                    </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              </TabsContent>
+
+              <TabsContent value="manual" className="mt-6">
+                <ManualCheckInForm
+                  onCheckInSuccess={handleManualCheckInSuccess}
+                  onCheckInError={handleManualCheckInError}
+                  conferences={conferences}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
 
           {/* Usage Guide */}
           <UsageGuide />
@@ -508,6 +522,44 @@ export default function PublicCheckInPage() {
           />
         </div>
       </div>
+
+      {/* Popup Message */}
+      {popupMessage.isVisible && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4 transform transition-all duration-300 scale-100">
+            <div className="flex items-center space-x-3">
+              {popupMessage.type === "success" && (
+                <CheckCircle className="h-8 w-8 text-green-500" />
+              )}
+              {popupMessage.type === "error" && (
+                <XCircle className="h-8 w-8 text-red-500" />
+              )}
+              {popupMessage.type === "warning" && (
+                <XCircle className="h-8 w-8 text-yellow-500" />
+              )}
+              {popupMessage.type === "info" && (
+                <CheckCircle className="h-8 w-8 text-blue-500" />
+              )}
+              <div className="flex-1">
+                <p className="text-lg font-semibold text-gray-900">
+                  {popupMessage.message}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setPopupMessage((prev) => ({ ...prev, isVisible: false }))
+                }
+              >
+                Đóng
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       <ToastNotification
