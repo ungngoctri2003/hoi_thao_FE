@@ -20,37 +20,23 @@ export async function GET(
     const conferenceId = searchParams.get("conferenceId");
     const includeFullData = searchParams.get("includeFullData") === "true";
 
-    // Generate QR code data - simplified for thinner QR
+    // Generate QR code data - ultra simplified for easy scanning
     let qrData: any = {
       id: attendeeId,
       conf: conferenceId ? parseInt(conferenceId) : null,
-      t: Date.now(),
     };
 
-    // If includeFullData is true, we'll need to fetch attendee and conference data
-    // For now, we'll create a basic structure that can be enhanced
+    // If includeFullData is true, create a URL-based QR code
     if (includeFullData && conferenceId) {
-      qrData = {
-        id: attendeeId,
-        conf: parseInt(conferenceId),
-        t: Date.now(),
-        // Note: In a real implementation, you would fetch this data from the database
-        a: {
-          id: attendeeId,
-          // These would be fetched from database
-          n: "Attendee Name",
-          e: "attendee@example.com",
-        },
-        c: {
-          id: parseInt(conferenceId),
-          // These would be fetched from database
-          n: "Conference Name",
-        },
-        v: "1.0",
-      };
+      // Create a short URL that contains full attendee data
+      const baseUrl =
+        process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+      const shortUrl = `${baseUrl}/attendee/${attendeeId}?conf=${conferenceId}`;
+      qrData = shortUrl; // QR code will contain just the URL
     }
 
-    const qrString = JSON.stringify(qrData);
+    const qrString =
+      typeof qrData === "string" ? qrData : JSON.stringify(qrData);
 
     // Generate QR code as data URL
     const qrCodeDataUrl = await QRCode.toDataURL(qrString, {
@@ -101,12 +87,10 @@ export async function POST(
     const body = await request.json();
     const { conferenceId, customData } = body;
 
-    // Generate QR code data with custom data if provided - simplified
+    // Generate QR code data with custom data if provided - ultra simplified
     const qrData = {
       id: attendeeId,
       conf: conferenceId || null,
-      c: customData || null,
-      t: Date.now(),
     };
 
     const qrString = JSON.stringify(qrData);

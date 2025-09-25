@@ -66,7 +66,6 @@ export const MOCK_DATA = {
       qrCode: JSON.stringify({
         id: 1,
         conf: 1,
-        t: Date.now(),
       }),
       conferenceId: 1,
       isRegistered: true,
@@ -79,7 +78,6 @@ export const MOCK_DATA = {
       qrCode: JSON.stringify({
         id: 2,
         conf: 1,
-        t: Date.now(),
       }),
       conferenceId: 1,
       isRegistered: true,
@@ -92,7 +90,6 @@ export const MOCK_DATA = {
       qrCode: JSON.stringify({
         id: 3,
         conf: 1,
-        t: Date.now(),
       }),
       conferenceId: 1,
       isRegistered: false,
@@ -105,7 +102,6 @@ export const MOCK_DATA = {
       qrCode: JSON.stringify({
         id: 4,
         conf: 2,
-        t: Date.now(),
       }),
       conferenceId: 2,
       isRegistered: true,
@@ -118,7 +114,6 @@ export const MOCK_DATA = {
       qrCode: JSON.stringify({
         id: 5,
         conf: 2,
-        t: Date.now(),
       }),
       conferenceId: 2,
       isRegistered: true,
@@ -135,7 +130,6 @@ export const MOCK_DATA = {
       qrCode: JSON.stringify({
         id: 1,
         conf: 1,
-        t: Date.now(),
       }),
       conferenceId: 1,
     },
@@ -148,7 +142,6 @@ export const MOCK_DATA = {
       qrCode: JSON.stringify({
         id: 2,
         conf: 1,
-        t: Date.now(),
       }),
       conferenceId: 1,
     },

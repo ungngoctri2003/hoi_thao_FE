@@ -372,68 +372,83 @@ class CheckInAPI {
       let qrConferenceId: number | null = null;
       let qrData: any = null;
 
-      // Try to parse as JSON first (from name card)
-      try {
-        qrData = JSON.parse(qrCode);
-        console.log("📱 Parsed QR data:", qrData);
-
-        if (qrData.id) {
-          attendeeId = qrData.id;
-          qrConferenceId = qrData.conf;
-          console.log("📱 Parsed name card QR code:", {
-            attendeeId,
-            qrConferenceId,
-            hasFullData: !!qrData.attendee,
-          });
-
-          // If QR code contains full attendee data, use it directly
-          if (qrData.a) {
-            console.log(
-              "✅ QR code contains full attendee data, using it directly"
-            );
-            const attendee: Attendee = {
-              id: qrData.a.id,
-              name: qrData.a.n,
-              email: qrData.a.e,
-              phone: qrData.a.p,
-              qrCode: qrCode,
-              conferenceId: qrConferenceId || conferenceId,
-              isRegistered: true,
-            };
-
-            // Validate checksum if present
-            if (qrData.checksum) {
-              const expectedChecksum = this.generateChecksum(
-                attendeeId,
-                qrConferenceId || conferenceId
-              );
-              if (qrData.checksum !== expectedChecksum) {
-                console.warn("❌ QR code checksum validation failed");
-                return { valid: false };
-              }
-            }
-
-            return { valid: true, attendee, qrData };
-          }
+      // Check if QR code is a URL first
+      if (qrCode.startsWith("http")) {
+        console.log("📱 QR code is a URL:", qrCode);
+        // Extract attendee ID and conference ID from URL
+        const urlMatch = qrCode.match(/\/attendee\/(\d+)\?conf=(\d+)/);
+        if (urlMatch) {
+          attendeeId = parseInt(urlMatch[1]);
+          qrConferenceId = parseInt(urlMatch[2]);
+          console.log("📱 Extracted from URL:", { attendeeId, qrConferenceId });
         } else {
-          console.log("📱 QR data doesn't match expected format:", {
-            id: qrData.id,
-            hasId: !!qrData.id,
-          });
+          console.warn("❌ Invalid URL format in QR code");
+          return { valid: false };
         }
-      } catch (e) {
-        console.log("📱 QR data is not JSON format, trying string format");
-        // Not JSON, try to parse as string format
-        const parts = qrCode.split(":");
-        if (parts.length >= 2 && parts[0] === "ATTENDEE") {
-          attendeeId = parseInt(parts[1]);
-          if (parts.length >= 4 && parts[2] === "CONF") {
-            qrConferenceId = parseInt(parts[3]);
+      } else {
+        // Try to parse as JSON first (from name card)
+        try {
+          qrData = JSON.parse(qrCode);
+          console.log("📱 Parsed QR data:", qrData);
+
+          if (qrData.id) {
+            attendeeId = qrData.id;
+            qrConferenceId = qrData.conf;
+            console.log("📱 Parsed name card QR code:", {
+              attendeeId,
+              qrConferenceId,
+              hasFullData: !!qrData.attendee,
+            });
+
+            // If QR code contains full attendee data, use it directly
+            if (qrData.a) {
+              console.log(
+                "✅ QR code contains full attendee data, using it directly"
+              );
+              const attendee: Attendee = {
+                id: qrData.a.id,
+                name: qrData.a.n,
+                email: qrData.a.e,
+                phone: qrData.a.p,
+                qrCode: qrCode,
+                conferenceId: qrConferenceId || conferenceId,
+                isRegistered: true,
+              };
+
+              // Validate checksum if present
+              if (qrData.checksum) {
+                const expectedChecksum = this.generateChecksum(
+                  attendeeId,
+                  qrConferenceId || conferenceId
+                );
+                if (qrData.checksum !== expectedChecksum) {
+                  console.warn("❌ QR code checksum validation failed");
+                  return { valid: false };
+                }
+              }
+
+              return { valid: true, attendee, qrData };
+            }
+          } else {
+            console.log("📱 QR data doesn't match expected format:", {
+              id: qrData.id,
+              hasId: !!qrData.id,
+            });
           }
-          console.log("📱 Parsed string QR code:", {
-            attendeeId,
-            qrConferenceId,
-          });
+        } catch (e) {
+          console.log("📱 QR data is not JSON format, trying string format");
+          // Not JSON, try to parse as string format
+          const parts = qrCode.split(":");
+          if (parts.length >= 2 && parts[0] === "ATTENDEE") {
+            attendeeId = parseInt(parts[1]);
+            if (parts.length >= 4 && parts[2] === "CONF") {
+              qrConferenceId = parseInt(parts[3]);
+            }
+            console.log("📱 Parsed string QR code:", {
+              attendeeId,
+              qrConferenceId,
+            });
+          }
         }
       }
 
