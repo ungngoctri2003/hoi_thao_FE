@@ -6,6 +6,9 @@ export interface CheckInRecord {
   status: 'success' | 'failed' | 'duplicate';
   qrCode: string | null;
   conferenceId: number;
+  method?: 'qr' | 'manual';
+  registrationId?: number;
+  attendeePhone?: string | null;
 }
 
 export interface Attendee {

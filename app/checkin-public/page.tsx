@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -14,23 +14,26 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PublicHeader } from "@/components/layout/public-header";
 import { QRScanner } from "./components/qr-scanner";
+import { QRUpload, type QRUploadRef } from "./components/qr-upload";
 import { ManualCheckInForm } from "./components/manual-checkin-form";
 import { StatsCards } from "./components/stats-cards";
 import { CheckInRecordsList } from "./components/checkin-records-list";
 // import { APIStatus } from "./components/api-status";
 import { ConferenceInfo } from "./components/conference-info";
+import { ConferenceSelector } from "./components/conference-selector";
 import { UsageGuide } from "./components/usage-guide";
 import { ToastNotification } from "./components/toast-notification";
 import { QRAttendeeInfo } from "@/components/attendees/qr-attendee-info";
 import { checkInAPI, type CheckInResponse } from "./lib/checkin-api";
 import { type CheckInRecord, type Attendee, type Conference } from "./types";
-import { QrCode, CheckCircle, XCircle, Users, Calendar } from "lucide-react";
+import { QrCode, CheckCircle, XCircle, Users, Calendar, Upload } from "lucide-react";
 
 export default function PublicCheckInPage() {
   const [checkInRecords, setCheckInRecords] = useState<CheckInRecord[]>([]);
   const [conferences, setConferences] = useState<Conference[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+  const qrUploadRef = useRef<QRUploadRef>(null);
   const [selectedConference, setSelectedConference] = useState<string>("");
   const [currentConference, setCurrentConference] = useState<Conference | null>(
     null
@@ -137,9 +140,11 @@ export default function PublicCheckInPage() {
         parsedQRData = JSON.parse(qrData);
         console.log("📱 Parsed QR data:", parsedQRData);
 
-        // Extract conference ID from QR data
+        // Extract conference ID from QR data (support both old and new format)
         if (parsedQRData.conferenceId) {
           conferenceId = parsedQRData.conferenceId;
+        } else if (parsedQRData.conf) {
+          conferenceId = parsedQRData.conf;
         }
       } catch (e) {
         console.log("📱 QR data is not JSON format");
@@ -148,19 +153,18 @@ export default function PublicCheckInPage() {
       // Store QR data for display
       setScannedQRData(parsedQRData);
 
-      // If no conference ID in QR, try to find from conferences list
-      if (!conferenceId && conferences.length > 0) {
-        // Use the first active conference as default
-        const activeConference =
-          conferences.find((c) => c.status === "active") || conferences[0];
-        conferenceId = activeConference.id;
-        setCurrentConference(activeConference);
-        setSelectedConference(conferenceId.toString());
-      }
-
-      if (!conferenceId) {
+      // Always use conference ID from QR code - no manual selection needed
+      if (conferenceId) {
+        console.log("📱 Using conference ID from QR:", conferenceId);
+        // Update selected conference to match QR code
+        setSelectedConference(conferenceId!.toString());
+        const qrConference = conferences.find((c) => c.id === conferenceId);
+        if (qrConference) {
+          setCurrentConference(qrConference);
+        }
+      } else {
         setPopupMessage({
-          message: "Không thể xác định hội nghị từ mã QR",
+          message: "Không thể xác định hội nghị từ mã QR. Vui lòng sử dụng QR code hợp lệ.",
           type: "error",
           isVisible: true,
         });
@@ -191,8 +195,8 @@ export default function PublicCheckInPage() {
 
       console.log("✅ QR validation successful:", validation.attendee);
 
-      // Show QR info if available
-      if (parsedQRData && parsedQRData.attendee) {
+      // Show QR info if available (support both old and new format)
+      if (parsedQRData && (parsedQRData.attendee || parsedQRData.a)) {
         setShowQRInfo(true);
       }
 
@@ -248,6 +252,141 @@ export default function PublicCheckInPage() {
 
   const handleQRScanError = (error: string) => {
     setIsScanning(false);
+    setPopupMessage({
+      message: error,
+      type: "error",
+      isVisible: true,
+    });
+
+    // Auto-hide popup after 5 seconds
+    setTimeout(() => {
+      setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+    }, 5000);
+  };
+
+  const handleQRUploadSuccess = async (qrData: string) => {
+    try {
+      console.log("🔍 Processing uploaded QR code:", qrData);
+
+      // Show processing message
+      setPopupMessage({
+        message: "Đang xử lý mã QR từ ảnh...",
+        type: "info",
+        isVisible: true,
+      });
+
+      // Parse QR data to check if it contains full information
+      let parsedQRData = null;
+      let conferenceId: number | null = null;
+
+      try {
+        parsedQRData = JSON.parse(qrData);
+        console.log("📱 Parsed QR data:", parsedQRData);
+      } catch (e) {
+        console.log("📱 QR data is not JSON format");
+      }
+
+      // Store QR data for display
+      setScannedQRData(parsedQRData);
+
+      // Always use conference ID from QR code - no manual selection needed
+      if (conferenceId !== null) {
+        console.log("📱 Using conference ID from QR:", conferenceId);
+        // Update selected conference to match QR code
+        setSelectedConference(String(conferenceId));
+        const qrConference = conferences.find((c) => c.id === conferenceId);
+        if (qrConference) {
+          setCurrentConference(qrConference);
+        }
+      } else {
+        setPopupMessage({
+          message: "Không thể xác định hội nghị từ mã QR. Vui lòng sử dụng QR code hợp lệ.",
+          type: "error",
+          isVisible: true,
+        });
+
+        // Auto-hide popup after 5 seconds
+        setTimeout(() => {
+          setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+        }, 5000);
+        return;
+      }
+
+      // Validate QR code first
+      const validation = await checkInAPI.validateQRCode(qrData, conferenceId);
+
+      if (!validation.valid || !validation.attendee) {
+        setPopupMessage({
+          message: "Mã QR không hợp lệ",
+          type: "error",
+          isVisible: true,
+        });
+
+        // Auto-hide popup after 5 seconds
+        setTimeout(() => {
+          setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+        }, 5000);
+        return;
+      }
+
+      console.log("✅ QR validation successful:", validation.attendee);
+
+      // Show QR info if available (support both old and new format)
+      if (parsedQRData && (parsedQRData.attendee || parsedQRData.a)) {
+        setShowQRInfo(true);
+      }
+
+      // Perform check-in
+      const response = await checkInAPI.checkInAttendee({
+        attendeeId: validation.attendee.id,
+        qrCode: qrData,
+        conferenceId: conferenceId,
+        checkInMethod: "qr",
+      });
+
+      if (response.success && response.data) {
+        // Reload checkin records for the current conference
+        await loadCheckInRecords(conferenceId);
+
+        // Show popup success message
+        setPopupMessage({
+          message: `✅ Check-in thành công cho ${response.data.attendeeName}`,
+          type: "success",
+          isVisible: true,
+        });
+
+        // Auto-hide popup after 5 seconds
+        setTimeout(() => {
+          setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+        }, 5000);
+      } else {
+        setPopupMessage({
+          message: response.message || "Lỗi khi check-in",
+          type: "error",
+          isVisible: true,
+        });
+
+        // Auto-hide popup after 5 seconds
+        setTimeout(() => {
+          setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+        }, 5000);
+      }
+    } catch (err) {
+      console.error("QR upload error:", err);
+      setPopupMessage({
+        message: "Lỗi khi xử lý mã QR từ ảnh",
+        type: "error",
+        isVisible: true,
+      });
+
+      // Auto-hide popup after 5 seconds
+      setTimeout(() => {
+        setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+      }, 5000);
+    }
+  };
+
+  const handleQRUploadError = (error: string) => {
     setPopupMessage({
       message: error,
       type: "error",
@@ -327,6 +466,14 @@ export default function PublicCheckInPage() {
     }, 5000);
   };
 
+  const handleConferenceChange = (conferenceId: string) => {
+    setSelectedConference(conferenceId);
+    const conference = conferences.find((c) => c.id === parseInt(conferenceId));
+    if (conference) {
+      setCurrentConference(conference);
+    }
+  };
+
   const handleDeleteRecord = async (recordId: number, qrCode: string) => {
     try {
       const response = await checkInAPI.deleteCheckInRecord(recordId, qrCode);
@@ -390,7 +537,7 @@ export default function PublicCheckInPage() {
               <div>
                 <h1 className="text-3xl font-bold">Hệ thống Check-in</h1>
                 <p className="text-muted-foreground">
-                  Quét QR code hoặc check-in thủ công cho tham dự viên
+                  Quét QR code để tự động xác định hội nghị và check-in tham dự viên
                 </p>
               </div>
             </div>
@@ -417,16 +564,24 @@ export default function PublicCheckInPage() {
             </Card>
           )}
 
-          {/* Conference Info */}
-          {currentConference && (
-            <ConferenceInfo
-              conference={currentConference}
-              totalAttendees={conferences.length * 10} // Mock data
-              checkedInCount={
-                checkInRecords.filter((r) => r.status === "success").length
-              }
-            />
-          )}
+        {/* Conference Selector - Hidden, auto-detect from QR code */}
+        {/* <ConferenceSelector
+          conferences={conferences}
+          selectedConference={selectedConference}
+          onConferenceChange={handleConferenceChange}
+          isLoading={isLoading}
+        /> */}
+
+        {/* Conference Info */}
+        {currentConference && (
+          <ConferenceInfo
+            conference={currentConference}
+            totalAttendees={conferences.length * 10} // Mock data
+            checkedInCount={
+              checkInRecords.filter((r) => r.status === "success").length
+            }
+          />
+        )}
 
           {/* Stats Cards */}
           <StatsCards
@@ -446,19 +601,26 @@ export default function PublicCheckInPage() {
                   Chọn Phương thức Check-in
                 </h3>
                 <p className="text-sm text-gray-600">
-                  Chọn một trong hai phương thức dưới đây
+                  Chọn một trong ba phương thức dưới đây
                 </p>
               </div>
             </div>
 
             <Tabs defaultValue="qr" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-12">
+              <TabsList className="grid w-full grid-cols-3 h-12">
                 <TabsTrigger
                   value="qr"
                   className="flex items-center space-x-2 text-base font-medium"
                 >
                   <QrCode className="h-5 w-5" />
                   <span>Quét QR Code</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="upload"
+                  className="flex items-center space-x-2 text-base font-medium"
+                >
+                  <Upload className="h-5 w-5" />
+                  <span>Tải ảnh QR</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="manual"
@@ -477,6 +639,40 @@ export default function PublicCheckInPage() {
                     isScanning={isScanning}
                     onStartScan={() => setIsScanning(true)}
                     onStopScan={() => setIsScanning(false)}
+                  />
+
+                  {/* QR Attendee Info */}
+                  {showQRInfo && scannedQRData && (
+                    <div className="mt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Thông tin từ QR Code
+                        </h3>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowQRInfo(false)}
+                        >
+                          Ẩn thông tin
+                        </Button>
+                      </div>
+                      <QRAttendeeInfo qrData={scannedQRData} />
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="upload" className="mt-6">
+                <div className="space-y-6">
+                  <QRUpload
+                    ref={qrUploadRef}
+                    onUploadSuccess={handleQRUploadSuccess}
+                    onUploadError={handleQRUploadError}
+                    conferences={conferences}
+                    selectedConference={selectedConference}
+                    onCheckInComplete={() => {
+                      console.log("✅ QR upload check-in completed");
+                    }}
                   />
 
                   {/* QR Attendee Info */}
@@ -550,9 +746,13 @@ export default function PublicCheckInPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() =>
-                  setPopupMessage((prev) => ({ ...prev, isVisible: false }))
-                }
+                onClick={() => {
+                  setPopupMessage((prev) => ({ ...prev, isVisible: false }));
+                  // Clear QR upload image when closing success popup
+                  if (popupMessage.type === "success" && qrUploadRef.current) {
+                    qrUploadRef.current.clearImage();
+                  }
+                }}
               >
                 Đóng
               </Button>

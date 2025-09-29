@@ -20,6 +20,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Table,
   TableBody,
   TableCell,
@@ -244,14 +250,14 @@ export default function AttendeesPage() {
   // Filter attendees based on current filters - memoized to prevent unnecessary re-renders
   const filteredAttendees = useMemo(() => {
     console.log("🔍 Filtering attendees:", {
-      total: attendees.length,
+      total: attendeesWithConferences.length,
       searchTerm,
       filterGender,
       filterConference,
       sortBy,
     });
 
-    const filtered = attendees
+    const filtered = attendeesWithConferences
       .filter((attendee) => {
         const matchesSearch =
           searchTerm === "" ||
@@ -266,11 +272,7 @@ export default function AttendeesPage() {
         // Filter by conference (only for global admin page)
         let matchesConference = true;
         if (isGlobalAdminPage && filterConference !== "all") {
-          const attendeeWithConferences = attendeesWithConferences.find(
-            (a) => a.ID === attendee.ID
-          );
-          const attendeeConferences =
-            attendeeWithConferences?.conferences || [];
+          const attendeeConferences = attendee.conferences || [];
           const filterConferenceId = parseInt(filterConference);
           matchesConference = attendeeConferences.some(
             (conf) => conf.ID === filterConferenceId
@@ -280,11 +282,7 @@ export default function AttendeesPage() {
         // Filter by checkin status
         let matchesCheckinStatus = true;
         if (filterCheckinStatus !== "all") {
-          const attendeeWithConferences = attendeesWithConferences.find(
-            (a) => a.ID === attendee.ID
-          );
-          const overallStatus =
-            attendeeWithConferences?.overallStatus || "registered";
+          const overallStatus = attendee.overallStatus || "registered";
 
           console.log("🔍 Filtering by checkin status:", {
             attendeeId: attendee.ID,
@@ -322,10 +320,17 @@ export default function AttendeesPage() {
         }
       });
 
-    console.log("🔍 Filtered result:", filtered.length);
+    console.log("🔍 Filtered result:", {
+      originalCount: attendeesWithConferences.length,
+      filteredCount: filtered.length,
+      searchTerm,
+      filterGender,
+      filterConference,
+      filterCheckinStatus,
+      isGlobalAdminPage,
+    });
     return filtered;
   }, [
-    attendees,
     attendeesWithConferences,
     searchTerm,
     filterGender,
@@ -344,10 +349,38 @@ export default function AttendeesPage() {
     console.log("❌ Error:", error);
   }
 
+  // Debug: Log data information
+  console.log("📊 Data status:", {
+    isLoading,
+    error,
+    attendeesWithConferencesCount: attendeesWithConferences.length,
+    filteredAttendeesCount: filteredAttendees.length,
+    pagination,
+    currentPage,
+    pageSize,
+    conferenceId,
+    isGlobalAdminPage,
+    searchTerm,
+    filterGender,
+    filterConference,
+    filterCheckinStatus,
+  });
+
+  // Debug: Log first few attendees to see their data
+  if (attendeesWithConferences.length > 0) {
+    console.log("👥 First few attendees:", attendeesWithConferences.slice(0, 3).map(attendee => ({
+      id: attendee.ID,
+      name: attendee.NAME,
+      email: attendee.EMAIL,
+      conferencesCount: attendee.conferences?.length || 0,
+      conferences: attendee.conferences?.map(c => c.NAME) || [],
+    })));
+  }
+
   // Debug: Check if we have data but it's not showing
-  if (attendees.length > 0 && filteredAttendees.length === 0) {
+  if (attendeesWithConferences.length > 0 && filteredAttendees.length === 0) {
     console.log("⚠️ Data exists but filtered out:", {
-      attendees: attendees.length,
+      attendeesWithConferences: attendeesWithConferences.length,
       filtered: filteredAttendees.length,
       searchTerm,
       filterGender,
@@ -684,9 +717,6 @@ export default function AttendeesPage() {
     try {
       // Prepare data for export
       const exportData = filteredAttendees.map((attendee) => {
-        const attendeeWithConferences = attendeesWithConferences.find(
-          (a) => a.ID === attendee.ID
-        );
         return {
           ID: attendee.ID,
           "Họ và tên": attendee.NAME,
@@ -699,33 +729,28 @@ export default function AttendeesPage() {
             ? new Date(attendee.DATE_OF_BIRTH).toLocaleDateString("vi-VN")
             : "",
           "Trạng thái":
-            attendeeWithConferences?.overallStatus === "not-registered"
+            attendee.overallStatus === "not-registered"
               ? "Chưa đăng ký"
-              : attendeeWithConferences?.overallStatus === "registered"
+              : attendee.overallStatus === "registered"
               ? "Đã đăng ký"
-              : attendeeWithConferences?.overallStatus === "checked-in"
+              : attendee.overallStatus === "checked-in"
               ? "Đã check-in"
-              : attendeeWithConferences?.overallStatus === "checked-out"
+              : attendee.overallStatus === "checked-out"
               ? "Đã check-out"
-              : attendeeWithConferences?.overallStatus === "cancelled"
+              : attendee.overallStatus === "cancelled"
               ? "Đã hủy"
-              : attendeeWithConferences?.overallStatus === "no-show"
+              : attendee.overallStatus === "no-show"
               ? "Không tham dự"
               : "Chưa xác định",
-          "Số hội nghị": attendeeWithConferences?.conferences.length || 0,
-          "Hội nghị":
-            attendeeWithConferences?.conferences
-              .map((c) => c.NAME)
-              .join(", ") || "Chưa có",
-          "Lần check-in cuối": attendeeWithConferences?.lastCheckinTime
-            ? new Date(attendeeWithConferences.lastCheckinTime).toLocaleString(
-                "vi-VN"
-              )
+          "Số hội nghị": attendee.conferences?.length || 0,
+          "Hội nghị": attendee.conferences
+            ?.map((c) => c.NAME)
+            .join(", ") || "Chưa tham dự hội nghị nào",
+          "Lần check-in cuối": attendee.lastCheckinTime
+            ? new Date(attendee.lastCheckinTime).toLocaleString("vi-VN")
             : "",
-          "Lần check-out cuối": attendeeWithConferences?.lastCheckoutTime
-            ? new Date(attendeeWithConferences.lastCheckoutTime).toLocaleString(
-                "vi-VN"
-              )
+          "Lần check-out cuối": attendee.lastCheckoutTime
+            ? new Date(attendee.lastCheckoutTime).toLocaleString("vi-VN")
             : "",
           "Ngày tạo": new Date(attendee.CREATED_AT).toLocaleString("vi-VN"),
           "Yêu cầu ăn uống": attendee.DIETARY || "",
@@ -807,9 +832,6 @@ export default function AttendeesPage() {
 
       // Prepare data for export
       const exportData = selectedAttendeesData.map((attendee) => {
-        const attendeeWithConferences = attendeesWithConferences.find(
-          (a) => a.ID === attendee.ID
-        );
         return {
           ID: attendee.ID,
           "Họ và tên": attendee.NAME,
@@ -819,24 +841,23 @@ export default function AttendeesPage() {
           "Chức vụ": attendee.POSITION || "",
           "Giới tính": attendee.GENDER || "",
           "Trạng thái":
-            attendeeWithConferences?.overallStatus === "not-registered"
+            attendee.overallStatus === "not-registered"
               ? "Chưa đăng ký"
-              : attendeeWithConferences?.overallStatus === "registered"
+              : attendee.overallStatus === "registered"
               ? "Đã đăng ký"
-              : attendeeWithConferences?.overallStatus === "checked-in"
+              : attendee.overallStatus === "checked-in"
               ? "Đã check-in"
-              : attendeeWithConferences?.overallStatus === "checked-out"
+              : attendee.overallStatus === "checked-out"
               ? "Đã check-out"
-              : attendeeWithConferences?.overallStatus === "cancelled"
+              : attendee.overallStatus === "cancelled"
               ? "Đã hủy"
-              : attendeeWithConferences?.overallStatus === "no-show"
+              : attendee.overallStatus === "no-show"
               ? "Không tham dự"
               : "Chưa xác định",
-          "Số hội nghị": attendeeWithConferences?.conferences.length || 0,
-          "Hội nghị":
-            attendeeWithConferences?.conferences
-              .map((c) => c.NAME)
-              .join(", ") || "Chưa có",
+          "Số hội nghị": attendee.conferences?.length || 0,
+          "Hội nghị": attendee.conferences
+            ?.map((c) => c.NAME)
+            .join(", ") || "Chưa tham dự hội nghị nào",
         };
       });
 
@@ -1482,7 +1503,7 @@ export default function AttendeesPage() {
                         <TableHead>Thông tin</TableHead>
                         <TableHead>Liên hệ</TableHead>
                         <TableHead>Công ty</TableHead>
-                        {isGlobalAdminPage && <TableHead>Hội nghị</TableHead>}
+                        {(isGlobalAdminPage || isConferenceSpecificPage) && <TableHead>Hội nghị</TableHead>}
                         <TableHead>Trạng thái</TableHead>
                         <TableHead>Giới tính</TableHead>
                         <TableHead>Ngày tạo</TableHead>
@@ -1491,13 +1512,8 @@ export default function AttendeesPage() {
                     </TableHeader>
                     <TableBody>
                       {filteredAttendees.map((attendee) => {
-                        // Find the attendee's conferences from the original data
-                        const attendeeWithConferences =
-                          attendeesWithConferences.find(
-                            (a) => a.ID === attendee.ID
-                          );
-                        const attendeeConferences =
-                          attendeeWithConferences?.conferences || [];
+                        // The attendee data already includes conferences and registrations
+                        const attendeeConferences = attendee.conferences || [];
 
                         console.log(
                           "🎯 Rendering attendee:",
@@ -1573,55 +1589,83 @@ export default function AttendeesPage() {
                                 </p>
                               </div>
                             </TableCell>
-                            {isGlobalAdminPage && (
+                            {(isGlobalAdminPage || isConferenceSpecificPage) && (
                               <TableCell>
-                                <div className="max-w-32 truncate">
-                                  <p className="text-sm font-medium">
-                                    {attendeeConferences.length > 0
-                                      ? attendeeConferences[0].NAME
-                                      : "Chưa có hội nghị"}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {attendeeConferences.length > 1
-                                      ? `+${
-                                          attendeeConferences.length - 1
-                                        } hội nghị khác`
-                                      : ""}
-                                  </p>
+                                <div className="max-w-40">
+                                  {attendeeConferences.length > 0 ? (
+                                    <div className="space-y-1">
+                                      <p className="text-sm font-medium text-primary">
+                                        {attendeeConferences[0].NAME}
+                                      </p>
+                                      {attendeeConferences.length > 1 && (
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <div className="flex items-center space-x-1">
+                                                <Badge variant="secondary" className="text-xs">
+                                                  +{attendeeConferences.length - 1} hội nghị khác
+                                                </Badge>
+                                              </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top" className="max-w-xs">
+                                              <div className="space-y-2">
+                                                <p className="font-medium text-sm">Hội nghị đã tham dự:</p>
+                                                <div className="space-y-1">
+                                                  {attendeeConferences.map((conference, index) => (
+                                                    <div key={conference.ID} className="flex items-center space-x-2 text-xs">
+                                                      <Badge variant="outline" className="text-xs">
+                                                        {index + 1}
+                                                      </Badge>
+                                                      <span className="font-medium">
+                                                        {conference.NAME}
+                                                      </span>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                  Tổng cộng: {attendeeConferences.length} hội nghị
+                                                </div>
+                                              </div>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center space-x-2">
+                                      <Badge variant="outline" className="text-xs text-muted-foreground">
+                                        Chưa tham dự
+                                      </Badge>
+                                    </div>
+                                  )}
                                 </div>
                               </TableCell>
                             )}
                             <TableCell>
                               <div className="space-y-1">
                                 {getCheckinStatusBadge(
-                                  attendeeWithConferences?.overallStatus ||
-                                    "registered"
+                                  attendee.overallStatus || "registered"
                                 )}
-                                {attendeeWithConferences?.lastCheckinTime && (
+                                {attendee.lastCheckinTime && (
                                   <p className="text-xs text-muted-foreground">
                                     Check-in:{" "}
                                     {new Date(
-                                      attendeeWithConferences.lastCheckinTime
+                                      attendee.lastCheckinTime
                                     ).toLocaleString("vi-VN")}
                                   </p>
                                 )}
-                                {attendeeWithConferences?.lastCheckoutTime && (
+                                {attendee.lastCheckoutTime && (
                                   <p className="text-xs text-muted-foreground">
                                     Check-out:{" "}
                                     {new Date(
-                                      attendeeWithConferences.lastCheckoutTime
+                                      attendee.lastCheckoutTime
                                     ).toLocaleString("vi-VN")}
                                   </p>
                                 )}
-                                {attendeeWithConferences?.registrations &&
-                                  attendeeWithConferences.registrations.length >
-                                    0 && (
+                                {attendee.registrations &&
+                                  attendee.registrations.length > 0 && (
                                     <p className="text-xs text-muted-foreground">
-                                      {
-                                        attendeeWithConferences.registrations
-                                          .length
-                                      }{" "}
-                                      đăng ký
+                                      {attendee.registrations.length} đăng ký
                                     </p>
                                   )}
                               </div>
@@ -1741,12 +1785,8 @@ export default function AttendeesPage() {
           {viewMode === "grid" && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredAttendees.map((attendee) => {
-                // Find the attendee's conferences from the original data
-                const attendeeWithConferences = attendeesWithConferences.find(
-                  (a) => a.ID === attendee.ID
-                );
-                const attendeeConferences =
-                  attendeeWithConferences?.conferences || [];
+                // The attendee data already includes conferences and registrations
+                const attendeeConferences = attendee.conferences || [];
 
                 console.log(
                   "🎯 Grid view - Rendering attendee:",
@@ -1806,41 +1846,79 @@ export default function AttendeesPage() {
                       </div>
 
                       <div className="space-y-2">
-                        {isGlobalAdminPage && (
+                        {(isGlobalAdminPage || isConferenceSpecificPage) && (
                           <div className="flex items-center justify-between text-sm">
                             <span>Hội nghị:</span>
-                            <span className="font-medium">
-                              {attendeeConferences.length > 0
-                                ? attendeeConferences[0].NAME
-                                : "Chưa có"}
-                            </span>
+                            <div className="flex items-center space-x-1">
+                              {attendeeConferences.length > 0 ? (
+                                <div className="flex items-center space-x-1">
+                                  <span className="font-medium text-primary">
+                                    {attendeeConferences[0].NAME}
+                                  </span>
+                                  {attendeeConferences.length > 1 && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="secondary" className="text-xs">
+                                            +{attendeeConferences.length - 1}
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="max-w-xs">
+                                          <div className="space-y-2">
+                                            <p className="font-medium text-sm">Hội nghị đã tham dự:</p>
+                                            <div className="space-y-1">
+                                              {attendeeConferences.map((conference, index) => (
+                                                <div key={conference.ID} className="flex items-center space-x-2 text-xs">
+                                                  <Badge variant="outline" className="text-xs">
+                                                    {index + 1}
+                                                  </Badge>
+                                                  <span className="font-medium">
+                                                    {conference.NAME}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                              Tổng cộng: {attendeeConferences.length} hội nghị
+                                            </div>
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </div>
+                              ) : (
+                                <Badge variant="outline" className="text-xs text-muted-foreground">
+                                  Chưa tham dự
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         )}
                         <div className="flex items-center justify-between text-sm">
                           <span>Trạng thái:</span>
                           <div className="flex items-center space-x-1">
                             {getCheckinStatusBadge(
-                              attendeeWithConferences?.overallStatus ||
-                                "registered"
+                              attendee.overallStatus || "registered"
                             )}
                           </div>
                         </div>
-                        {attendeeWithConferences?.lastCheckinTime && (
+                        {attendee.lastCheckinTime && (
                           <div className="flex items-center justify-between text-sm">
                             <span>Check-in:</span>
                             <span className="text-xs text-muted-foreground">
                               {new Date(
-                                attendeeWithConferences.lastCheckinTime
+                                attendee.lastCheckinTime
                               ).toLocaleString("vi-VN")}
                             </span>
                           </div>
                         )}
-                        {attendeeWithConferences?.lastCheckoutTime && (
+                        {attendee.lastCheckoutTime && (
                           <div className="flex items-center justify-between text-sm">
                             <span>Check-out:</span>
                             <span className="text-xs text-muted-foreground">
                               {new Date(
-                                attendeeWithConferences.lastCheckoutTime
+                                attendee.lastCheckoutTime
                               ).toLocaleString("vi-VN")}
                             </span>
                           </div>
@@ -1886,12 +1964,8 @@ export default function AttendeesPage() {
           {viewMode === "cards" && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {filteredAttendees.map((attendee) => {
-                // Find the attendee's conferences from the original data
-                const attendeeWithConferences = attendeesWithConferences.find(
-                  (a) => a.ID === attendee.ID
-                );
-                const attendeeConferences =
-                  attendeeWithConferences?.conferences || [];
+                // The attendee data already includes conferences and registrations
+                const attendeeConferences = attendee.conferences || [];
 
                 console.log(
                   "🎯 Cards view - Rendering attendee:",
@@ -1953,14 +2027,53 @@ export default function AttendeesPage() {
                             {attendee.COMPANY || "Chưa cập nhật"}
                           </span>
                         </div>
-                        {isGlobalAdminPage && (
+                        {(isGlobalAdminPage || isConferenceSpecificPage) && (
                           <div className="flex items-center space-x-2">
                             <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span>
-                              {attendeeConferences.length > 0
-                                ? attendeeConferences[0].NAME
-                                : "Chưa có hội nghị"}
-                            </span>
+                            <div className="flex items-center space-x-1">
+                              {attendeeConferences.length > 0 ? (
+                                <div className="flex items-center space-x-1">
+                                  <span className="font-medium text-primary">
+                                    {attendeeConferences[0].NAME}
+                                  </span>
+                                  {attendeeConferences.length > 1 && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="secondary" className="text-xs">
+                                            +{attendeeConferences.length - 1}
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="max-w-xs">
+                                          <div className="space-y-2">
+                                            <p className="font-medium text-sm">Hội nghị đã tham dự:</p>
+                                            <div className="space-y-1">
+                                              {attendeeConferences.map((conference, index) => (
+                                                <div key={conference.ID} className="flex items-center space-x-2 text-xs">
+                                                  <Badge variant="outline" className="text-xs">
+                                                    {index + 1}
+                                                  </Badge>
+                                                  <span className="font-medium">
+                                                    {conference.NAME}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                              Tổng cộng: {attendeeConferences.length} hội nghị
+                                            </div>
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </div>
+                              ) : (
+                                <Badge variant="outline" className="text-xs text-muted-foreground">
+                                  Chưa tham dự hội nghị
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         )}
                         <div className="flex items-center space-x-2">
@@ -1968,30 +2081,29 @@ export default function AttendeesPage() {
                             Trạng thái:
                           </span>
                           {getCheckinStatusBadge(
-                            attendeeWithConferences?.overallStatus ||
-                              "registered"
+                            attendee.overallStatus || "registered"
                           )}
                         </div>
-                        {attendeeWithConferences?.lastCheckinTime && (
+                        {attendee.lastCheckinTime && (
                           <div className="flex items-center space-x-2">
                             <span className="text-muted-foreground">
                               Check-in:
                             </span>
                             <span className="text-xs text-muted-foreground">
                               {new Date(
-                                attendeeWithConferences.lastCheckinTime
+                                attendee.lastCheckinTime
                               ).toLocaleString("vi-VN")}
                             </span>
                           </div>
                         )}
-                        {attendeeWithConferences?.lastCheckoutTime && (
+                        {attendee.lastCheckoutTime && (
                           <div className="flex items-center space-x-2">
                             <span className="text-muted-foreground">
                               Check-out:
                             </span>
                             <span className="text-xs text-muted-foreground">
                               {new Date(
-                                attendeeWithConferences.lastCheckoutTime
+                                attendee.lastCheckoutTime
                               ).toLocaleString("vi-VN")}
                             </span>
                           </div>

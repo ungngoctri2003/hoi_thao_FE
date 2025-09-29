@@ -584,27 +584,35 @@ export function AttendeeDialog({
   // Load checkin statuses when attendee changes
   useEffect(() => {
     if (attendee && mode !== "create") {
-      // For demo purposes, create mock registration data
-      if (conferences.length > 0) {
-        const mockStatuses: CheckinStatus[] = conferences
-          .slice(0, 2)
-          .map((conference, index) => ({
-            registrationId: 1000 + attendee.ID * 10 + conference.ID,
-            conferenceId: conference.ID,
-            conferenceName: conference.NAME,
-            status: index === 0 ? "checked-in" : "registered",
-            qrCode: `MOCK_QR_${attendee.ID}_${conference.ID}`,
-            registrationDate: new Date(
-              Date.now() - (index + 1) * 24 * 60 * 60 * 1000
-            ),
-            checkinTime:
-              index === 0
-                ? new Date(Date.now() - 2 * 60 * 60 * 1000)
-                : undefined,
-            checkoutTime: undefined,
-          }));
-        setCheckinStatuses(mockStatuses);
+      // Use real data from attendee.conferences and attendee.registrations
+      if (attendee.conferences && attendee.registrations) {
+        console.log("🔍 Loading real conference data for attendee:", {
+          attendeeId: attendee.ID,
+          attendeeName: attendee.NAME,
+          conferences: attendee.conferences.length,
+          registrations: attendee.registrations.length,
+        });
+
+        // Map registrations to CheckinStatus format
+        const realStatuses: CheckinStatus[] = attendee.registrations.map((registration) => {
+          const conference = attendee.conferences?.find(c => c.ID === registration.CONFERENCE_ID);
+          return {
+            registrationId: registration.ID,
+            conferenceId: registration.CONFERENCE_ID,
+            conferenceName: conference?.NAME || "Unknown Conference",
+            status: registration.STATUS as any,
+            qrCode: registration.QR_CODE,
+            registrationDate: registration.REGISTRATION_DATE,
+            checkinTime: registration.CHECKIN_TIME,
+            checkoutTime: registration.CHECKOUT_TIME,
+          };
+        });
+
+        console.log("✅ Mapped real statuses:", realStatuses);
+        setCheckinStatuses(realStatuses);
       } else {
+        // Fallback to API call if data is not available
+        console.log("⚠️ No conference/registration data available, falling back to API call");
         loadCheckinStatuses();
       }
     }

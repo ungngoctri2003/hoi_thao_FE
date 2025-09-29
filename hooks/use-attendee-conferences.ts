@@ -233,18 +233,34 @@ export function useAttendeeConferences(
         conferenceId ? `for conference ${conferenceId}` : "for all conferences"
       );
 
-      // Get attendees list with better error handling
+      // Use the optimized endpoint that fetches everything in one call
       let attendeesResponse;
       try {
-        attendeesResponse = await attendeesAPI.getAttendees({
+        const filters = {
+          ...memoizedFilters,
+          ...(conferenceId && { conferenceId }),
+        };
+
+        attendeesResponse = await attendeesAPI.getAttendeesWithConferences({
           page,
           limit,
-          filters: memoizedFilters,
+          filters,
           search: search || undefined,
+          includeConferences: true,
+          includeRegistrations: true,
         });
-        console.log("✅ Got attendees:", attendeesResponse.data.length);
+        console.log("✅ Got attendees with conferences:", {
+          count: attendeesResponse.data.length,
+          total: attendeesResponse.meta.total,
+          page: attendeesResponse.meta.page,
+          limit: attendeesResponse.meta.limit,
+          totalPages: attendeesResponse.meta.totalPages,
+          filters,
+          search,
+          conferenceId,
+        });
       } catch (err) {
-        console.error("❌ Error fetching attendees:", err);
+        console.error("❌ Error fetching attendees with conferences:", err);
         throw new Error(
           `Failed to fetch attendees: ${
             err instanceof Error ? err.message : "Unknown error"
@@ -265,226 +281,92 @@ export function useAttendeeConferences(
         return;
       }
 
-      // Process attendees in smaller batches to avoid overwhelming the API
-      const batchSize = 3; // Reduced batch size to avoid overwhelming server
+      // Process the data from the optimized endpoint
       const attendees = attendeesResponse.data;
-      const attendeesWithConferencesData: (AttendeeWithConferences | null)[] =
-        [];
+      const attendeesWithConferencesData: AttendeeWithConferences[] = [];
 
-      for (let i = 0; i < attendees.length; i += batchSize) {
-        const batch = attendees.slice(i, i + batchSize);
-        console.log(
-          `🔄 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(
-            attendees.length / batchSize
-          )}`
-        );
+      for (const attendee of attendees) {
+        try {
+          // The attendee data already includes conferences and registrations from the backend
+          const allConferences = attendee.conferences || [];
+          const registrations = attendee.registrations || [];
 
-        const batchResults = await Promise.allSettled(
-          batch.map(async (attendee) => {
-            try {
-              // Get attendee's registrations with timeout
-              const registrationsResponse = (await Promise.race([
-                attendeesAPI.getAttendeeRegistrations(attendee.ID),
-                new Promise((_, reject) =>
-                  setTimeout(
-                    () => reject(new Error("Registration fetch timeout")),
-                    10000
-                  )
-                ),
-              ])) as { data: Registration[] };
+          // Filter conferences to only include those that the attendee actually registered for
+          // Get conference IDs from registrations
+          const registeredConferenceIds = registrations.map(reg => reg.CONFERENCE_ID);
+          
+          // Filter conferences to only include registered ones
+          const conferences = allConferences.filter(conference => 
+            registeredConferenceIds.includes(conference.ID)
+          );
 
-              const registrations = registrationsResponse.data || [];
+          console.log(`🔍 Conference filtering for ${attendee.NAME}:`, {
+            allConferences: allConferences.length,
+            registrations: registrations.length,
+            registeredConferenceIds,
+            filteredConferences: conferences.length,
+            conferenceNames: conferences.map(c => c.NAME),
+            allConferenceNames: allConferences.map(c => c.NAME)
+          });
 
+          console.log(
+            `📋 Attendee ${attendee.NAME} has ${allConferences.length} total conferences, ${conferences.length} registered conferences, and ${registrations.length} registrations`
+          );
+
+          // If conferenceId is specified, filter to only include attendees registered for that conference
+          if (conferenceId) {
+            const isRegisteredForConference = registrations.some(
+              (reg) => reg.CONFERENCE_ID === conferenceId
+            );
+            if (!isRegisteredForConference) {
               console.log(
-                `📋 Attendee ${attendee.NAME} has ${registrations.length} registrations`
+                `🚫 Attendee ${attendee.NAME} not registered for conference ${conferenceId}, skipping`
               );
-
-              // Get conference details for each registration (with error handling and caching)
-              const conferences: Conference[] = [];
-              if (registrations.length > 0) {
-                const conferencePromises = registrations.map(
-                  async (registration) => {
-                    try {
-                      // Check cache first
-                      const cachedConference = conferenceCache.current.get(
-                        registration.CONFERENCE_ID
-                      );
-                      if (cachedConference) {
-                        console.log(
-                          `📦 Using cached conference ${registration.CONFERENCE_ID}`
-                        );
-                        return cachedConference;
-                      }
-
-                      // Retry logic for conference fetching
-                      let lastError;
-                      for (let retry = 0; retry < 3; retry++) {
-                        try {
-                          const conferenceResponse = (await Promise.race([
-                            conferencesAPI.getConferenceById(
-                              registration.CONFERENCE_ID
-                            ),
-                            new Promise((_, reject) =>
-                              setTimeout(
-                                () =>
-                                  reject(new Error("Conference fetch timeout")),
-                                15000 // Increased timeout to 15 seconds
-                              )
-                            ),
-                          ])) as { data: Conference };
-
-                          // Cache the conference data
-                          conferenceCache.current.set(
-                            registration.CONFERENCE_ID,
-                            conferenceResponse.data
-                          );
-                          return conferenceResponse.data;
-                        } catch (err) {
-                          lastError = err;
-                          console.warn(
-                            `⚠️ Conference fetch attempt ${
-                              retry + 1
-                            }/3 failed for ${registration.CONFERENCE_ID}:`,
-                            err
-                          );
-                          if (retry < 2) {
-                            // Wait before retry
-                            await new Promise((resolve) =>
-                              setTimeout(resolve, 2000)
-                            );
-                          }
-                        }
-                      }
-
-                      // All retries failed
-                      console.error(
-                        `❌ All retries failed for conference ${registration.CONFERENCE_ID}:`,
-                        lastError
-                      );
-                      return null;
-                    } catch (err) {
-                      console.error(
-                        `Error fetching conference ${registration.CONFERENCE_ID}:`,
-                        err
-                      );
-                      return null;
-                    }
-                  }
-                );
-
-                const conferenceResults = await Promise.allSettled(
-                  conferencePromises
-                );
-                conferences.push(
-                  ...conferenceResults
-                    .filter(
-                      (result): result is PromiseFulfilledResult<Conference> =>
-                        result.status === "fulfilled" && result.value !== null
-                    )
-                    .map((result) => result.value)
-                );
-              }
-
-              // If conferenceId is specified, filter to only include attendees registered for that conference
-              if (conferenceId) {
-                const isRegisteredForConference = registrations.some(
-                  (reg) => reg.CONFERENCE_ID === conferenceId
-                );
-                if (!isRegisteredForConference) {
-                  console.log(
-                    `🚫 Attendee ${attendee.NAME} not registered for conference ${conferenceId}, skipping`
-                  );
-                  return null; // Skip this attendee
-                }
-              }
-
-              // If no conferences were fetched successfully, create a fallback conference object
-              if (conferences.length === 0 && registrations.length > 0) {
-                console.log(
-                  `⚠️ No conference data for attendee ${attendee.NAME}, creating fallback`
-                );
-                conferences.push({
-                  ID: registrations[0].CONFERENCE_ID,
-                  NAME: `Conference ${registrations[0].CONFERENCE_ID}`,
-                  DESCRIPTION: "Conference details not available",
-                  START_DATE: new Date(),
-                  END_DATE: new Date(),
-                  STATUS: "unknown",
-                  VENUE: "Unknown",
-                  CREATED_AT: new Date(),
-                });
-              }
-
-              // Tính toán trạng thái tổng hợp
-              const overallStatus = calculateOverallStatus(registrations);
-              const lastCheckinTime = getLastCheckinTime(registrations);
-              const lastCheckoutTime = getLastCheckoutTime(registrations);
-
-              console.log(`🎯 Final status calculation for ${attendee.NAME}:`, {
-                overallStatus,
-                lastCheckinTime,
-                lastCheckoutTime,
-                registrationsCount: registrations.length,
-              });
-
-              return {
-                ...attendee,
-                conferences,
-                registrations,
-                overallStatus,
-                lastCheckinTime,
-                lastCheckoutTime,
-              };
-            } catch (err) {
-              console.error(`Error processing attendee ${attendee.ID}:`, err);
-              return {
-                ...attendee,
-                conferences: [],
-                registrations: [],
-                overallStatus: "not-registered" as const,
-                lastCheckinTime: undefined,
-                lastCheckoutTime: undefined,
-              };
+              continue; // Skip this attendee
             }
-          })
-        );
-
-        // Process batch results
-        batchResults.forEach((result, index) => {
-          if (result.status === "fulfilled" && result.value !== null) {
-            attendeesWithConferencesData.push(result.value);
-          } else if (result.status === "rejected") {
-            console.error(`Batch item ${i + index} failed:`, result.reason);
-            // Add attendee with default values
-            const attendee = batch[index];
-            attendeesWithConferencesData.push({
-              ...attendee,
-              conferences: [],
-              registrations: [],
-              overallStatus: "not-registered" as const,
-              lastCheckinTime: undefined,
-              lastCheckoutTime: undefined,
-            });
           }
-        });
 
-        // Add delay between batches to avoid overwhelming the server
-        if (i + batchSize < attendees.length) {
-          console.log("⏳ Waiting before next batch...");
-          await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 second delay
+          // Tính toán trạng thái tổng hợp
+          const overallStatus = calculateOverallStatus(registrations);
+          const lastCheckinTime = getLastCheckinTime(registrations);
+          const lastCheckoutTime = getLastCheckoutTime(registrations);
+
+          console.log(`🎯 Final status calculation for ${attendee.NAME}:`, {
+            overallStatus,
+            lastCheckinTime,
+            lastCheckoutTime,
+            registrationsCount: registrations.length,
+            conferencesCount: conferences.length,
+          });
+
+          attendeesWithConferencesData.push({
+            ...attendee,
+            conferences,
+            registrations,
+            overallStatus,
+            lastCheckinTime,
+            lastCheckoutTime,
+          });
+        } catch (err) {
+          console.error(`Error processing attendee ${attendee.ID}:`, err);
+          // Add attendee with default values
+          attendeesWithConferencesData.push({
+            ...attendee,
+            conferences: [],
+            registrations: [],
+            overallStatus: "not-registered" as const,
+            lastCheckinTime: undefined,
+            lastCheckoutTime: undefined,
+          });
         }
       }
 
-      // Filter out null values (attendees not registered for the specific conference)
-      const filteredData = attendeesWithConferencesData.filter(
-        (attendee): attendee is AttendeeWithConferences => attendee !== null
-      );
       console.log(
         "✅ Processed attendees with conferences:",
-        filteredData.length
+        attendeesWithConferencesData.length
       );
 
-      setAttendeesWithConferences(filteredData);
+      setAttendeesWithConferences(attendeesWithConferencesData);
       setPagination({
         page: attendeesResponse.meta.page,
         limit: attendeesResponse.meta.limit,

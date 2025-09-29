@@ -136,19 +136,22 @@ export function QRScanner({
           // Try to parse QR code as JSON first (from name card)
           try {
             const qrData = JSON.parse(result.data);
-            if (qrData.type === "attendee_registration" && qrData.attendeeId) {
-              console.log("📱 Name card QR code detected:", qrData);
+            if (qrData.type === "attendee_registration" && qrData.id) {
+              console.log("📱 Optimized name card QR code detected:", qrData);
 
-              // Check if QR code contains full attendee data
-              if (qrData.attendee && qrData.conference) {
-                console.log("✅ Full attendee data found in QR code:", {
-                  attendee: qrData.attendee.name,
-                  conference: qrData.conference.name,
-                  registration: qrData.registration?.status,
+              // Check QR code version and structure
+              if (qrData.v === "2.0") {
+                console.log("✅ Optimized QR code v2.0 detected:", {
+                  attendeeId: qrData.id,
+                  conferenceId: qrData.conf,
+                  timestamp: qrData.t,
+                  checksum: qrData.cs,
                 });
+              } else {
+                console.log("📱 Legacy QR code detected:", qrData);
               }
 
-              // Use the full JSON data for better processing
+              // Use the JSON data for processing
               onScanSuccess(result.data);
             } else {
               // Fallback to original data

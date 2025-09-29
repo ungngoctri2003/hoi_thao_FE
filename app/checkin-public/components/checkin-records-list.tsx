@@ -135,17 +135,29 @@ export function CheckInRecordsList({ records, isLoading, selectedConference, onD
               <div key={record.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                 <div className="flex items-center space-x-4">
                   <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <QrCode className="h-5 w-5 text-primary" />
+                    {record.method === 'qr' ? (
+                      <QrCode className="h-5 w-5 text-primary" />
+                    ) : (
+                      <CheckCircle className="h-5 w-5 text-primary" />
+                    )}
                   </div>
                   <div>
                     <p className="font-medium">{record.attendeeName || 'N/A'}</p>
                     <p className="text-sm text-muted-foreground">{record.attendeeEmail || 'N/A'}</p>
+                    {record.attendeePhone && (
+                      <p className="text-xs text-muted-foreground">{record.attendeePhone}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">
                   <div className="text-right">
                     <p className="text-sm font-medium">{formatDateTime(record.checkInTime)}</p>
-                    {getStatusBadge(record.status)}
+                    <div className="flex items-center space-x-2 mt-1">
+                      {getStatusBadge(record.status)}
+                      <Badge variant="outline" className="text-xs">
+                        {record.method === 'qr' ? 'QR Code' : 'Thủ công'}
+                      </Badge>
+                    </div>
                   </div>
                   {onDeleteRecord && (
                     <div className="flex items-center space-x-2">

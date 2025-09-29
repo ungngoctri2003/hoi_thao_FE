@@ -15,6 +15,9 @@ export interface Attendee {
   GENDER: string | null;
   FIREBASE_UID: string | null;
   CREATED_AT: Date;
+  // Optional fields for attendees with conferences
+  conferences?: Conference[];
+  registrations?: Registration[];
 }
 
 export interface AttendeeWithRegistration extends Attendee {
@@ -58,6 +61,7 @@ export interface Conference {
   END_DATE: Date;
   STATUS: string;
   VENUE?: string;
+  LOCATION?: string; // Backend uses LOCATION instead of VENUE
   CREATED_AT: Date;
 }
 
@@ -233,6 +237,35 @@ class AttendeesAPI {
 
     const queryString = searchParams.toString();
     return this.request<AttendeeListResponse>(`?${queryString}`);
+  }
+
+  // Get attendees with their conferences and registrations (optimized endpoint)
+  async getAttendeesWithConferences(
+    params: AttendeeListParams & {
+      includeConferences?: boolean;
+      includeRegistrations?: boolean;
+    } = {}
+  ): Promise<AttendeeListResponse> {
+    const searchParams = new URLSearchParams();
+
+    if (params.page) searchParams.append("page", params.page.toString());
+    if (params.limit) searchParams.append("limit", params.limit.toString());
+    if (params.search) searchParams.append("search", params.search);
+    if (params.includeConferences !== undefined) {
+      searchParams.append("includeConferences", params.includeConferences.toString());
+    }
+    if (params.includeRegistrations !== undefined) {
+      searchParams.append("includeRegistrations", params.includeRegistrations.toString());
+    }
+
+    if (params.filters) {
+      Object.entries(params.filters).forEach(([key, value]) => {
+        if (value) searchParams.append(`filters[${key}]`, value);
+      });
+    }
+
+    const queryString = searchParams.toString();
+    return this.request<AttendeeListResponse>(`/with-conferences?${queryString}`);
   }
 
   // Get attendee by ID

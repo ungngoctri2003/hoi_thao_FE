@@ -38,13 +38,14 @@ import {
 } from "lucide-react";
 import QRCode from "qrcode";
 import { Attendee, Conference, Registration } from "@/lib/api/attendees-api";
+import { SessionInfo, apiClient } from "@/lib/api";
 
 interface QRNameCardGeneratorProps {
   attendee: Attendee;
   conferences?: Conference[];
   registrations?: Registration[];
   qrCode?: string;
-  onGenerateQR?: (attendeeId: number, conferenceId?: number) => Promise<string>;
+  onGenerateQR?: (attendeeId: number, conferenceId?: number, sessionId?: number) => Promise<string>;
 }
 
 export function QRNameCardGenerator({
@@ -62,7 +63,24 @@ export function QRNameCardGenerator({
     useState<Conference | null>(null);
   const [selectedRegistration, setSelectedRegistration] =
     useState<Registration | null>(null);
+  const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // Fetch sessions when conference changes
+  const fetchSessions = async (conferenceId: number) => {
+    setIsLoadingSessions(true);
+    try {
+      const response = await apiClient.getSessions(conferenceId);
+      setSessions(response.data || []);
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+      setSessions([]);
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  };
 
   // Generate QR code when component mounts or QR code changes
   useEffect(() => {
@@ -91,49 +109,20 @@ export function QRNameCardGenerator({
   }, [qrCode, generatedQR]);
 
   const handleGenerateQR = async () => {
-    if (!attendee?.ID || !selectedConference) return;
+    if (!attendee?.ID || !selectedConference || !selectedSession) return;
 
     setIsGenerating(true);
     try {
-      // Create comprehensive QR data with all necessary information for checkin
+      // Create minimal QR data with only essential information for checkin
       const qrData = {
         id: attendee.ID,
         conf: selectedConference.ID,
-        rid: selectedRegistration?.ID || null,
+        ...(selectedSession && { session: selectedSession.id }),
         t: Date.now(),
-        // Attendee information - simplified
-        a: {
-          id: attendee.ID,
-          n: attendee.NAME,
-          e: attendee.EMAIL,
-          p: attendee.PHONE,
-          c: attendee.COMPANY,
-          pos: attendee.POSITION,
-          av: attendee.AVATAR_URL,
-        },
-        // Conference information - simplified
-        c: {
-          id: selectedConference.ID,
-          n: selectedConference.NAME,
-          d: selectedConference.DESCRIPTION,
-          sd: selectedConference.START_DATE,
-          ed: selectedConference.END_DATE,
-          v: selectedConference.VENUE,
-          s: selectedConference.STATUS,
-        },
-        // Registration information - simplified
-        r: selectedRegistration
-          ? {
-              id: selectedRegistration.ID,
-              s: selectedRegistration.STATUS,
-              rd: selectedRegistration.REGISTRATION_DATE,
-              ct: selectedRegistration.CHECKIN_TIME,
-              cot: selectedRegistration.CHECKOUT_TIME,
-            }
-          : null,
+        type: "attendee_registration",
         // Security and validation
-        cs: generateChecksum(attendee.ID, selectedConference.ID),
-        v: "1.0",
+        cs: generateChecksum(attendee.ID, selectedConference.ID, selectedSession?.id),
+        v: "2.0", // Updated version for optimized QR
       };
 
       const qrString = JSON.stringify(qrData);
@@ -153,11 +142,14 @@ export function QRNameCardGenerator({
       setQrCodeDataUrl(qrDataUrl);
     } catch (error) {
       console.error("Error generating QR code:", error);
-      // Generate a fallback QR code
+      // Generate a fallback QR code with minimal data
       const fallbackQR = JSON.stringify({
         id: attendee.ID,
         conf: selectedConference.ID,
+        ...(selectedSession && { session: selectedSession.id }),
         t: Date.now(),
+        type: "attendee_registration",
+        v: "2.0",
       });
       setGeneratedQR(fallbackQR);
 
@@ -180,9 +172,10 @@ export function QRNameCardGenerator({
   // Generate checksum for security validation
   const generateChecksum = (
     attendeeId: number,
-    conferenceId: number
+    conferenceId: number,
+    sessionId?: number
   ): string => {
-    const data = `${attendeeId}-${conferenceId}-${Date.now()}`;
+    const data = `${attendeeId}-${conferenceId}-${sessionId || 0}-${Date.now()}`;
     let hash = 0;
     for (let i = 0; i < data.length; i++) {
       const char = data.charCodeAt(i);
@@ -209,7 +202,7 @@ export function QRNameCardGenerator({
   };
 
   // Handle conference selection
-  const handleConferenceSelect = (conferenceId: string) => {
+  const handleConferenceSelect = async (conferenceId: string) => {
     const conference = conferences.find((c) => c.ID === parseInt(conferenceId));
     const registration = registrations.find(
       (r) => r.CONFERENCE_ID === parseInt(conferenceId)
@@ -217,8 +210,24 @@ export function QRNameCardGenerator({
 
     setSelectedConference(conference || null);
     setSelectedRegistration(registration || null);
+    setSelectedSession(null); // Reset session selection
 
     // Reset QR code when conference changes
+    setGeneratedQR("");
+    setQrCodeDataUrl("");
+
+    // Fetch sessions for the selected conference
+    if (conference) {
+      await fetchSessions(conference.ID);
+    }
+  };
+
+  // Handle session selection
+  const handleSessionSelect = (sessionId: string) => {
+    const session = sessions.find((s) => s.id === parseInt(sessionId));
+    setSelectedSession(session || null);
+    
+    // Reset QR code when session changes
     setGeneratedQR("");
     setQrCodeDataUrl("");
   };
@@ -307,10 +316,12 @@ export function QRNameCardGenerator({
       ctx.closePath();
       ctx.clip();
 
-      // Draw QR Code
-      const qrSize = 120; // Size in pixels
-      const qrX = 30;
-      const qrY = (canvas.height / scale - qrSize) / 2;
+      // Draw QR Code - Optimized for 3.5" x 2" card
+      const qrSize = 130; // Increased size for better scanning
+      const canvasWidth = canvas.width / scale; // Actual canvas width
+      const canvasHeight = canvas.height / scale; // Actual canvas height
+      const qrX = (canvasWidth - qrSize) / 2; // Center horizontally
+      const qrY = 15; // Position from top - minimal margin
 
       // Load and draw QR code image
       const qrImage = new Image();
@@ -322,118 +333,55 @@ export function QRNameCardGenerator({
         qrImage.src = qrCodeDataUrl;
       });
 
-      // Draw QR code with border
+      // Draw QR code with prominent border
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8);
-      ctx.strokeStyle = "#d1d5db";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8);
+      ctx.fillRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
 
       ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
 
-      // Draw attendee information
-      const infoX = qrX + qrSize + 30;
-      const infoY = 30;
-      const lineHeight = 20;
-
-      // Draw avatar
-      const avatarSize = 50;
-      const avatarX = infoX;
-      const avatarY = infoY;
-
-      // Draw avatar background circle
-      ctx.fillStyle = "#8b5cf6";
-      ctx.beginPath();
-      ctx.arc(
-        avatarX + avatarSize / 2,
-        avatarY + avatarSize / 2,
-        avatarSize / 2,
-        0,
-        2 * Math.PI
-      );
-      ctx.fill();
-
-      // Draw avatar initial
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 20px Arial, sans-serif";
+      // Draw minimal attendee information below QR code - centered and simple
+      const infoY = qrY + qrSize + 12; // Balanced spacing
+      
+      ctx.fillStyle = "#1f2937";
       ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(
-        getInitials(attendee.NAME),
-        avatarX + avatarSize / 2,
-        avatarY + avatarSize / 2
-      );
-
-      // Reset text alignment
-      ctx.textAlign = "left";
       ctx.textBaseline = "top";
 
-      // Set font properties
-      ctx.fillStyle = "#1f2937";
+      // Draw name - larger and centered
+      ctx.font = "bold 16px Arial, sans-serif"; // Reduced font size
+      ctx.fillText(attendee.NAME, canvasWidth / 2, infoY);
 
-      // Draw name
-      ctx.font = "bold 24px Arial, sans-serif";
-      ctx.fillText(attendee.NAME, infoX + avatarSize + 15, infoY);
-
-      // Draw position
-      ctx.font = "14px Arial, sans-serif";
+      // Draw position - smaller and centered
+      ctx.font = "10px Arial, sans-serif"; // Reduced font size // Reduced font size
       ctx.fillStyle = "#6b7280";
       ctx.fillText(
         attendee.POSITION || "Tham dự viên",
-        infoX + avatarSize + 15,
-        infoY + 30
+        canvasWidth / 2,
+        infoY + 12 // Compact spacing
       );
 
-      // Draw company
-      ctx.fillText(
-        attendee.COMPANY || "Chưa cập nhật",
-        infoX + avatarSize + 15,
-        infoY + 50
-      );
-
-      // Draw contact info
-      let currentY = infoY + 80;
-      if (attendee.EMAIL) {
-        ctx.font = "12px Arial, sans-serif";
-        ctx.fillText(`📧 ${attendee.EMAIL}`, infoX, currentY);
-        currentY += 20;
-      }
-      if (attendee.PHONE) {
-        ctx.fillText(`📞 ${attendee.PHONE}`, infoX, currentY);
-        currentY += 20;
-      }
-
-      // Draw conference info
+      // Draw conference name - smaller and centered
       if (selectedConference) {
-        currentY += 10;
-        ctx.strokeStyle = "#e5e7eb";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(infoX, currentY);
-        ctx.lineTo(canvas.width / scale - 30, currentY);
-        ctx.stroke();
-        currentY += 15;
-
-        ctx.font = "12px Arial, sans-serif";
-        ctx.fillText(`📅 ${selectedConference.NAME}`, infoX, currentY);
-        currentY += 20;
-
-        const startDate = formatDate(selectedConference.START_DATE);
-        const endDate = formatDate(selectedConference.END_DATE);
-        ctx.fillText(`${startDate} - ${endDate}`, infoX, currentY);
-        currentY += 20;
-
-        if (selectedConference.VENUE) {
-          ctx.fillText(`📍 ${selectedConference.VENUE}`, infoX, currentY);
-          currentY += 20;
-        }
-
-        if (selectedRegistration) {
-          ctx.fillText(
-            `🎫 Trạng thái: ${selectedRegistration.STATUS}`,
-            infoX,
-            currentY
-          );
+        ctx.font = "9px Arial, sans-serif"; // Reduced font size
+        ctx.fillStyle = "#9ca3af";
+        ctx.fillText(selectedConference.NAME, canvasWidth / 2, infoY + 22); // Compact spacing
+        
+        // Draw session name if selected
+        if (selectedSession) {
+          ctx.font = "8px Arial, sans-serif";
+          ctx.fillStyle = "#6b7280";
+          // Truncate session name if too long
+          const maxWidth = canvasWidth - 20; // Leave margin
+          let sessionName = selectedSession.name;
+          if (ctx.measureText(sessionName).width > maxWidth) {
+            while (ctx.measureText(sessionName + "...").width > maxWidth && sessionName.length > 0) {
+              sessionName = sessionName.slice(0, -1);
+            }
+            sessionName += "...";
+          }
+          ctx.fillText(sessionName, canvasWidth / 2, infoY + 32);
         }
       }
 
@@ -522,10 +470,12 @@ export function QRNameCardGenerator({
       ctx.closePath();
       ctx.clip();
 
-      // Draw QR Code
-      const qrSize = 120;
-      const qrX = 30;
-      const qrY = (canvas.height / scale - qrSize) / 2;
+      // Draw QR Code - Optimized for 3.5" x 2" card
+      const qrSize = 130; // Increased size for better scanning
+      const canvasWidth = canvas.width / scale; // Actual canvas width
+      const canvasHeight = canvas.height / scale; // Actual canvas height
+      const qrX = (canvasWidth - qrSize) / 2; // Center horizontally
+      const qrY = 15; // Position from top - minimal margin
 
       // Load and draw QR code image
       const qrImage = new Image();
@@ -537,117 +487,55 @@ export function QRNameCardGenerator({
         qrImage.src = qrCodeDataUrl;
       });
 
-      // Draw QR code with border
+      // Draw QR code with prominent border
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8);
-      ctx.strokeStyle = "#d1d5db";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8);
+      ctx.fillRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
 
       ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
 
-      // Draw attendee information
-      const infoX = qrX + qrSize + 30;
-      const infoY = 30;
-
-      // Draw avatar
-      const avatarSize = 50;
-      const avatarX = infoX;
-      const avatarY = infoY;
-
-      // Draw avatar background circle
-      ctx.fillStyle = "#8b5cf6";
-      ctx.beginPath();
-      ctx.arc(
-        avatarX + avatarSize / 2,
-        avatarY + avatarSize / 2,
-        avatarSize / 2,
-        0,
-        2 * Math.PI
-      );
-      ctx.fill();
-
-      // Draw avatar initial
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 20px Arial, sans-serif";
+      // Draw minimal attendee information below QR code - centered and simple
+      const infoY = qrY + qrSize + 12; // Balanced spacing
+      
+      ctx.fillStyle = "#1f2937";
       ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(
-        getInitials(attendee.NAME),
-        avatarX + avatarSize / 2,
-        avatarY + avatarSize / 2
-      );
-
-      // Reset text alignment
-      ctx.textAlign = "left";
       ctx.textBaseline = "top";
 
-      // Set font properties
-      ctx.fillStyle = "#1f2937";
+      // Draw name - larger and centered
+      ctx.font = "bold 16px Arial, sans-serif"; // Reduced font size
+      ctx.fillText(attendee.NAME, canvasWidth / 2, infoY);
 
-      // Draw name
-      ctx.font = "bold 24px Arial, sans-serif";
-      ctx.fillText(attendee.NAME, infoX + avatarSize + 15, infoY);
-
-      // Draw position
-      ctx.font = "14px Arial, sans-serif";
+      // Draw position - smaller and centered
+      ctx.font = "10px Arial, sans-serif"; // Reduced font size // Reduced font size
       ctx.fillStyle = "#6b7280";
       ctx.fillText(
         attendee.POSITION || "Tham dự viên",
-        infoX + avatarSize + 15,
-        infoY + 30
+        canvasWidth / 2,
+        infoY + 12 // Compact spacing
       );
 
-      // Draw company
-      ctx.fillText(
-        attendee.COMPANY || "Chưa cập nhật",
-        infoX + avatarSize + 15,
-        infoY + 50
-      );
-
-      // Draw contact info
-      let currentY = infoY + 80;
-      if (attendee.EMAIL) {
-        ctx.font = "12px Arial, sans-serif";
-        ctx.fillText(`📧 ${attendee.EMAIL}`, infoX, currentY);
-        currentY += 20;
-      }
-      if (attendee.PHONE) {
-        ctx.fillText(`📞 ${attendee.PHONE}`, infoX, currentY);
-        currentY += 20;
-      }
-
-      // Draw conference info
+      // Draw conference name - smaller and centered
       if (selectedConference) {
-        currentY += 10;
-        ctx.strokeStyle = "#e5e7eb";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(infoX, currentY);
-        ctx.lineTo(canvas.width / scale - 30, currentY);
-        ctx.stroke();
-        currentY += 15;
-
-        ctx.font = "12px Arial, sans-serif";
-        ctx.fillText(`📅 ${selectedConference.NAME}`, infoX, currentY);
-        currentY += 20;
-
-        const startDate = formatDate(selectedConference.START_DATE);
-        const endDate = formatDate(selectedConference.END_DATE);
-        ctx.fillText(`${startDate} - ${endDate}`, infoX, currentY);
-        currentY += 20;
-
-        if (selectedConference.VENUE) {
-          ctx.fillText(`📍 ${selectedConference.VENUE}`, infoX, currentY);
-          currentY += 20;
-        }
-
-        if (selectedRegistration) {
-          ctx.fillText(
-            `🎫 Trạng thái: ${selectedRegistration.STATUS}`,
-            infoX,
-            currentY
-          );
+        ctx.font = "9px Arial, sans-serif"; // Reduced font size
+        ctx.fillStyle = "#9ca3af";
+        ctx.fillText(selectedConference.NAME, canvasWidth / 2, infoY + 22); // Compact spacing
+        
+        // Draw session name if selected
+        if (selectedSession) {
+          ctx.font = "8px Arial, sans-serif";
+          ctx.fillStyle = "#6b7280";
+          // Truncate session name if too long
+          const maxWidth = canvasWidth - 20; // Leave margin
+          let sessionName = selectedSession.name;
+          if (ctx.measureText(sessionName).width > maxWidth) {
+            while (ctx.measureText(sessionName + "...").width > maxWidth && sessionName.length > 0) {
+              sessionName = sessionName.slice(0, -1);
+            }
+            sessionName += "...";
+          }
+          ctx.fillText(sessionName, canvasWidth / 2, infoY + 32);
         }
       }
 
@@ -776,13 +664,63 @@ export function QRNameCardGenerator({
             </div>
           )}
 
+          {/* Session Selection */}
+          {selectedConference && sessions.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                Chọn phiên tham dự:
+              </label>
+              <Select
+                onValueChange={handleSessionSelect}
+                value={selectedSession?.id.toString() || ""}
+                disabled={isLoadingSessions}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={isLoadingSessions ? "Đang tải..." : "Chọn phiên tham dự..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {sessions.map((session) => (
+                    <SelectItem
+                      key={session.id}
+                      value={session.id.toString()}
+                    >
+                      <div className="flex flex-col w-full">
+                        <span className="font-medium text-gray-900">{session.name}</span>
+                        <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
+                          <span>
+                            {new Date(session.startTime).toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })} -{" "}
+                            {new Date(session.endTime).toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          <span>
+                            {new Date(session.startTime).toLocaleDateString("vi-VN")}
+                          </span>
+                        </div>
+                        {session.location && (
+                          <span className="text-xs text-gray-400 mt-1">
+                            📍 {session.location}
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex items-center justify-between">
             <div className="flex space-x-2">
               {!qrCode && !generatedQR && (
                 <Button
                   onClick={handleGenerateQR}
-                  disabled={isGenerating || !selectedConference}
+                  disabled={isGenerating || !selectedConference || !selectedSession}
                   className="flex items-center space-x-2"
                 >
                   <QrCode className="h-4 w-4" />
@@ -812,97 +750,52 @@ export function QRNameCardGenerator({
             </div>
           </div>
 
-          {/* Name Card Preview */}
+          {/* Name Card Preview - Simplified Design */}
           <div className="flex justify-center">
             <div
               ref={cardRef}
-              className="w-[420px] h-[240px] bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-gray-200 rounded-lg shadow-lg p-6 flex items-center space-x-6"
+              className="w-[420px] h-[240px] bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-gray-200 rounded-lg shadow-lg p-6 flex flex-col items-center justify-center space-y-4"
               style={{
                 aspectRatio: "3.5/2", // Chuẩn namecard 3.5" x 2"
                 maxWidth: "420px",
                 maxHeight: "240px",
               }}
             >
-              {/* Left side - QR Code */}
-              <div className="flex-shrink-0 qr-section">
+              {/* QR Code - Large and Centered */}
+              <div className="qr-section">
                 {qrCodeDataUrl ? (
                   <img
                     src={qrCodeDataUrl}
                     alt="QR Code"
-                    className="w-28 h-28 border border-gray-300 rounded-lg"
+                    className="w-32 h-32 border-4 border-black rounded-lg"
                     style={{
                       imageRendering: "crisp-edges", // Tối ưu hiển thị QR code
                     }}
                   />
                 ) : (
-                  <div className="w-28 h-28 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                    <QrCode className="h-10 w-10 text-gray-400" />
+                  <div className="w-32 h-32 border-4 border-dashed border-gray-400 rounded-lg flex items-center justify-center">
+                    <QrCode className="h-12 w-12 text-gray-400" />
                   </div>
                 )}
               </div>
 
-              {/* Right side - Attendee Info */}
-              <div className="flex-1 min-w-0 info-section">
-                <div className="flex items-start space-x-4 mb-3">
-                  <Avatar className="w-14 h-14 flex-shrink-0">
-                    <AvatarImage src={attendee.AVATAR_URL || ""} />
-                    <AvatarFallback className="text-base">
-                      {getInitials(attendee.NAME)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-xl text-gray-900 truncate">
-                      {attendee.NAME}
-                    </h3>
-                    <p className="text-sm text-gray-600 truncate position">
-                      {attendee.POSITION || "Tham dự viên"}
-                    </p>
-                    <p className="text-sm text-gray-600 truncate company">
-                      {attendee.COMPANY || "Chưa cập nhật"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Contact Info */}
-                <div className="space-y-1 text-xs text-gray-600 contact-info">
-                  {attendee.EMAIL && (
-                    <div className="flex items-center space-x-2">
-                      <Mail className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate">{attendee.EMAIL}</span>
-                    </div>
-                  )}
-                  {attendee.PHONE && (
-                    <div className="flex items-center space-x-2">
-                      <Phone className="h-3 w-3 flex-shrink-0" />
-                      <span>{attendee.PHONE}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Conference Info */}
+              {/* Attendee Info - Minimal and Centered */}
+              <div className="text-center space-y-1">
+                <h3 className="font-bold text-lg text-gray-900">
+                  {attendee.NAME}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {attendee.POSITION || "Tham dự viên"}
+                </p>
                 {selectedConference && (
-                  <div className="mt-3 pt-2 border-t border-gray-200 conference-info">
-                    <div className="flex items-center space-x-2 text-xs text-gray-600">
-                      <Calendar className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate">
-                        {selectedConference.NAME}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {formatDate(selectedConference.START_DATE)} -{" "}
-                      {formatDate(selectedConference.END_DATE)}
-                    </div>
-                    {selectedConference.VENUE && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        📍 {selectedConference.VENUE}
-                      </div>
-                    )}
-                    {selectedRegistration && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        🎫 Trạng thái: {selectedRegistration.STATUS}
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-xs text-gray-500">
+                    {selectedConference.NAME}
+                  </p>
+                )}
+                {selectedSession && (
+                  <p className="text-xs text-gray-400 truncate max-w-[200px]">
+                    {selectedSession.name}
+                  </p>
                 )}
               </div>
             </div>
@@ -915,23 +808,27 @@ export function QRNameCardGenerator({
             </h4>
             <ul className="text-sm text-blue-800 space-y-1">
               <li>• Chọn hội nghị cụ thể để xuất QR Name Card</li>
+              <li>• Bắt buộc chọn phiên tham dự cụ thể để QR code có hiệu lực cho phiên đó</li>
               <li>• Name card có kích thước chuẩn 3.5" x 2" (thẻ tham dự)</li>
-              <li>• QR code chất lượng cao (400px) với error correction</li>
+              <li>• QR code lớn, rõ ràng, dễ quét (130px)</li>
               <li>
-                • QR code bao gồm: thông tin cá nhân, thông tin hội nghị, trạng
-                thái đăng ký
+                • QR code tối ưu: chứa ID tham dự viên, ID hội nghị, session ID và timestamp
+              </li>
+              <li>
+                • Thiết kế đơn giản: QR code làm trung tâm, thông tin tối thiểu
               </li>
               <li>
                 • Tải xuống với độ phân giải 300 DPI cho chất lượng in tốt
               </li>
-              <li>• In với bố cục chuẩn namecard, tối ưu cho máy in</li>
+              <li>• In với bố cục tối ưu cho việc quét QR code</li>
               <li>
-                • Thẻ có thể được sử dụng để check-in tại hội nghị tương ứng
+                • Thẻ có thể được sử dụng để check-in tại phiên tương ứng
               </li>
               <li>• QR code có tính bảo mật với checksum để xác thực</li>
               <li>
-                • Dữ liệu QR được mã hóa an toàn, không hiển thị dạng text
+                • QR code nhỏ gọn, dễ quét, tối ưu cho thiết bị di động
               </li>
+              <li>• Tên phiên tham dự sẽ hiển thị trên name card với font size tối ưu</li>
             </ul>
           </div>
         </div>

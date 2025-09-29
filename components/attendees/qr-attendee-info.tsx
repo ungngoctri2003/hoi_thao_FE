@@ -34,7 +34,10 @@ export function QRAttendeeInfo({
     return null;
   }
 
-  const { attendee, conference, registration } = qrData;
+  // Support both old and new QR format
+  const attendee = qrData.attendee || qrData.a;
+  const conference = qrData.conference || qrData.c;
+  const registration = qrData.registration || qrData.r;
 
   const getInitials = (name: string) => {
     return name
@@ -98,27 +101,27 @@ export function QRAttendeeInfo({
             <div className="flex-1 space-y-2">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {attendee?.name || "N/A"}
+                  {attendee?.name || attendee?.n || "N/A"}
                 </h3>
                 <p className="text-sm text-gray-600">
-                  {attendee?.position || "Tham dự viên"}
+                  {attendee?.position || attendee?.pos || "Tham dự viên"}
                 </p>
                 <p className="text-sm text-gray-600">
-                  {attendee?.company || "Chưa cập nhật"}
+                  {attendee?.company || attendee?.c || "Chưa cập nhật"}
                 </p>
               </div>
 
               <div className="space-y-1">
-                {attendee?.email && (
+                {(attendee?.email || attendee?.e) && (
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <Mail className="h-4 w-4" />
-                    <span>{attendee.email}</span>
+                    <span>{attendee.email || attendee.e}</span>
                   </div>
                 )}
-                {attendee?.phone && (
+                {(attendee?.phone || attendee?.p) && (
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <Phone className="h-4 w-4" />
-                    <span>{attendee.phone}</span>
+                    <span>{attendee.phone || attendee.p}</span>
                   </div>
                 )}
               </div>
@@ -140,11 +143,11 @@ export function QRAttendeeInfo({
             <div className="space-y-3">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {conference.name}
+                  {conference.name || conference.n}
                 </h3>
-                {conference.description && (
+                {(conference.description || conference.d) && (
                   <p className="text-sm text-gray-600 mt-1">
-                    {conference.description}
+                    {conference.description || conference.d}
                   </p>
                 )}
               </div>
@@ -153,15 +156,15 @@ export function QRAttendeeInfo({
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <Calendar className="h-4 w-4" />
                   <span>
-                    {formatDate(conference.startDate)} -{" "}
-                    {formatDate(conference.endDate)}
+                    {formatDate(conference.startDate || conference.sd)} -{" "}
+                    {formatDate(conference.endDate || conference.ed)}
                   </span>
                 </div>
 
-                {conference.venue && (
+                {(conference.venue || conference.v) && (
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <MapPin className="h-4 w-4" />
-                    <span>{conference.venue}</span>
+                    <span>{conference.venue || conference.v}</span>
                   </div>
                 )}
               </div>
@@ -241,11 +244,12 @@ export function QRAttendeeInfo({
         </CardHeader>
         <CardContent>
           <div className="space-y-2 text-xs text-gray-600">
-            <div>ID Tham dự viên: {qrData.attendeeId}</div>
-            <div>ID Hội nghị: {qrData.conferenceId}</div>
-            <div>Tạo lúc: {formatDateTime(new Date(qrData.timestamp))}</div>
+            <div>ID Tham dự viên: {qrData.attendeeId || qrData.id}</div>
+            <div>ID Hội nghị: {qrData.conferenceId || qrData.conf}</div>
+            <div>Tạo lúc: {formatDateTime(new Date(qrData.timestamp || qrData.t))}</div>
             {qrData.checksum && <div>Checksum: {qrData.checksum}</div>}
-            <div>Phiên bản: {qrData.version || "1.0"}</div>
+            {qrData.cs && <div>Checksum: {qrData.cs}</div>}
+            <div>Phiên bản: {qrData.version || qrData.v || "1.0"}</div>
           </div>
         </CardContent>
       </Card>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Key, AlertTriangle, CheckCircle } from "lucide-react";
 import { apiClient } from '@/lib/api';
 import { toast } from "sonner";
+import { useAuth } from '@/hooks/use-auth';
 
 interface AccountDisabledNoticeProps {
   email?: string;
@@ -13,6 +14,7 @@ interface AccountDisabledNoticeProps {
 }
 
 export function AccountDisabledNotice({ email, onFixed }: AccountDisabledNoticeProps) {
+  const { isAuthenticated } = useAuth();
   const [isChecking, setIsChecking] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
   const [disabledAccounts, setDisabledAccounts] = useState<any[]>([]);
@@ -26,7 +28,12 @@ export function AccountDisabledNotice({ email, onFixed }: AccountDisabledNoticeP
       setDisabledAccounts(disabled);
     } catch (error) {
       console.error('Error checking disabled accounts:', error);
-      toast.error('Không thể kiểm tra trạng thái tài khoản');
+      // Don't show error toast for authentication issues to avoid spam
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('Phiên đăng nhập đã hết hạn') && 
+          !errorMessage.includes('Token refresh failed')) {
+        toast.error('Không thể kiểm tra trạng thái tài khoản');
+      }
     } finally {
       setIsChecking(false);
     }
@@ -63,7 +70,11 @@ export function AccountDisabledNotice({ email, onFixed }: AccountDisabledNoticeP
       }
     } catch (error) {
       console.error('Error fixing disabled accounts:', error);
-      toast.error('Lỗi khi mở khóa tài khoản');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('Phiên đăng nhập đã hết hạn') && 
+          !errorMessage.includes('Token refresh failed')) {
+        toast.error('Lỗi khi mở khóa tài khoản');
+      }
     } finally {
       setIsFixing(false);
     }
@@ -88,13 +99,20 @@ export function AccountDisabledNotice({ email, onFixed }: AccountDisabledNoticeP
       }
     } catch (error) {
       console.error('Error fixing specific account:', error);
-      toast.error('Không thể mở khóa tài khoản này');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('Phiên đăng nhập đã hết hạn') && 
+          !errorMessage.includes('Token refresh failed')) {
+        toast.error('Không thể mở khóa tài khoản này');
+      }
     }
   };
 
   useEffect(() => {
-    checkDisabledAccounts();
-  }, []);
+    // Only check for disabled accounts if user is authenticated
+    if (isAuthenticated) {
+      checkDisabledAccounts();
+    }
+  }, [isAuthenticated]);
 
   if (disabledAccounts.length === 0) {
     return null;

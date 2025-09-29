@@ -47,14 +47,28 @@ export default function TestQRScanPage() {
     attendeeId: number,
     conferenceId?: number
   ): Promise<string> => {
-    // Generate QR code data like the API would
+    // Generate optimized QR code data
     const qrData = {
-      attendeeId,
-      conferenceId: conferenceId || null,
-      timestamp: Date.now(),
+      id: attendeeId,
+      conf: conferenceId || null,
+      t: Date.now(),
       type: "attendee_registration",
+      cs: generateChecksum(attendeeId, conferenceId || 0),
+      v: "2.0",
     };
     return JSON.stringify(qrData);
+  };
+
+  // Generate checksum for QR code validation
+  const generateChecksum = (attendeeId: number, conferenceId: number): string => {
+    const data = `${attendeeId}-${conferenceId}`;
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+      const char = data.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(16);
   };
 
   return (
@@ -158,16 +172,19 @@ export default function TestQRScanPage() {
             <div className="bg-gray-100 p-4 rounded-lg">
               <pre className="text-sm">
                 {`{
-  "attendeeId": 1,
-  "conferenceId": 1,
-  "timestamp": 1703123456789,
-  "type": "attendee_registration"
+  "id": 1,
+  "conf": 1,
+  "t": 1703123456789,
+  "type": "attendee_registration",
+  "cs": "a1b2c3d4",
+  "v": "2.0"
 }`}
               </pre>
             </div>
             <p className="text-sm text-gray-600 mt-2">
-              Khi quét QR code này, hệ thống sẽ tự động parse JSON và thực hiện
-              check-in cho attendee tương ứng.
+              QR code đã được tối ưu hóa để chỉ chứa thông tin cần thiết: ID tham dự viên, 
+              ID hội nghị, timestamp và checksum. Điều này giúp QR code nhỏ gọn hơn, 
+              dễ quét hơn và tối ưu cho thiết bị di động.
             </p>
           </CardContent>
         </Card>
