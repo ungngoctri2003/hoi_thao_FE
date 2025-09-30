@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PublicHeader } from "@/components/layout/public-header";
+import { useSessionsByDay } from "@/hooks/use-sessions";
 import { 
   Calendar, 
   Clock, 
@@ -16,103 +17,33 @@ import {
   Bookmark,
   Share2,
   Filter,
-  Search
+  Search,
+  Loader2
 } from "lucide-react";
 
 export default function SessionsPublicPage() {
-  const [selectedDay, setSelectedDay] = useState("day1");
+  const [selectedDay, setSelectedDay] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTrack, setSelectedTrack] = useState("all");
 
-  const conferenceDays = [
-    {
-      id: "day1",
-      date: "20/12/2024",
-      day: "Thứ 6",
-      sessions: [
-        {
-          id: 1,
-          title: "Keynote: Tương lai của AI trong doanh nghiệp",
-          speaker: "TS. Nguyễn Văn An",
-          time: "09:00 - 10:30",
-          room: "Hội trường A",
-          track: "AI & Machine Learning",
-          description: "Khám phá xu hướng AI mới nhất và ứng dụng thực tế trong doanh nghiệp",
-          capacity: 500,
-          registered: 450,
-          status: "live",
-          tags: ["AI", "Machine Learning", "Keynote"]
-        },
-        {
-          id: 2,
-          title: "Workshop: Xây dựng ứng dụng React hiện đại",
-          speaker: "Trần Thị Bình",
-          time: "11:00 - 12:30",
-          room: "Phòng họp 201",
-          track: "Frontend Development",
-          description: "Hands-on workshop về React Hooks, Context API và performance optimization",
-          capacity: 100,
-          registered: 95,
-          status: "upcoming",
-          tags: ["React", "Frontend", "Workshop"]
-        },
-        {
-          id: 3,
-          title: "Blockchain và Fintech: Cơ hội mới",
-          speaker: "Lê Minh Cường",
-          time: "14:00 - 15:30",
-          room: "Phòng họp 202",
-          track: "Blockchain",
-          description: "Tìm hiểu về blockchain và ứng dụng trong lĩnh vực tài chính",
-          capacity: 80,
-          registered: 78,
-          status: "upcoming",
-          tags: ["Blockchain", "Fintech", "Crypto"]
-        }
-      ]
-    },
-    {
-      id: "day2",
-      date: "21/12/2024",
-      day: "Thứ 7",
-      sessions: [
-        {
-          id: 4,
-          title: "Cloud Computing: Best Practices",
-          speaker: "Phạm Thị Dung",
-          time: "09:00 - 10:30",
-          room: "Hội trường A",
-          track: "Cloud & DevOps",
-          description: "Chia sẻ kinh nghiệm triển khai và quản lý hệ thống cloud",
-          capacity: 500,
-          registered: 420,
-          status: "upcoming",
-          tags: ["Cloud", "DevOps", "AWS"]
-        },
-        {
-          id: 5,
-          title: "Panel: Tương lai của Web Development",
-          speaker: "Nhiều diễn giả",
-          time: "11:00 - 12:30",
-          room: "Hội trường A",
-          track: "Web Development",
-          description: "Thảo luận về xu hướng và tương lai của web development",
-          capacity: 500,
-          registered: 380,
-          status: "upcoming",
-          tags: ["Web", "Panel", "Discussion"]
-        }
-      ]
+  // Fetch sessions from API
+  const { days, sessions, loading, error, refetch } = useSessionsByDay({
+    search: searchTerm || undefined,
+    status: selectedTrack !== "all" ? selectedTrack : undefined,
+  });
+
+  // Set first day as selected when data loads
+  useEffect(() => {
+    if (days.length > 0 && !selectedDay) {
+      setSelectedDay(days[0].id);
     }
-  ];
+  }, [days, selectedDay]);
 
   const tracks = [
     { id: "all", name: "Tất cả", color: "bg-gray-100 text-gray-800" },
-    { id: "AI & Machine Learning", name: "AI & ML", color: "bg-blue-100 text-blue-800" },
-    { id: "Frontend Development", name: "Frontend", color: "bg-green-100 text-green-800" },
-    { id: "Blockchain", name: "Blockchain", color: "bg-purple-100 text-purple-800" },
-    { id: "Cloud & DevOps", name: "Cloud", color: "bg-orange-100 text-orange-800" },
-    { id: "Web Development", name: "Web Dev", color: "bg-pink-100 text-pink-800" }
+    { id: "upcoming", name: "Sắp diễn ra", color: "bg-blue-100 text-blue-800" },
+    { id: "live", name: "Đang diễn ra", color: "bg-red-100 text-red-800" },
+    { id: "completed", name: "Đã kết thúc", color: "bg-gray-100 text-gray-800" }
   ];
 
   const getStatusBadge = (status: string) => {
@@ -132,15 +63,26 @@ export default function SessionsPublicPage() {
     );
   };
 
-  const filteredSessions = conferenceDays
-    .find(day => day.id === selectedDay)
-    ?.sessions.filter(session => {
-      const matchesSearch = session.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          session.speaker.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          session.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesTrack = selectedTrack === "all" || session.track === selectedTrack;
-      return matchesSearch && matchesTrack;
-    }) || [];
+  // Get selected day data
+  const selectedDayData = days.find(day => day.id === selectedDay);
+  const filteredSessions = selectedDayData?.sessions || [];
+
+  // Format date for display
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('vi-VN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
+  // Format time for display
+  const formatTime = (startTime: string, endTime: string) => {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    return `${start.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -157,7 +99,41 @@ export default function SessionsPublicPage() {
           </p>
         </div>
 
-        {/* Search and Filters */}
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <span className="ml-2 text-slate-600">Đang tải dữ liệu...</span>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <div className="text-red-600">
+                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Lỗi tải dữ liệu</h3>
+                <p className="text-sm text-red-700 mt-1">{error}</p>
+                <button
+                  onClick={refetch}
+                  className="mt-2 text-sm text-red-600 hover:text-red-500 underline"
+                >
+                  Thử lại
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Content - Only show if not loading and no error */}
+        {!loading && !error && (
+          <>
+            {/* Search and Filters */}
         <Card className="mb-8">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row gap-4">
@@ -194,7 +170,7 @@ export default function SessionsPublicPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {conferenceDays.map((day) => (
+                    {days.map((day) => (
                       <Button
                         key={day.id}
                         variant={selectedDay === day.id ? "default" : "outline"}
@@ -203,8 +179,8 @@ export default function SessionsPublicPage() {
                       >
                         <Calendar className="h-4 w-4 mr-2" />
                         <div className="text-left">
-                          <div className="font-medium">{day.day}</div>
-                          <div className="text-sm opacity-80">{day.date}</div>
+                          <div className="font-medium">{formatDate(day.date).split(',')[0]}</div>
+                          <div className="text-sm opacity-80">{formatDate(day.date).split(',')[1]}</div>
                         </div>
                       </Button>
                     ))}
@@ -246,8 +222,7 @@ export default function SessionsPublicPage() {
                   Phiên họp ({filteredSessions.length})
                 </CardTitle>
                 <CardDescription>
-                  {conferenceDays.find(day => day.id === selectedDay)?.day} - 
-                  {conferenceDays.find(day => day.id === selectedDay)?.date}
+                  {selectedDayData ? formatDate(selectedDayData.date) : 'Chọn ngày để xem phiên họp'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -258,13 +233,12 @@ export default function SessionsPublicPage() {
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex-1">
                             <div className="flex items-center space-x-2 mb-2">
-                              {getStatusBadge(session.status)}
-                              <Badge variant="outline">{session.track}</Badge>
+                              {getStatusBadge(session.status || 'upcoming')}
                             </div>
                             <h3 className="text-xl font-semibold text-slate-800 mb-2">
-                              {session.title}
+                              {session.name}
                             </h3>
-                            <p className="text-slate-600 mb-4">{session.description}</p>
+                            <p className="text-slate-600 mb-4">{session.description || 'Không có mô tả'}</p>
                           </div>
                           <div className="flex space-x-2">
                             <Button variant="outline" size="sm">
@@ -280,38 +254,25 @@ export default function SessionsPublicPage() {
                           <div className="space-y-2">
                             <div className="flex items-center space-x-2">
                               <User className="h-4 w-4 text-slate-500" />
-                              <span className="font-medium">{session.speaker}</span>
+                              <span className="font-medium">{session.speaker || 'Chưa có diễn giả'}</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <Clock className="h-4 w-4 text-slate-500" />
-                              <span>{session.time}</span>
+                              <span>{session.startTime && session.endTime ? formatTime(session.startTime, session.endTime) : 'Chưa có thời gian'}</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <MapPin className="h-4 w-4 text-slate-500" />
-                              <span>{session.room}</span>
+                              <span>{session.roomName || session.location || 'Chưa có địa điểm'}</span>
                             </div>
                           </div>
                           <div className="space-y-2">
                             <div className="flex items-center space-x-2">
                               <Users className="h-4 w-4 text-slate-500" />
-                              <span>{session.registered}/{session.capacity} người đăng ký</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-blue-600 h-2 rounded-full" 
-                                style={{ width: `${(session.registered / session.capacity) * 100}%` }}
-                              ></div>
+                              <span>Phiên họp</span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          {session.tags.map((tag, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -332,6 +293,8 @@ export default function SessionsPublicPage() {
             </Card>
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

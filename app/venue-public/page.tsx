@@ -18,114 +18,31 @@ import {
   Star,
   Phone,
   Mail,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from "lucide-react";
 import Link from "next/link";
+import { useVenues } from "@/hooks/use-venues";
 
 export default function PublicVenuePage() {
-  const [selectedFloor, setSelectedFloor] = useState("floor1");
+  const [selectedFloor, setSelectedFloor] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const floors = [
-    {
-      id: "floor1",
-      name: "Tầng 1",
-      description: "Sảnh chính, quầy đăng ký, khu vực networking"
-    },
-    {
-      id: "floor2", 
-      name: "Tầng 2",
-      description: "Phòng họp, workshop rooms"
-    },
-    {
-      id: "floor3",
-      name: "Tầng 3", 
-      description: "Hội trường chính, phòng VIP"
-    }
-  ];
+  // Fetch venue data from API (will fallback to mock data if backend unavailable)
+  const { floors, rooms, amenities, loading, error, refetch } = useVenues();
 
-  const venues = [
-    {
-      id: 1,
-      name: "Hội trường A",
-      floor: "floor3",
-      capacity: 500,
-      type: "Hội trường",
-      description: "Hội trường chính với sức chứa lớn, trang bị hệ thống âm thanh và ánh sáng hiện đại",
-      features: ["Âm thanh", "Ánh sáng", "Máy chiếu", "WiFi"],
-      status: "available",
-      location: "Tầng 3, Phòng 301",
-      coordinates: { x: 50, y: 30 }
-    },
-    {
-      id: 2,
-      name: "Phòng họp 201",
-      floor: "floor2", 
-      capacity: 100,
-      type: "Phòng họp",
-      description: "Phòng họp vừa với bàn tròn, phù hợp cho thảo luận nhóm",
-      features: ["Bàn tròn", "Máy chiếu", "WiFi", "Điều hòa"],
-      status: "occupied",
-      location: "Tầng 2, Phòng 201",
-      coordinates: { x: 30, y: 60 }
-    },
-    {
-      id: 3,
-      name: "Workshop Room 202",
-      floor: "floor2",
-      capacity: 50,
-      type: "Workshop",
-      description: "Phòng workshop với bàn dài, phù hợp cho hands-on training",
-      features: ["Bàn dài", "Bảng trắng", "WiFi", "Máy tính"],
-      status: "available", 
-      location: "Tầng 2, Phòng 202",
-      coordinates: { x: 70, y: 60 }
-    },
-    {
-      id: 4,
-      name: "Sảnh chính",
-      floor: "floor1",
-      capacity: 200,
-      type: "Sảnh",
-      description: "Khu vực đăng ký và networking, có quầy bar và khu vực nghỉ ngơi",
-      features: ["Quầy bar", "Khu nghỉ", "WiFi", "Điều hòa"],
-      status: "available",
-      location: "Tầng 1, Sảnh chính",
-      coordinates: { x: 50, y: 80 }
+  // Set default selected floor when floors are loaded
+  React.useEffect(() => {
+    if (floors.length > 0 && !selectedFloor) {
+      setSelectedFloor(floors[0].id.toString());
     }
-  ];
+  }, [floors, selectedFloor]);
 
-  const amenities = [
-    {
-      name: "Quầy đăng ký",
-      icon: MapPin,
-      location: "Tầng 1, Sảnh chính",
-      description: "Đăng ký tham dự và nhận tài liệu"
-    },
-    {
-      name: "Quầy cà phê",
-      icon: Coffee,
-      location: "Tầng 1, Góc sảnh",
-      description: "Cà phê, trà và đồ ăn nhẹ"
-    },
-    {
-      name: "Bãi đỗ xe",
-      icon: Car,
-      location: "Tầng hầm",
-      description: "Bãi đỗ xe miễn phí cho tham dự viên"
-    },
-    {
-      name: "WiFi miễn phí",
-      icon: Wifi,
-      location: "Toàn bộ tòa nhà",
-      description: "Kết nối internet tốc độ cao"
-    }
-  ];
-
-  const filteredVenues = venues.filter(venue => {
-    const matchesFloor = venue.floor === selectedFloor;
-    const matchesSearch = venue.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         venue.description.toLowerCase().includes(searchTerm.toLowerCase());
+  // Filter rooms based on selected floor and search term
+  const filteredRooms = rooms.filter(room => {
+    const matchesFloor = selectedFloor ? room.floorId.toString() === selectedFloor : true;
+    const matchesSearch = room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (room.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFloor && matchesSearch;
   });
 
@@ -144,6 +61,59 @@ export default function PublicVenuePage() {
       </Badge>
     );
   };
+
+  // Get icon component by name
+  const getIconComponent = (iconName: string) => {
+    const iconMap: Record<string, any> = {
+      MapPin,
+      Coffee,
+      Car,
+      Wifi,
+    };
+    return iconMap[iconName] || MapPin;
+  };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <PublicHeader />
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <p className="text-lg text-slate-600">Đang tải thông tin địa điểm...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <PublicHeader />
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="text-red-500 mb-4">
+                <MapPin className="h-12 w-12 mx-auto" />
+              </div>
+              <h3 className="text-lg font-medium text-slate-800 mb-2">
+                Không thể tải thông tin địa điểm
+              </h3>
+              <p className="text-slate-600 mb-4">{error}</p>
+              <Button onClick={refetch} variant="outline">
+                Thử lại
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -211,14 +181,14 @@ export default function PublicVenuePage() {
                       {floors.map((floor) => (
                         <Button
                           key={floor.id}
-                          variant={selectedFloor === floor.id ? "default" : "outline"}
-                          onClick={() => setSelectedFloor(floor.id)}
+                          variant={selectedFloor === floor.id.toString() ? "default" : "outline"}
+                          onClick={() => setSelectedFloor(floor.id.toString())}
                           className="w-full justify-start"
                         >
                           <MapPin className="h-4 w-4 mr-2" />
                           <div className="text-left">
                             <div className="font-medium">{floor.name}</div>
-                            <div className="text-sm opacity-80">{floor.description}</div>
+                            <div className="text-sm opacity-80">{floor.description || `Tầng ${floor.id}`}</div>
                           </div>
                         </Button>
                       ))}
@@ -234,7 +204,7 @@ export default function PublicVenuePage() {
                   <CardContent>
                     <div className="space-y-3">
                       {amenities.map((amenity, index) => {
-                        const Icon = amenity.icon;
+                        const Icon = getIconComponent(amenity.icon);
                         return (
                           <div key={index} className="flex items-start space-x-3">
                             <Icon className="h-5 w-5 text-blue-600 mt-0.5" />
@@ -257,32 +227,32 @@ export default function PublicVenuePage() {
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    {floors.find(f => f.id === selectedFloor)?.name} - 
-                    {floors.find(f => f.id === selectedFloor)?.description}
+                    {floors.find(f => f.id.toString() === selectedFloor)?.name || 'Chọn tầng'} - 
+                    {floors.find(f => f.id.toString() === selectedFloor)?.description || 'Phòng họp và khu vực'}
                   </CardTitle>
                   <CardDescription>
-                    {filteredVenues.length} phòng họp và khu vực
+                    {filteredRooms.length} phòng họp và khu vực
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {filteredVenues.map((venue) => (
-                      <Card key={venue.id} className="hover:shadow-lg transition-shadow">
+                    {filteredRooms.map((room) => (
+                      <Card key={room.id} className="hover:shadow-lg transition-shadow">
                         <CardContent className="p-6">
                           <div className="flex justify-between items-start mb-4">
                             <div className="flex-1">
                               <div className="flex items-center space-x-2 mb-2">
-                                {getStatusBadge(venue.status)}
-                                <Badge variant="outline">{venue.type}</Badge>
-                                <Badge variant="secondary">{venue.capacity} người</Badge>
+                                {getStatusBadge(room.status)}
+                                <Badge variant="outline">{room.roomType || 'Phòng họp'}</Badge>
+                                <Badge variant="secondary">{room.capacity} người</Badge>
                               </div>
                               <h3 className="text-xl font-semibold text-slate-800 mb-2">
-                                {venue.name}
+                                {room.name}
                               </h3>
-                              <p className="text-slate-600 mb-4">{venue.description}</p>
+                              <p className="text-slate-600 mb-4">{room.description || 'Không có mô tả'}</p>
                               <p className="text-sm text-slate-500 mb-4">
                                 <MapPin className="h-4 w-4 inline mr-1" />
-                                {venue.location}
+                                {room.floorName ? `${room.floorName}, ${room.name}` : room.name}
                               </p>
                             </div>
                             <div className="flex space-x-2">
@@ -296,7 +266,7 @@ export default function PublicVenuePage() {
                           </div>
 
                           <div className="flex flex-wrap gap-2">
-                            {venue.features.map((feature, index) => (
+                            {room.features.map((feature, index) => (
                               <Badge key={index} variant="secondary" className="text-xs">
                                 {feature}
                               </Badge>
@@ -306,7 +276,7 @@ export default function PublicVenuePage() {
                       </Card>
                     ))}
 
-                    {filteredVenues.length === 0 && (
+                    {filteredRooms.length === 0 && (
                       <div className="text-center py-12">
                         <MapPin className="h-12 w-12 mx-auto text-slate-400 mb-4" />
                         <h3 className="text-lg font-medium text-slate-600 mb-2">

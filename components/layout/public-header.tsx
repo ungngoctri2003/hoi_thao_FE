@@ -8,7 +8,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   QrCode,
-  MapPin,
   Menu,
   X,
   Calendar,
@@ -54,13 +53,6 @@ export function PublicHeader() {
       icon: Calendar,
       description: "Xem lịch trình hội nghị",
       badge: null,
-    },
-    {
-      name: "Bản đồ",
-      href: "/venue-public",
-      icon: MapPin,
-      description: "Xem bản đồ và địa điểm",
-      badge: "3D",
     },
     {
       name: "Đăng nhập",
