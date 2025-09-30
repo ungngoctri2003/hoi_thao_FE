@@ -122,35 +122,111 @@ export function AuditProvider({ children }: AuditProviderProps) {
 
 function getPageName(pathname: string): string {
   const pageMap: Record<string, string> = {
+    // Main pages
     "/": "Trang chủ",
     "/dashboard": "Bảng điều khiển",
+    
+    // Management pages
     "/attendees": "Quản lý người tham dự",
     "/conferences": "Quản lý hội nghị",
     "/sessions": "Quản lý phiên họp",
+    "/sessions-management": "Quản lý phiên họp",
+    "/sessions-public": "Phiên họp công khai",
     "/registrations": "Quản lý đăng ký",
-    "/checkin": "Check-in",
-    "/analytics": "Phân tích",
-    "/audit": "Nhật ký hệ thống",
-    "/profile": "Hồ sơ cá nhân",
-    "/settings": "Cài đặt",
-    "/users": "Quản lý người dùng",
     "/roles": "Quản lý vai trò",
     "/permissions": "Quản lý quyền",
+    "/venue": "Quản lý địa điểm",
+    "/venue-management": "Quản lý địa điểm",
+    "/venue-public": "Địa điểm công khai",
+    "/rooms-management": "Quản lý phòng họp",
+    
+    // Check-in pages
+    "/checkin": "Check-in",
+    "/checkin-public": "Check-in công khai",
+    
+    // Analytics and reporting
+    "/analytics": "Phân tích",
+    "/ai-analytics": "Phân tích AI",
+    
+    // User management
+    "/users": "Quản lý người dùng",
+    "/profile": "Hồ sơ cá nhân",
+    "/settings": "Cài đặt",
+    
+    // Communication
     "/notifications": "Thông báo",
     "/messages": "Tin nhắn",
+    "/messaging": "Tin nhắn",
+    "/networking": "Kết nối mạng",
     "/matches": "Kết nối",
+    
+    // Badges and certificates
     "/badges": "Huy hiệu",
     "/certificates": "Chứng chỉ",
-    "/venue": "Địa điểm",
+    
+    // Events and registration
+    "/my-events": "Sự kiện của tôi",
+    "/register": "Đăng ký",
+    "/register-attendee": "Đăng ký người tham dự",
+    "/register-simple": "Đăng ký đơn giản",
+    
+    // Authentication
+    "/login": "Đăng nhập",
+    "/auth": "Xác thực",
+    "/forgot-password": "Quên mật khẩu",
+    "/reset-password": "Đặt lại mật khẩu",
+    
+    // Audit and system
+    "/audit": "Nhật ký hệ thống",
+    
+    // Mobile
+    "/mobile": "Phiên bản di động",
+    "/mobile-public": "Phiên bản di động công khai",
+    
+    // Attendee details
+    "/attendee": "Chi tiết người tham dự",
+    
+    // Conference details
+    "/conference-management": "Quản lý hội nghị",
+    
+    // Test and debug pages
+    "/debug-qr": "Debug QR",
+    "/test-": "Trang kiểm tra",
+    "/demo-": "Trang demo",
   };
 
-  // Find matching page
+  // Special handling for dynamic routes (check these FIRST)
+  if (pathname.startsWith("/conferences/") && pathname.includes("/manage")) {
+    return "Quản lý hội nghị chi tiết";
+  }
+  if (pathname.startsWith("/conferences/")) {
+    return "Chi tiết hội nghị";
+  }
+  if (pathname.startsWith("/attendee/")) {
+    return "Chi tiết người tham dự";
+  }
+  if (pathname.startsWith("/test-")) {
+    return "Trang kiểm tra";
+  }
+  if (pathname.startsWith("/demo-")) {
+    return "Trang demo";
+  }
+
+  // Find matching page - check for exact matches first, then prefix matches
   for (const [route, pageName] of Object.entries(pageMap)) {
-    if (pathname.startsWith(route)) {
+    if (pathname === route) {
+      return pageName;
+    }
+  }
+  
+  // Check for prefix matches (for dynamic routes like /conferences/[id])
+  for (const [route, pageName] of Object.entries(pageMap)) {
+    if (pathname.startsWith(route) && route !== "/") {
       return pageName;
     }
   }
 
-  // Fallback to path
-  return pathname;
+  // Fallback: convert pathname to a more readable format
+  const cleanPath = pathname.replace(/^\//, '').replace(/-/g, ' ');
+  return cleanPath.charAt(0).toUpperCase() + cleanPath.slice(1);
 }

@@ -41,6 +41,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate date of birth if provided
+    if (body.dateOfBirth) {
+      const dateOfBirth = new Date(body.dateOfBirth)
+      const currentYear = new Date().getFullYear()
+      
+      // Check if date is valid
+      if (isNaN(dateOfBirth.getTime())) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Ngày sinh không hợp lệ' 
+          },
+          { status: 400 }
+        )
+      }
+      
+      // Check if year is reasonable (not in the future and not too far in the past)
+      const birthYear = dateOfBirth.getFullYear()
+      if (birthYear > currentYear || birthYear < 1900) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Năm sinh phải hợp lệ (từ 1900 đến hiện tại)' 
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     // Prepare data for backend API
     const registrationData = {
       email: body.email,
@@ -59,6 +88,9 @@ export async function POST(request: NextRequest) {
 
     // Call backend API
     const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'
+    console.log('Calling backend API:', `${backendUrl}/registrations/public`)
+    console.log('Registration data:', JSON.stringify(registrationData, null, 2))
+    
     const response = await fetch(`${backendUrl}/registrations/public`, {
       method: 'POST',
       headers: {
@@ -68,6 +100,8 @@ export async function POST(request: NextRequest) {
     })
 
     const result = await response.json()
+    console.log('Backend response status:', response.status)
+    console.log('Backend response:', JSON.stringify(result, null, 2))
 
     if (!response.ok) {
       // Handle specific error cases
@@ -76,11 +110,12 @@ export async function POST(request: NextRequest) {
       if (response.status === 409) {
         errorMessage = 'Email này đã được sử dụng. Vui lòng đăng nhập hoặc sử dụng email khác.'
       } else if (response.status === 400) {
-        errorMessage = 'Thông tin không hợp lệ. Vui lòng kiểm tra lại.'
+        errorMessage = result.error?.message || 'Thông tin không hợp lệ. Vui lòng kiểm tra lại.'
       } else if (response.status === 422) {
         errorMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các trường thông tin.'
       }
 
+      console.error('Registration failed:', errorMessage)
       return NextResponse.json(
         { 
           success: false, 
