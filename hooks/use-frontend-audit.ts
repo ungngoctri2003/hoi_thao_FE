@@ -3,14 +3,17 @@
 import { useCallback } from "react"
 import { apiClient } from "@/lib/api"
 
-// Simple hook for frontend audit logging
+// Simple hook for frontend audit logging - TEMPORARILY DISABLED
 export function useFrontendAudit() {
   const logAction = useCallback(async (action: string, page?: string, details?: string) => {
-    try {
-      await apiClient.logFrontendAction(action, page, details)
-    } catch (error) {
-      console.warn('Failed to log frontend action:', error)
-    }
+    // Audit logging temporarily disabled
+    console.log('Audit logging disabled:', { action, page, details })
+    return
+    // try {
+    //   await apiClient.logFrontendAction(action, page, details)
+    // } catch (error) {
+    //   console.warn('Failed to log frontend action:', error)
+    // }
   }, [])
 
   // Helper functions for common actions
