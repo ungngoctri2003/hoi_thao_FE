@@ -5,6 +5,8 @@ interface CheckInRequest {
   attendeeId?: number;
   qrCode?: string;
   conferenceId: number;
+  sessionId?: number | null; // Optional: for session-specific check-in
+  actionType?: "checkin" | "checkout"; // Type of action: checkin (entry) or checkout (exit)
   checkInMethod: "qr" | "manual";
   attendeeInfo?: {
     name: string;
@@ -52,9 +54,13 @@ class CheckInAPI {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error("Check-in API error:", response.status, errorData);
+        
+        // Use backend error message directly (already in Vietnamese)
+        const errorMessage = errorData.error?.message || errorData.message || "Lỗi khi thực hiện check-in/check-out";
+        
         return {
           success: false,
-          message: errorData.error?.message || "Lỗi khi check-in",
+          message: errorMessage,
           error: errorData.error?.code || "API_ERROR",
         };
       }
@@ -268,7 +274,7 @@ class CheckInAPI {
 
       // Map backend response format to frontend format
       return records.map((record: any) => {
-        // Backend now returns: ID, REGISTRATION_ID, CHECKIN_TIME, METHOD, STATUS, ATTENDEE_NAME, ATTENDEE_EMAIL, ATTENDEE_PHONE, QR_CODE, CONFERENCE_ID
+        // Backend now returns: ID, REGISTRATION_ID, CHECKIN_TIME, METHOD, STATUS, ACTION_TYPE, ATTENDEE_NAME, ATTENDEE_EMAIL, ATTENDEE_PHONE, QR_CODE, CONFERENCE_ID
         const checkInTime =
           record.CHECKIN_TIME || record.checkInTime || record.checkin_time;
         let formattedTime = "N/A";
@@ -302,6 +308,9 @@ class CheckInAPI {
             record.conferenceId ||
             record.conference_id ||
             0,
+          method: record.METHOD || record.method || "qr",
+          actionType: record.ACTION_TYPE || record.actionType || record.action_type || "checkin",
+          attendeePhone: record.ATTENDEE_PHONE || record.attendeePhone || record.attendee_phone || null,
         };
       });
     } catch (error) {
@@ -394,9 +403,11 @@ class CheckInAPI {
 
             // Validate checksum if present (temporarily disabled for testing)
             if (qrData.cs) {
+              // Use conferenceId from QR or fallback to parameter (guaranteed to be number)
+              const checksumConferenceId = qrConferenceId ?? conferenceId;
               const expectedChecksum = this.generateChecksum(
-                attendeeId,
-                qrConferenceId || conferenceId
+                attendeeId!,
+                checksumConferenceId!
               );
               console.log("🔍 Checksum validation:", {
                 provided: qrData.cs,
@@ -413,13 +424,15 @@ class CheckInAPI {
 
             // For optimized QR code, create attendee data from QR data
             console.log("📱 Optimized QR code detected, creating attendee data from QR");
+            // Use conferenceId from QR or fallback to parameter (guaranteed to be number)
+            const attendeeConferenceId = qrConferenceId ?? conferenceId;
             const attendee: Attendee = {
-              id: attendeeId,
-              name: qrData.a?.name || `Tham dự viên ${attendeeId}`,
-              email: qrData.a?.email || `attendee${attendeeId}@example.com`,
+              id: attendeeId!,
+              name: qrData.a?.name || `Tham dự viên ${attendeeId!}`,
+              email: qrData.a?.email || `attendee${attendeeId!}@example.com`,
               phone: qrData.a?.phone || "0123456789",
               qrCode: qrCode,
-              conferenceId: qrConferenceId || conferenceId,
+              conferenceId: attendeeConferenceId!,
               isRegistered: true,
             };
             return { valid: true, attendee, qrData };

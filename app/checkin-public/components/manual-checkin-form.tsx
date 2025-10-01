@@ -35,12 +35,14 @@ interface ManualCheckInFormProps {
   onCheckInSuccess: (attendee: Attendee) => void;
   onCheckInError: (error: string) => void;
   conferences: Array<{ id: number; name: string; date: string }>;
+  actionType?: "checkin" | "checkout"; // Action type: checkin or checkout
 }
 
 export function ManualCheckInForm({
   onCheckInSuccess,
   onCheckInError,
   conferences,
+  actionType = "checkin", // Default to checkin
 }: ManualCheckInFormProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedConference, setSelectedConference] = useState<string>("");
@@ -110,6 +112,7 @@ export function ManualCheckInForm({
         qrCode: attendee.qrCode,
         conferenceId: attendee.conferenceId,
         checkInMethod: "manual",
+        actionType: actionType, // Send action type
       });
 
       if (response.success && response.data) {

@@ -316,12 +316,12 @@ export function QRNameCardGenerator({
       ctx.closePath();
       ctx.clip();
 
-      // Draw QR Code - Optimized for 3.5" x 2" card
-      const qrSize = 130; // Increased size for better scanning
+      // Draw QR Code - Left side layout (matching preview)
+      const qrSize = 120; // Size for horizontal layout
       const canvasWidth = canvas.width / scale; // Actual canvas width
       const canvasHeight = canvas.height / scale; // Actual canvas height
-      const qrX = (canvasWidth - qrSize) / 2; // Center horizontally
-      const qrY = 15; // Position from top - minimal margin
+      const qrX = 20; // Left side position
+      const qrY = 20; // Top position
 
       // Load and draw QR code image
       const qrImage = new Image();
@@ -335,45 +335,64 @@ export function QRNameCardGenerator({
 
       // Draw QR code with prominent border
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
+      ctx.fillRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8);
       ctx.strokeStyle = "#000000";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
+      ctx.lineWidth = 2;
+      ctx.strokeRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8);
 
       ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
 
-      // Draw minimal attendee information below QR code - centered and simple
-      const infoY = qrY + qrSize + 12; // Balanced spacing
+      // Draw attendee information on the right side - matching preview layout
+      const infoX = qrX + qrSize + 20; // Right side of QR code
+      const infoY = qrY; // Same vertical position as QR code
       
       ctx.fillStyle = "#1f2937";
-      ctx.textAlign = "center";
+      ctx.textAlign = "left";
       ctx.textBaseline = "top";
 
-      // Draw name - larger and centered
-      ctx.font = "bold 16px Arial, sans-serif"; // Reduced font size
-      ctx.fillText(attendee.NAME, canvasWidth / 2, infoY);
+      // Draw name - large and bold
+      ctx.font = "bold 18px Arial, sans-serif";
+      ctx.fillText(attendee.NAME, infoX, infoY);
 
-      // Draw position - smaller and centered
-      ctx.font = "10px Arial, sans-serif"; // Reduced font size // Reduced font size
+      // Draw position - medium size
+      ctx.font = "12px Arial, sans-serif";
       ctx.fillStyle = "#6b7280";
-      ctx.fillText(
-        attendee.POSITION || "Tham dự viên",
-        canvasWidth / 2,
-        infoY + 12 // Compact spacing
-      );
+      const positionText = attendee.POSITION || "Tham dự viên";
+      ctx.fillText(positionText, infoX, infoY + 25);
 
-      // Draw conference name - smaller and centered
+      // Draw company if available
+      if (attendee.COMPANY) {
+        ctx.font = "10px Arial, sans-serif";
+        ctx.fillStyle = "#6b7280";
+        ctx.fillText(attendee.COMPANY, infoX, infoY + 40);
+      }
+
+      // Draw email
+      if (attendee.EMAIL) {
+        ctx.font = "9px Arial, sans-serif";
+        ctx.fillStyle = "#4b5563";
+        ctx.fillText(attendee.EMAIL, infoX, infoY + 55);
+      }
+
+      // Draw phone
+      if (attendee.PHONE) {
+        ctx.font = "9px Arial, sans-serif";
+        ctx.fillStyle = "#4b5563";
+        ctx.fillText(attendee.PHONE, infoX, infoY + 70);
+      }
+
+      // Draw conference name at bottom
       if (selectedConference) {
-        ctx.font = "9px Arial, sans-serif"; // Reduced font size
+        ctx.font = "8px Arial, sans-serif";
         ctx.fillStyle = "#9ca3af";
-        ctx.fillText(selectedConference.NAME, canvasWidth / 2, infoY + 22); // Compact spacing
+        ctx.fillText(selectedConference.NAME, infoX, infoY + 85);
         
         // Draw session name if selected
         if (selectedSession) {
-          ctx.font = "8px Arial, sans-serif";
+          ctx.font = "7px Arial, sans-serif";
           ctx.fillStyle = "#6b7280";
           // Truncate session name if too long
-          const maxWidth = canvasWidth - 20; // Leave margin
+          const maxWidth = canvasWidth - infoX - 20;
           let sessionName = selectedSession.name;
           if (ctx.measureText(sessionName).width > maxWidth) {
             while (ctx.measureText(sessionName + "...").width > maxWidth && sessionName.length > 0) {
@@ -381,8 +400,38 @@ export function QRNameCardGenerator({
             }
             sessionName += "...";
           }
-          ctx.fillText(sessionName, canvasWidth / 2, infoY + 32);
+          ctx.fillText(sessionName, infoX, infoY + 95);
         }
+      }
+
+      // Draw attendee ID at bottom
+      ctx.font = "7px Arial, sans-serif";
+      ctx.fillStyle = "#9ca3af";
+      ctx.fillText(`ID: ${attendee.ID}`, infoX, infoY + 105);
+
+      // Draw QR Code string for manual reference
+      if (selectedRegistration?.QR_CODE) {
+        ctx.font = "6px Arial, sans-serif";
+        ctx.fillStyle = "#9ca3af";
+        const qrCodeText = `QR: ${selectedRegistration.QR_CODE}`;
+        // Truncate if too long for the card width
+        const maxWidth = canvasWidth - infoX - 20;
+        let displayText = qrCodeText;
+        if (ctx.measureText(qrCodeText).width > maxWidth) {
+          while (ctx.measureText(displayText + "...").width > maxWidth && displayText.length > 0) {
+            displayText = displayText.slice(0, -1);
+          }
+          displayText += "...";
+        }
+        ctx.fillText(displayText, infoX, infoY + 115);
+      }
+
+      // Draw registration status at bottom right
+      if (selectedRegistration?.STATUS) {
+        ctx.font = "7px Arial, sans-serif";
+        ctx.fillStyle = selectedRegistration.STATUS === "checked-in" ? "#059669" : 
+                        selectedRegistration.STATUS === "registered" ? "#2563eb" : "#6b7280";
+        ctx.fillText(`Status: ${selectedRegistration.STATUS.toUpperCase()}`, infoX, infoY + 125);
       }
 
       // Download the image
@@ -470,12 +519,12 @@ export function QRNameCardGenerator({
       ctx.closePath();
       ctx.clip();
 
-      // Draw QR Code - Optimized for 3.5" x 2" card
-      const qrSize = 130; // Increased size for better scanning
+      // Draw QR Code - Left side layout (matching preview)
+      const qrSize = 120; // Size for horizontal layout
       const canvasWidth = canvas.width / scale; // Actual canvas width
       const canvasHeight = canvas.height / scale; // Actual canvas height
-      const qrX = (canvasWidth - qrSize) / 2; // Center horizontally
-      const qrY = 15; // Position from top - minimal margin
+      const qrX = 20; // Left side position
+      const qrY = 20; // Top position
 
       // Load and draw QR code image
       const qrImage = new Image();
@@ -489,45 +538,64 @@ export function QRNameCardGenerator({
 
       // Draw QR code with prominent border
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
+      ctx.fillRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8);
       ctx.strokeStyle = "#000000";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
+      ctx.lineWidth = 2;
+      ctx.strokeRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8);
 
       ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
 
-      // Draw minimal attendee information below QR code - centered and simple
-      const infoY = qrY + qrSize + 12; // Balanced spacing
+      // Draw attendee information on the right side - matching preview layout
+      const infoX = qrX + qrSize + 20; // Right side of QR code
+      const infoY = qrY; // Same vertical position as QR code
       
       ctx.fillStyle = "#1f2937";
-      ctx.textAlign = "center";
+      ctx.textAlign = "left";
       ctx.textBaseline = "top";
 
-      // Draw name - larger and centered
-      ctx.font = "bold 16px Arial, sans-serif"; // Reduced font size
-      ctx.fillText(attendee.NAME, canvasWidth / 2, infoY);
+      // Draw name - large and bold
+      ctx.font = "bold 18px Arial, sans-serif";
+      ctx.fillText(attendee.NAME, infoX, infoY);
 
-      // Draw position - smaller and centered
-      ctx.font = "10px Arial, sans-serif"; // Reduced font size // Reduced font size
+      // Draw position - medium size
+      ctx.font = "12px Arial, sans-serif";
       ctx.fillStyle = "#6b7280";
-      ctx.fillText(
-        attendee.POSITION || "Tham dự viên",
-        canvasWidth / 2,
-        infoY + 12 // Compact spacing
-      );
+      const positionText = attendee.POSITION || "Tham dự viên";
+      ctx.fillText(positionText, infoX, infoY + 25);
 
-      // Draw conference name - smaller and centered
+      // Draw company if available
+      if (attendee.COMPANY) {
+        ctx.font = "10px Arial, sans-serif";
+        ctx.fillStyle = "#6b7280";
+        ctx.fillText(attendee.COMPANY, infoX, infoY + 40);
+      }
+
+      // Draw email
+      if (attendee.EMAIL) {
+        ctx.font = "9px Arial, sans-serif";
+        ctx.fillStyle = "#4b5563";
+        ctx.fillText(attendee.EMAIL, infoX, infoY + 55);
+      }
+
+      // Draw phone
+      if (attendee.PHONE) {
+        ctx.font = "9px Arial, sans-serif";
+        ctx.fillStyle = "#4b5563";
+        ctx.fillText(attendee.PHONE, infoX, infoY + 70);
+      }
+
+      // Draw conference name at bottom
       if (selectedConference) {
-        ctx.font = "9px Arial, sans-serif"; // Reduced font size
+        ctx.font = "8px Arial, sans-serif";
         ctx.fillStyle = "#9ca3af";
-        ctx.fillText(selectedConference.NAME, canvasWidth / 2, infoY + 22); // Compact spacing
+        ctx.fillText(selectedConference.NAME, infoX, infoY + 85);
         
         // Draw session name if selected
         if (selectedSession) {
-          ctx.font = "8px Arial, sans-serif";
+          ctx.font = "7px Arial, sans-serif";
           ctx.fillStyle = "#6b7280";
           // Truncate session name if too long
-          const maxWidth = canvasWidth - 20; // Leave margin
+          const maxWidth = canvasWidth - infoX - 20;
           let sessionName = selectedSession.name;
           if (ctx.measureText(sessionName).width > maxWidth) {
             while (ctx.measureText(sessionName + "...").width > maxWidth && sessionName.length > 0) {
@@ -535,8 +603,38 @@ export function QRNameCardGenerator({
             }
             sessionName += "...";
           }
-          ctx.fillText(sessionName, canvasWidth / 2, infoY + 32);
+          ctx.fillText(sessionName, infoX, infoY + 95);
         }
+      }
+
+      // Draw attendee ID at bottom
+      ctx.font = "7px Arial, sans-serif";
+      ctx.fillStyle = "#9ca3af";
+      ctx.fillText(`ID: ${attendee.ID}`, infoX, infoY + 105);
+
+      // Draw QR Code string for manual reference
+      if (selectedRegistration?.QR_CODE) {
+        ctx.font = "6px Arial, sans-serif";
+        ctx.fillStyle = "#9ca3af";
+        const qrCodeText = `QR: ${selectedRegistration.QR_CODE}`;
+        // Truncate if too long for the card width
+        const maxWidth = canvasWidth - infoX - 20;
+        let displayText = qrCodeText;
+        if (ctx.measureText(qrCodeText).width > maxWidth) {
+          while (ctx.measureText(displayText + "...").width > maxWidth && displayText.length > 0) {
+            displayText = displayText.slice(0, -1);
+          }
+          displayText += "...";
+        }
+        ctx.fillText(displayText, infoX, infoY + 115);
+      }
+
+      // Draw registration status at bottom right
+      if (selectedRegistration?.STATUS) {
+        ctx.font = "7px Arial, sans-serif";
+        ctx.fillStyle = selectedRegistration.STATUS === "checked-in" ? "#059669" : 
+                        selectedRegistration.STATUS === "registered" ? "#2563eb" : "#6b7280";
+        ctx.fillText(`Status: ${selectedRegistration.STATUS.toUpperCase()}`, infoX, infoY + 125);
       }
 
       // Create print window with the canvas image
@@ -750,53 +848,162 @@ export function QRNameCardGenerator({
             </div>
           </div>
 
-          {/* Name Card Preview - Simplified Design */}
+          {/* Name Card Preview - Enhanced Design */}
           <div className="flex justify-center">
             <div
               ref={cardRef}
-              className="w-[420px] h-[240px] bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-gray-200 rounded-lg shadow-lg p-6 flex flex-col items-center justify-center space-y-4"
+              className="relative w-[560px] h-[320px] bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 border-2 border-slate-200 rounded-xl shadow-xl overflow-hidden"
               style={{
                 aspectRatio: "3.5/2", // Chuẩn namecard 3.5" x 2"
-                maxWidth: "420px",
-                maxHeight: "240px",
+                maxWidth: "560px",
+                maxHeight: "320px",
               }}
             >
-              {/* QR Code - Large and Centered */}
-              <div className="qr-section">
-                {qrCodeDataUrl ? (
-                  <img
-                    src={qrCodeDataUrl}
-                    alt="QR Code"
-                    className="w-32 h-32 border-4 border-black rounded-lg"
-                    style={{
-                      imageRendering: "crisp-edges", // Tối ưu hiển thị QR code
-                    }}
-                  />
-                ) : (
-                  <div className="w-32 h-32 border-4 border-dashed border-gray-400 rounded-lg flex items-center justify-center">
-                    <QrCode className="h-12 w-12 text-gray-400" />
-                  </div>
-                )}
+              {/* Decorative Background Pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute top-4 right-4 w-16 h-16 bg-blue-200 rounded-full"></div>
+                <div className="absolute bottom-4 left-4 w-12 h-12 bg-indigo-200 rounded-full"></div>
+                <div className="absolute top-1/2 right-8 w-8 h-8 bg-slate-200 rounded-full"></div>
               </div>
 
-              {/* Attendee Info - Minimal and Centered */}
-              <div className="text-center space-y-1">
-                <h3 className="font-bold text-lg text-gray-900">
-                  {attendee.NAME}
-                </h3>
-                <p className="text-sm text-gray-600">
-                  {attendee.POSITION || "Tham dự viên"}
-                </p>
-                {selectedConference && (
-                  <p className="text-xs text-gray-500">
-                    {selectedConference.NAME}
-                  </p>
-                )}
-                {selectedSession && (
-                  <p className="text-xs text-gray-400 truncate max-w-[200px]">
-                    {selectedSession.name}
-                  </p>
-                )}
+              {/* Main Layout - QR Code Left, Info Right */}
+              <div className="relative z-10 flex items-start p-4 space-x-4">
+                {/* QR Code Section */}
+                <div className="flex-shrink-0">
+                  {qrCodeDataUrl ? (
+                    <div className="relative">
+                      <img
+                        src={qrCodeDataUrl}
+                        alt="QR Code"
+                        className="w-32 h-32 border-3 border-white rounded-lg shadow-lg"
+                        style={{
+                          imageRendering: "crisp-edges",
+                        }}
+                      />
+                      <div className="absolute -top-1 -right-1 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                        <div className="w-3 h-3 bg-white rounded-full"></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-32 h-32 border-3 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-white/50">
+                      <QrCode className="h-10 w-10 text-slate-400" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Main Content Section */}
+                <div className="flex-1 min-w-0">
+                    {/* Name and Title */}
+                    <div className="">
+                      {/* Tên tham dự viên */}
+                      <h3 className="font-bold text-2xl text-slate-800 leading-tight ">
+                        <span className="font-medium text-sm text-slate-500">Tên:</span> {attendee.NAME}
+                      </h3>
+                      {/* Chức vụ/Công việc */}
+                      <div className="flex items-center space-x-3 mb-3">
+                        <Building className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                        <p className="text-lg text-slate-600 font-medium">
+                          <span className="font-medium text-sm text-slate-500">Chức vụ:</span> {attendee.POSITION || "Tham dự viên"}
+                        </p>
+                      </div>
+                      {/* Tên công ty */}
+                      {attendee.COMPANY && (
+                        <div className="flex items-center space-x-3">
+                          <Building className="h-4 w-4 text-slate-400" />
+                          <p className="text-sm text-slate-600">
+                            <span className="font-medium text-sm text-slate-500">Công ty:</span> {attendee.COMPANY}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                  {/* Contact Information */}
+                  <div className=" mb-8">
+                    {/* Email liên hệ */}
+                    {attendee.EMAIL && (
+                      <div className="flex items-center space-x-3">
+                        <Mail className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                        <p className="text-sm text-slate-600 truncate">
+                          <span className="font-medium text-sm text-slate-500">Email:</span> {attendee.EMAIL}
+                        </p>
+                      </div>
+                    )}
+                    {/* Số điện thoại */}
+                    {attendee.PHONE && (
+                      <div className="flex items-center space-x-3">
+                        <Phone className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                        <p className="text-sm text-slate-600">
+                          <span className="font-medium text-sm text-slate-500">ĐT:</span> {attendee.PHONE}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* Download Icon */}
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-white/80 rounded-full flex items-center justify-center shadow-md">
+                    <Download className="h-5 w-5 text-slate-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Section */}
+              <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-6 py-5">
+                <div className="flex items-start justify-between">
+                  {/* Left side - ID and QR info */}
+                  <div className="flex flex-col space-y-3">
+                    {/* ID tham dự viên */}
+                    <div className="flex items-center space-x-3">
+                      <User className="h-4 w-4 text-slate-400" />
+                      <span className="text-sm text-slate-500 font-mono">
+                        <span className="font-medium text-sm text-slate-500">ID:</span> {attendee.ID}
+                      </span>
+                    </div>
+                    {/* Mã QR code */}
+                    {selectedRegistration?.QR_CODE && (
+                      <div className="flex items-start space-x-3">
+                        <QrCode className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm text-slate-400 font-mono break-all leading-tight">
+                          <span className="font-medium text-sm text-slate-500">QR:</span> {selectedRegistration.QR_CODE}
+                        </span>
+                      </div>
+                    )}
+                    {/* Tên hội nghị */}
+                    {selectedConference && (
+                      <div className="flex items-center space-x-3">
+                        <Calendar className="h-4 w-4 text-slate-400" />
+                        <span className="text-sm text-slate-500">
+                          <span className="font-medium text-sm text-slate-500">Hội nghị:</span> {selectedConference.NAME}
+                        </span>
+                      </div>
+                    )}
+                    {/* Tên phiên tham dự */}
+                    {selectedSession && (
+                      <div className="flex items-center space-x-3">
+                        <Calendar className="h-4 w-4 text-slate-400" />
+                        <span className="text-sm text-slate-400">
+                          <span className="font-medium text-sm text-slate-500">Phiên:</span> {selectedSession.name}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Right side - Status badge */}
+                  {/* Trạng thái đăng ký */}
+                  {selectedRegistration?.STATUS && (
+                    <div className={`px-4 py-2 rounded-full text-sm font-medium ${
+                      selectedRegistration.STATUS === "checked-in" 
+                        ? "bg-green-100 text-green-700" 
+                        : selectedRegistration.STATUS === "registered" 
+                        ? "bg-blue-100 text-blue-700" 
+                        : "bg-slate-100 text-slate-700"
+                    }`}>
+                      {selectedRegistration.STATUS.toUpperCase()}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -815,7 +1022,7 @@ export function QRNameCardGenerator({
                 • QR code tối ưu: chứa ID tham dự viên, ID hội nghị, session ID và timestamp
               </li>
               <li>
-                • Thiết kế đơn giản: QR code làm trung tâm, thông tin tối thiểu
+                • Thông tin đầy đủ: Tên, chức vụ, công ty, email, số điện thoại, ID, QR code, trạng thái
               </li>
               <li>
                 • Tải xuống với độ phân giải 300 DPI cho chất lượng in tốt
@@ -828,7 +1035,10 @@ export function QRNameCardGenerator({
               <li>
                 • QR code nhỏ gọn, dễ quét, tối ưu cho thiết bị di động
               </li>
-              <li>• Tên phiên tham dự sẽ hiển thị trên name card với font size tối ưu</li>
+              <li>• Thông tin đầy đủ cho checkin thủ công khi không có QR scanner</li>
+              <li>• Email và số điện thoại giúp xác định tham dự viên dễ dàng</li>
+              <li>• QR code string và trạng thái giúp tra cứu và xác minh nhanh chóng</li>
+              <li>• Trạng thái có màu sắc: Xanh lá (đã check-in), Xanh dương (đã đăng ký), Xám (khác)</li>
             </ul>
           </div>
         </div>

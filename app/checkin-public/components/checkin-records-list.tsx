@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, QrCode, CheckCircle, XCircle, Clock, Trash2, AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { Search, QrCode, CheckCircle, XCircle, Clock, Trash2, AlertTriangle, Eye, EyeOff, LogIn, LogOut } from "lucide-react";
 import { type CheckInRecord } from "../types";
 
 interface CheckInRecordsListProps {
@@ -41,6 +41,26 @@ export function CheckInRecordsList({ records, isLoading, selectedConference, onD
       <Badge className={config.color}>
         <IconComponent className="h-3 w-3 mr-1" />
         {config.label}
+      </Badge>
+    );
+  };
+
+  const getActionTypeBadge = (actionType?: string) => {
+    const isCheckout = actionType === "checkout";
+    
+    return (
+      <Badge className={isCheckout ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"}>
+        {isCheckout ? (
+          <>
+            <LogOut className="h-3 w-3 mr-1" />
+            Check-out
+          </>
+        ) : (
+          <>
+            <LogIn className="h-3 w-3 mr-1" />
+            Check-in
+          </>
+        )}
       </Badge>
     );
   };
@@ -153,6 +173,7 @@ export function CheckInRecordsList({ records, isLoading, selectedConference, onD
                   <div className="text-right">
                     <p className="text-sm font-medium">{formatDateTime(record.checkInTime)}</p>
                     <div className="flex items-center space-x-2 mt-1">
+                      {getActionTypeBadge(record.actionType)}
                       {getStatusBadge(record.status)}
                       <Badge variant="outline" className="text-xs">
                         {record.method === 'qr' ? 'QR Code' : 'Thủ công'}

@@ -21,6 +21,7 @@ import { CheckInRecordsList } from "./components/checkin-records-list";
 // import { APIStatus } from "./components/api-status";
 import { ConferenceInfo } from "./components/conference-info";
 import { ConferenceSelector } from "./components/conference-selector";
+import { ActionTypeSelector } from "./components/action-type-selector";
 import { UsageGuide } from "./components/usage-guide";
 import { ToastNotification } from "./components/toast-notification";
 import { QRAttendeeInfo } from "@/components/attendees/qr-attendee-info";
@@ -60,6 +61,7 @@ export default function PublicCheckInPage() {
   });
   const [scannedQRData, setScannedQRData] = useState<any>(null);
   const [showQRInfo, setShowQRInfo] = useState(false);
+  const [selectedActionType, setSelectedActionType] = useState<"checkin" | "checkout">("checkin");
 
   // Load initial data
   useEffect(() => {
@@ -135,6 +137,7 @@ export default function PublicCheckInPage() {
       // Parse QR data to check if it contains full information
       let parsedQRData = null;
       let conferenceId: number | null = null;
+      let sessionId: number | null = null;
 
       try {
         parsedQRData = JSON.parse(qrData);
@@ -145,6 +148,12 @@ export default function PublicCheckInPage() {
           conferenceId = parsedQRData.conferenceId;
         } else if (parsedQRData.conf) {
           conferenceId = parsedQRData.conf;
+        }
+
+        // Extract session ID from QR data if available
+        if (parsedQRData.session) {
+          sessionId = parsedQRData.session;
+          console.log("📱 Session ID from QR:", sessionId);
         }
       } catch (e) {
         console.log("📱 QR data is not JSON format");
@@ -200,21 +209,23 @@ export default function PublicCheckInPage() {
         setShowQRInfo(true);
       }
 
-      // Perform check-in
+      // Perform check-in/checkout based on selected action type
       const response = await checkInAPI.checkInAttendee({
         attendeeId: validation.attendee.id,
         qrCode: qrData,
         conferenceId: conferenceId,
         checkInMethod: "qr",
+        actionType: selectedActionType, // Send selected action type
       });
 
       if (response.success && response.data) {
         // Reload checkin records for the current conference
         await loadCheckInRecords(conferenceId);
 
-        // Show popup success message
+        // Show popup success message with action type
+        const actionText = selectedActionType === "checkin" ? "Check-in" : "Check-out";
         setPopupMessage({
-          message: `✅ Check-in thành công cho ${response.data.attendeeName}`,
+          message: `✅ ${actionText} thành công cho ${response.data.attendeeName}`,
           type: "success",
           isVisible: true,
         });
@@ -264,7 +275,7 @@ export default function PublicCheckInPage() {
     }, 5000);
   };
 
-  const handleQRUploadSuccess = async (qrData: string) => {
+  const handleQRUploadSuccess = async (qrData: string, conferenceIdFromQR?: number) => {
     try {
       console.log("🔍 Processing uploaded QR code:", qrData);
 
@@ -277,11 +288,18 @@ export default function PublicCheckInPage() {
 
       // Parse QR data to check if it contains full information
       let parsedQRData = null;
-      let conferenceId: number | null = null;
+      let conferenceId: number | null = conferenceIdFromQR || null;
 
       try {
         parsedQRData = JSON.parse(qrData);
         console.log("📱 Parsed QR data:", parsedQRData);
+
+        // Extract conference ID from QR data (support both old and new format)
+        if (parsedQRData.conferenceId) {
+          conferenceId = parsedQRData.conferenceId;
+        } else if (parsedQRData.conf) {
+          conferenceId = parsedQRData.conf;
+        }
       } catch (e) {
         console.log("📱 QR data is not JSON format");
       }
@@ -290,7 +308,7 @@ export default function PublicCheckInPage() {
       setScannedQRData(parsedQRData);
 
       // Always use conference ID from QR code - no manual selection needed
-      if (conferenceId !== null) {
+      if (conferenceId) {
         console.log("📱 Using conference ID from QR:", conferenceId);
         // Update selected conference to match QR code
         setSelectedConference(String(conferenceId));
@@ -336,21 +354,23 @@ export default function PublicCheckInPage() {
         setShowQRInfo(true);
       }
 
-      // Perform check-in
+      // Perform check-in/checkout based on selected action type
       const response = await checkInAPI.checkInAttendee({
         attendeeId: validation.attendee.id,
         qrCode: qrData,
         conferenceId: conferenceId,
         checkInMethod: "qr",
+        actionType: selectedActionType, // Send selected action type
       });
 
       if (response.success && response.data) {
         // Reload checkin records for the current conference
         await loadCheckInRecords(conferenceId);
 
-        // Show popup success message
+        // Show popup success message with action type
+        const actionText = selectedActionType === "checkin" ? "Check-in" : "Check-out";
         setPopupMessage({
-          message: `✅ Check-in thành công cho ${response.data.attendeeName}`,
+          message: `✅ ${actionText} thành công cho ${response.data.attendeeName}`,
           type: "success",
           isVisible: true,
         });
@@ -580,6 +600,9 @@ export default function PublicCheckInPage() {
             checkedInCount={
               checkInRecords.filter((r) => r.status === "success").length
             }
+            checkoutCount={
+              checkInRecords.filter((r) => r.actionType === "checkout" && r.status === "success").length
+            }
           />
         )}
 
@@ -589,6 +612,14 @@ export default function PublicCheckInPage() {
             conferences={conferences}
             selectedConference={selectedConference}
           />
+
+          {/* Action Type Selector - Must select before check-in */}
+          {conferences.length > 0 && (
+            <ActionTypeSelector
+              selectedAction={selectedActionType}
+              onActionChange={setSelectedActionType}
+            />
+          )}
 
           {/* Check-in Methods Tabs */}
           <div className="space-y-4">
@@ -701,6 +732,7 @@ export default function PublicCheckInPage() {
                   onCheckInSuccess={handleManualCheckInSuccess}
                   onCheckInError={handleManualCheckInError}
                   conferences={conferences}
+                  actionType={selectedActionType}
                 />
               </TabsContent>
             </Tabs>

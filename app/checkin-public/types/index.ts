@@ -9,6 +9,7 @@ export interface CheckInRecord {
   method?: 'qr' | 'manual';
   registrationId?: number;
   attendeePhone?: string | null;
+  actionType?: 'checkin' | 'checkout'; // Type of action: checkin (entry) or checkout (exit)
 }
 
 export interface Attendee {

@@ -14,7 +14,7 @@ import jsQR from "jsqr";
 import { checkInAPI } from "../lib/checkin-api";
 
 interface QRUploadProps {
-  onUploadSuccess: (data: string) => void;
+  onUploadSuccess: (data: string, conferenceId?: number) => void;
   onUploadError: (error: string) => void;
   conferences?: any[];
   selectedConference?: string;
@@ -107,7 +107,7 @@ export const QRUpload = forwardRef<QRUploadRef, QRUploadProps>(({ onUploadSucces
         // Pass QR data to parent component for validation and check-in
         console.log("✅ QR code detected from uploaded image:", qrData);
         console.log("📱 Conference ID for validation:", conferenceId);
-        onUploadSuccess(qrData);
+        onUploadSuccess(qrData, conferenceId);
       } else {
         setError("Không tìm thấy mã QR trong ảnh");
         onUploadError("Không tìm thấy mã QR trong ảnh");

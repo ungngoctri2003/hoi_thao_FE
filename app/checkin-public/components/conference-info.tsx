@@ -3,7 +3,7 @@
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Clock, Users, CheckCircle } from "lucide-react";
+import { Calendar, MapPin, Clock, Users, CheckCircle, LogOut } from "lucide-react";
 
 interface Conference {
   id: number;
@@ -16,9 +16,10 @@ interface ConferenceInfoProps {
   conference: Conference | null;
   totalAttendees?: number;
   checkedInCount?: number;
+  checkoutCount?: number;
 }
 
-export function ConferenceInfo({ conference, totalAttendees = 0, checkedInCount = 0 }: ConferenceInfoProps) {
+export function ConferenceInfo({ conference, totalAttendees = 0, checkedInCount = 0, checkoutCount = 0 }: ConferenceInfoProps) {
   if (!conference) {
     return (
       <Card>
@@ -62,6 +63,7 @@ export function ConferenceInfo({ conference, totalAttendees = 0, checkedInCount 
   };
 
   const checkInRate = totalAttendees > 0 ? Math.round((checkedInCount / totalAttendees) * 100) : 0;
+  const checkoutRate = totalAttendees > 0 ? Math.round((checkoutCount / totalAttendees) * 100) : 0;
 
   return (
     <Card>
@@ -83,7 +85,7 @@ export function ConferenceInfo({ conference, totalAttendees = 0, checkedInCount 
       </CardHeader>
       
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Date & Time */}
           <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
             <Clock className="h-5 w-5 text-blue-600" />
@@ -108,6 +110,15 @@ export function ConferenceInfo({ conference, totalAttendees = 0, checkedInCount 
             <div>
               <p className="text-sm font-medium text-purple-900">Tỷ lệ check-in</p>
               <p className="text-sm text-purple-700">{checkInRate}% ({checkedInCount}/{totalAttendees})</p>
+            </div>
+          </div>
+
+          {/* Check-out Rate */}
+          <div className="flex items-center space-x-3 p-3 bg-orange-50 rounded-lg">
+            <LogOut className="h-5 w-5 text-orange-600" />
+            <div>
+              <p className="text-sm font-medium text-orange-900">Tỷ lệ check-out</p>
+              <p className="text-sm text-orange-700">{checkoutRate}% ({checkoutCount}/{totalAttendees})</p>
             </div>
           </div>
         </div>
