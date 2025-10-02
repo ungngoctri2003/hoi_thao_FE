@@ -196,6 +196,43 @@ class CheckInAPI {
     }
   }
 
+  // Get sessions by conference ID
+  async getSessions(conferenceId: number): Promise<any[]> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}${API_CONFIG.ENDPOINTS.SESSIONS}?conferenceId=${conferenceId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.warn("Sessions API not available, using empty data");
+        return [];
+      }
+
+      const data = await response.json();
+      const sessions = data.data || data || [];
+
+      // Map backend response format to frontend format
+      return sessions.map((session: any) => ({
+        id: session.ID || session.id,
+        title: session.TITLE || session.title,
+        speaker: session.SPEAKER || session.speaker,
+        startTime: session.START_TIME || session.startTime,
+        endTime: session.END_TIME || session.endTime,
+        status: session.STATUS || session.status,
+        conferenceId: session.CONFERENCE_ID || session.conferenceId,
+      }));
+    } catch (error) {
+      console.error("Get sessions error:", error);
+      return [];
+    }
+  }
+
   // Get conferences
   async getConferences(): Promise<Conference[]> {
     try {

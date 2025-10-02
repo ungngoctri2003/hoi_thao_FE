@@ -10,6 +10,7 @@ export const API_CONFIG = {
     CHECKIN_VALIDATE_QR: "/public/checkins/validate-qr",
     ATTENDEES_SEARCH: "/public/attendees/search",
     CONFERENCES: "/public/conferences",
+    SESSIONS: "/sessions", // Public endpoint for sessions
   },
 
   // Request timeout (in milliseconds)

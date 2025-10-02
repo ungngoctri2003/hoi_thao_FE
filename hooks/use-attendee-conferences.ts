@@ -5,6 +5,7 @@ import {
   type Attendee,
   type Registration,
   type Conference,
+  type SessionCheckin,
 } from "@/lib/api/attendees-api";
 
 // Helper functions để tính toán trạng thái
@@ -12,6 +13,7 @@ function calculateOverallStatus(
   registrations: Registration[]
 ):
   | "not-registered"
+  | "pending"
   | "registered"
   | "checked-in"
   | "checked-out"
@@ -89,7 +91,13 @@ function calculateOverallStatus(
     return "checked-in";
   }
 
-  // 5. Registered - mặc định
+  // 5. Pending - Chờ duyệt
+  if (status === "pending") {
+    console.log("⏳ Status: pending");
+    return "pending";
+  }
+
+  // 6. Registered - mặc định
   console.log("✅ Status: registered (default)");
   return "registered";
 }
@@ -151,9 +159,11 @@ function getLastCheckoutTime(registrations: Registration[]): Date | undefined {
 export interface AttendeeWithConferences extends Attendee {
   conferences: Conference[];
   registrations: Registration[];
+  sessionCheckins: SessionCheckin[];
   // Trạng thái tổng hợp
   overallStatus:
     | "not-registered"
+    | "pending"
     | "registered"
     | "checked-in"
     | "checked-out"
@@ -287,9 +297,10 @@ export function useAttendeeConferences(
 
       for (const attendee of attendees) {
         try {
-          // The attendee data already includes conferences and registrations from the backend
+          // The attendee data already includes conferences, registrations, and sessionCheckins from the backend
           const allConferences = attendee.conferences || [];
           const registrations = attendee.registrations || [];
+          const sessionCheckins = attendee.sessionCheckins || [];
 
           // Filter conferences to only include those that the attendee actually registered for
           // Get conference IDs from registrations
@@ -303,6 +314,7 @@ export function useAttendeeConferences(
           console.log(`🔍 Conference filtering for ${attendee.NAME}:`, {
             allConferences: allConferences.length,
             registrations: registrations.length,
+            sessionCheckins: sessionCheckins.length,
             registeredConferenceIds,
             filteredConferences: conferences.length,
             conferenceNames: conferences.map(c => c.NAME),
@@ -343,6 +355,7 @@ export function useAttendeeConferences(
             ...attendee,
             conferences,
             registrations,
+            sessionCheckins,
             overallStatus,
             lastCheckinTime,
             lastCheckoutTime,
@@ -354,6 +367,7 @@ export function useAttendeeConferences(
             ...attendee,
             conferences: [],
             registrations: [],
+            sessionCheckins: [],
             overallStatus: "not-registered" as const,
             lastCheckinTime: undefined,
             lastCheckoutTime: undefined,

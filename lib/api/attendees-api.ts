@@ -18,6 +18,7 @@ export interface Attendee {
   // Optional fields for attendees with conferences
   conferences?: Conference[];
   registrations?: Registration[];
+  sessionCheckins?: SessionCheckin[];
 }
 
 export interface AttendeeWithRegistration extends Attendee {
@@ -69,11 +70,26 @@ export interface Registration {
   ID: number;
   CONFERENCE_ID: number;
   ATTENDEE_ID: number;
-  STATUS: string;
+  STATUS: 'pending' | 'registered' | 'checked-in' | 'checked-out' | 'cancelled' | 'no-show';
   QR_CODE: string;
   REGISTRATION_DATE: Date;
   CHECKIN_TIME?: Date;
   CHECKOUT_TIME?: Date;
+  APPROVED_BY?: number;
+  APPROVED_AT?: Date;
+}
+
+export interface SessionCheckin {
+  ID: number;
+  SESSION_ID: number;
+  CHECKIN_TIME: Date;
+  ACTION_TYPE: 'checkin' | 'checkout';
+  METHOD: 'qr' | 'manual' | 'nfc';
+  SESSION_TITLE: string;
+  SESSION_START_TIME: Date;
+  SESSION_END_TIME: Date;
+  SESSION_STATUS: string;
+  CONFERENCE_ID: number;
 }
 
 export interface CheckinStatus {
@@ -81,6 +97,7 @@ export interface CheckinStatus {
   conferenceId: number;
   conferenceName: string;
   status:
+    | "pending"
     | "not-registered"
     | "registered"
     | "checked-in"
@@ -509,6 +526,26 @@ class RegistrationsAPI {
   ): Promise<{ data: Registration[] }> {
     return this.request<{ data: Registration[] }>(
       `?conferenceId=${conferenceId}`
+    );
+  }
+
+  // Approve a pending registration
+  async approveRegistration(registrationId: number): Promise<{ data: Registration }> {
+    return this.request<{ data: Registration }>(
+      `/${registrationId}/approve`,
+      {
+        method: "POST",
+      }
+    );
+  }
+
+  // Reject a pending registration
+  async rejectRegistration(registrationId: number): Promise<{ data: Registration }> {
+    return this.request<{ data: Registration }>(
+      `/${registrationId}/reject`,
+      {
+        method: "POST",
+      }
     );
   }
 }

@@ -419,7 +419,7 @@ export default function PublicCheckInPage() {
     }, 5000);
   };
 
-  const handleManualCheckInSuccess = async (attendee: Attendee) => {
+  const handleManualCheckInSuccess = async (attendee: Attendee, actionType?: "checkin" | "checkout") => {
     try {
       // Set current conference if not set
       if (!selectedConference && attendee.conferenceId) {
@@ -432,24 +432,15 @@ export default function PublicCheckInPage() {
         }
       }
 
-      // Create check-in record from attendee data
-      const checkInRecord: CheckInRecord = {
-        id: Date.now(),
-        attendeeName: attendee.name,
-        attendeeEmail: attendee.email,
-        checkInTime: new Date().toLocaleString("vi-VN"),
-        status: "success",
-        qrCode: attendee.qrCode,
-        conferenceId: attendee.conferenceId,
-      };
-
       // Reload checkin records for the current conference
       if (attendee.conferenceId) {
         await loadCheckInRecords(attendee.conferenceId);
       }
 
+      // Show popup success message with action type (same as QR code)
+      const actionText = actionType === "checkout" ? "Check-out" : "Check-in";
       setPopupMessage({
-        message: `Check-in thành công cho ${attendee.name}`,
+        message: `✅ ${actionText} thành công cho ${attendee.name}`,
         type: "success",
         isVisible: true,
       });
@@ -461,7 +452,7 @@ export default function PublicCheckInPage() {
     } catch (err) {
       console.error("Manual check-in error:", err);
       setPopupMessage({
-        message: "Lỗi khi check-in thủ công",
+        message: "Lỗi khi xử lý",
         type: "error",
         isVisible: true,
       });

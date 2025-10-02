@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAttendeeConferences } from "@/hooks/use-attendee-conferences";
 import { AttendeeDialog } from "@/components/attendees/attendee-dialog";
 import { DeleteAttendeeDialog } from "@/components/attendees/delete-attendee-dialog";
+import { SessionStatusBadges } from "@/components/attendees/session-status-badges";
 import {
   Card,
   CardContent,
@@ -282,7 +283,7 @@ export default function AttendeesPage() {
         // Filter by checkin status
         let matchesCheckinStatus = true;
         if (filterCheckinStatus !== "all") {
-          const overallStatus = attendee.overallStatus || "registered";
+          const overallStatus = attendee.overallStatus;
 
           console.log("🔍 Filtering by checkin status:", {
             attendeeId: attendee.ID,
@@ -374,6 +375,13 @@ export default function AttendeesPage() {
       email: attendee.EMAIL,
       conferencesCount: attendee.conferences?.length || 0,
       conferences: attendee.conferences?.map(c => c.NAME) || [],
+      sessionCheckinsCount: attendee.sessionCheckins?.length || 0,
+      sessionCheckins: attendee.sessionCheckins?.map(sc => ({
+        sessionId: sc.SESSION_ID,
+        sessionTitle: sc.SESSION_TITLE,
+        conferenceId: sc.CONFERENCE_ID,
+        actionType: sc.ACTION_TYPE,
+      })) || [],
     })));
   }
 
@@ -427,6 +435,10 @@ export default function AttendeesPage() {
   const getRegistrationStatusBadge = (status: string | undefined) => {
     if (!status) return null;
     const statusConfig = {
+      pending: {
+        label: "Chờ duyệt",
+        color: "bg-yellow-100 text-yellow-800",
+      },
       "not-registered": {
         label: "Chưa đăng ký",
         color: "bg-gray-100 text-gray-600",
@@ -452,6 +464,7 @@ export default function AttendeesPage() {
 
   const getCheckinStatusBadge = (
     status:
+      | "pending"
       | "not-registered"
       | "registered"
       | "checked-in"
@@ -460,6 +473,11 @@ export default function AttendeesPage() {
       | "cancelled"
   ) => {
     const statusConfig = {
+      pending: {
+        label: "Chờ duyệt",
+        color: "bg-yellow-100 text-yellow-800",
+        icon: "⏳",
+      },
       "not-registered": {
         label: "Chưa đăng ký",
         color: "bg-gray-100 text-gray-600",
@@ -712,6 +730,82 @@ export default function AttendeesPage() {
     }
   };
 
+  // Handle approve registration
+  const handleApproveRegistration = async (registration: any) => {
+    if (!registration || !registration.ID) {
+      console.error("No registration to approve");
+      return;
+    }
+
+    try {
+      console.log("Approving registration:", registration.ID);
+
+      const response = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1"
+        }/registrations/${registration.ID}/approve`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to approve registration");
+      }
+
+      const result = await response.json();
+      console.log("Registration approved successfully:", result);
+
+      // Refresh data to show updated status
+      await refetch();
+    } catch (error) {
+      console.error("Error approving registration:", error);
+    }
+  };
+
+  // Handle reject registration
+  const handleRejectRegistration = async (registration: any) => {
+    if (!registration || !registration.ID) {
+      console.error("No registration to reject");
+      return;
+    }
+
+    try {
+      console.log("Rejecting registration:", registration.ID);
+
+      const response = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1"
+        }/registrations/${registration.ID}/reject`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to reject registration");
+      }
+
+      const result = await response.json();
+      console.log("Registration rejected successfully:", result);
+
+      // Refresh data to show updated status
+      await refetch();
+    } catch (error) {
+      console.error("Error rejecting registration:", error);
+    }
+  };
+
   // Export to Excel
   const handleExportExcel = () => {
     try {
@@ -729,7 +823,9 @@ export default function AttendeesPage() {
             ? new Date(attendee.DATE_OF_BIRTH).toLocaleDateString("vi-VN")
             : "",
           "Trạng thái":
-            attendee.overallStatus === "not-registered"
+            attendee.overallStatus === "pending"
+              ? "Chờ duyệt"
+              : attendee.overallStatus === "not-registered"
               ? "Chưa đăng ký"
               : attendee.overallStatus === "registered"
               ? "Đã đăng ký"
@@ -841,7 +937,9 @@ export default function AttendeesPage() {
           "Chức vụ": attendee.POSITION || "",
           "Giới tính": attendee.GENDER || "",
           "Trạng thái":
-            attendee.overallStatus === "not-registered"
+            attendee.overallStatus === "pending"
+              ? "Chờ duyệt"
+              : attendee.overallStatus === "not-registered"
               ? "Chưa đăng ký"
               : attendee.overallStatus === "registered"
               ? "Đã đăng ký"
@@ -1254,6 +1352,7 @@ export default function AttendeesPage() {
                       className="w-full px-3 py-2 border rounded-md"
                     >
                       <option value="all">Tất cả trạng thái</option>
+                      <option value="pending">⏳ Chờ duyệt</option>
                       <option value="not-registered">⭕ Chưa đăng ký</option>
                       <option value="registered">📝 Đã đăng ký</option>
                       <option value="checked-in">✅ Đã check-in</option>
@@ -1642,10 +1741,74 @@ export default function AttendeesPage() {
                               </TableCell>
                             )}
                             <TableCell>
-                              <div className="space-y-1">
-                                {getCheckinStatusBadge(
-                                  attendee.overallStatus || "registered"
+                              <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  {getCheckinStatusBadge(
+                                    attendee.overallStatus || "registered"
+                                  )}
+                                </div>
+                                
+                                {/* Show approve/reject buttons if there are pending registrations */}
+                                {canManage && attendee.registrations && attendee.registrations.some((reg: any) => reg.STATUS === 'pending') && (
+                                  <div className="flex items-center space-x-2 mt-2">
+                                    {attendee.registrations
+                                      .filter((reg: any) => reg.STATUS === 'pending')
+                                      .map((pendingReg: any) => (
+                                        <div key={pendingReg.ID} className="flex items-center space-x-1">
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  size="sm"
+                                                  variant="default"
+                                                  className="h-7 bg-green-600 hover:bg-green-700"
+                                                  onClick={() => handleApproveRegistration(pendingReg)}
+                                                >
+                                                  <UserCheck className="h-3 w-3" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                <p>Duyệt đăng ký</p>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  size="sm"
+                                                  variant="destructive"
+                                                  className="h-7"
+                                                  onClick={() => handleRejectRegistration(pendingReg)}
+                                                >
+                                                  <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                <p>Từ chối đăng ký</p>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        </div>
+                                      ))}
+                                  </div>
                                 )}
+                                
+                                {/* Session Check-ins */}
+                                {attendee.sessionCheckins && attendee.sessionCheckins.length > 0 && (
+                                  <div className="mt-2">
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">
+                                      Session Check-ins:
+                                    </p>
+                                    <SessionStatusBadges
+                                      sessionCheckins={attendee.sessionCheckins}
+                                      conferences={attendee.conferences || allConferences}
+                                      conferenceId={conferenceId || undefined}
+                                      maxVisible={2}
+                                    />
+                                  </div>
+                                )}
+                                
                                 {attendee.lastCheckinTime && (
                                   <p className="text-xs text-muted-foreground">
                                     Check-in:{" "}
@@ -1662,12 +1825,6 @@ export default function AttendeesPage() {
                                     ).toLocaleString("vi-VN")}
                                   </p>
                                 )}
-                                {attendee.registrations &&
-                                  attendee.registrations.length > 0 && (
-                                    <p className="text-xs text-muted-foreground">
-                                      {attendee.registrations.length} đăng ký
-                                    </p>
-                                  )}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -1895,13 +2052,30 @@ export default function AttendeesPage() {
                             </div>
                           </div>
                         )}
-                        <div className="flex items-center justify-between text-sm">
-                          <span>Trạng thái:</span>
-                          <div className="flex items-center space-x-1">
-                            {getCheckinStatusBadge(
-                              attendee.overallStatus || "registered"
-                            )}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span>Trạng thái:</span>
+                            <div className="flex items-center space-x-1">
+                              {getCheckinStatusBadge(
+                                attendee.overallStatus || "registered"
+                              )}
+                            </div>
                           </div>
+                          
+                          {/* Session Check-ins */}
+                          {attendee.sessionCheckins && attendee.sessionCheckins.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">
+                                Session Check-ins:
+                              </p>
+                              <SessionStatusBadges
+                                sessionCheckins={attendee.sessionCheckins}
+                                conferences={attendee.conferences || allConferences}
+                                conferenceId={conferenceId || undefined}
+                                maxVisible={1}
+                              />
+                            </div>
+                          )}
                         </div>
                         {attendee.lastCheckinTime && (
                           <div className="flex items-center justify-between text-sm">
@@ -2076,12 +2250,29 @@ export default function AttendeesPage() {
                             </div>
                           </div>
                         )}
-                        <div className="flex items-center space-x-2">
-                          <span className="text-muted-foreground">
-                            Trạng thái:
-                          </span>
-                          {getCheckinStatusBadge(
-                            attendee.overallStatus || "registered"
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-muted-foreground">
+                              Trạng thái:
+                            </span>
+                            {getCheckinStatusBadge(
+                              attendee.overallStatus || "registered"
+                            )}
+                          </div>
+                          
+                          {/* Session Check-ins */}
+                          {attendee.sessionCheckins && attendee.sessionCheckins.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">
+                                Session Check-ins:
+                              </p>
+                              <SessionStatusBadges
+                                sessionCheckins={attendee.sessionCheckins}
+                                conferences={attendee.conferences || allConferences}
+                                conferenceId={conferenceId || undefined}
+                                maxVisible={2}
+                              />
+                            </div>
                           )}
                         </div>
                         {attendee.lastCheckinTime && (
