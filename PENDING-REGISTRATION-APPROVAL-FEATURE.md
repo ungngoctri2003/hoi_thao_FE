@@ -301,3 +301,6 @@ curl -X POST http://localhost:4000/api/v1/registrations/2/reject \
 - Date: 2025-10-02
 - Version: 1.0.0
 
+
+
+
