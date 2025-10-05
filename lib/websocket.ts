@@ -548,11 +548,12 @@ class WebSocketService {
     return null;
   }
 
-  private isValidTokenFormat(token: string): boolean {
+  private isValidTokenFormat(token: string, skipExpirationCheck: boolean = false): boolean {
     try {
       // Check if it's a valid JWT format
       const parts = token.split(".");
       if (parts.length !== 3) {
+        console.warn("Invalid JWT format: not 3 parts");
         return false;
       }
 
@@ -561,13 +562,27 @@ class WebSocketService {
 
       // Check if token has required fields
       if (!payload.userId || !payload.exp) {
+        console.warn("Token missing required fields (userId or exp)");
         return false;
       }
 
-      // Check if token is not expired
+      // Check if token is not expired (with 60 second grace period for clock skew)
       const now = Math.floor(Date.now() / 1000);
-      if (now >= payload.exp) {
-        console.warn("Token is expired");
+      const timeUntilExpiry = payload.exp - now;
+      
+      console.log("Token validation:", {
+        userId: payload.userId,
+        exp: payload.exp,
+        expDate: new Date(payload.exp * 1000).toISOString(),
+        currentTime: now,
+        currentDate: new Date(now * 1000).toISOString(),
+        timeUntilExpiry: timeUntilExpiry,
+        isExpired: now >= payload.exp,
+        skipExpirationCheck: skipExpirationCheck
+      });
+
+      if (!skipExpirationCheck && now >= payload.exp + 60) { // Add 60 second grace period for clock skew
+        console.warn("Token is expired (grace period exceeded)");
         return false;
       }
 
@@ -709,32 +724,46 @@ class WebSocketService {
       }
 
       const result = await response.json();
+      console.log("Token refresh response received:", {
+        hasData: !!result.data,
+        hasAccessToken: !!result.data?.accessToken,
+        hasRefreshToken: !!result.data?.refreshToken,
+      });
+
       if (result.data) {
+        console.log("=== Starting token update process ===");
+        
         // Update tokens in localStorage and cookies
         this.setToken(result.data.accessToken);
         this.setRefreshToken(result.data.refreshToken);
 
+        console.log("Waiting 200ms for tokens to be persisted...");
         // Add a small delay to ensure cookies are set
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 200));
 
-        // Verify token was set correctly
-        const newToken = this.getToken();
-        if (newToken) {
-          console.log("Token refresh successful, new token verified");
-          return true;
-        } else {
-          console.error(
-            "Token refresh succeeded but token not found after setting"
-          );
-          // Try to get token from localStorage as fallback
-          const fallbackToken = localStorage.getItem("accessToken");
-          if (fallbackToken && this.isValidTokenFormat(fallbackToken)) {
-            console.log("Using fallback token from localStorage");
+        console.log("=== Verifying token after refresh ===");
+        // Directly verify from localStorage (skip getToken's expiration validation)
+        const fallbackToken = localStorage.getItem("accessToken");
+        console.log("Token from localStorage:", fallbackToken ? "exists" : "missing");
+        
+        if (fallbackToken) {
+          console.log("Validating token format (skipping expiration check for fresh token)...");
+          // Skip expiration check for freshly refreshed token to avoid clock skew issues
+          const isValid = this.isValidTokenFormat(fallbackToken, true);
+          console.log("Token validation result:", isValid);
+          
+          if (isValid) {
+            console.log("✅ Token refresh successful, new token verified");
             return true;
+          } else {
+            console.error("❌ Refreshed token has invalid format");
           }
-          return false;
+        } else {
+          console.error("❌ Token not found in localStorage after refresh");
         }
+        return false;
       }
+      console.error("❌ Token refresh response has no data");
       return false;
     } catch (error) {
       console.error("Token refresh failed:", error);
@@ -790,6 +819,19 @@ class WebSocketService {
   private setToken(token: string): void {
     if (typeof window !== "undefined") {
       console.log("Setting new access token...");
+      
+      // Parse and log token details
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        console.log("New token details:", {
+          userId: payload.userId,
+          exp: payload.exp,
+          expDate: new Date(payload.exp * 1000).toISOString(),
+          timeUntilExpiry: Math.floor((payload.exp - Date.now() / 1000) / 60) + " minutes"
+        });
+      } catch (error) {
+        console.error("Failed to parse new token:", error);
+      }
 
       // Set localStorage first (most reliable)
       localStorage.setItem("accessToken", token);
@@ -804,9 +846,20 @@ class WebSocketService {
       // Verify token was set correctly
       const verifyToken = localStorage.getItem("accessToken");
       if (verifyToken === token) {
-        console.log("Token verification successful");
+        console.log("✅ Token verification successful - localStorage matches");
       } else {
-        console.error("Token verification failed");
+        console.error("❌ Token verification failed - localStorage mismatch");
+      }
+      
+      // Also verify cookie
+      const cookies = document.cookie.split(";");
+      const tokenCookie = cookies.find((cookie) =>
+        cookie.trim().startsWith("accessToken=")
+      );
+      if (tokenCookie) {
+        console.log("✅ Token verification successful - cookie exists");
+      } else {
+        console.error("❌ Token verification failed - cookie not found");
       }
     }
   }
