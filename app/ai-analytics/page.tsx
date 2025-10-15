@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/use-auth";
-import { websocketService } from "@/lib/websocket";
 import {
   Card,
   CardContent,
@@ -107,12 +106,6 @@ export default function GlobalAIAnalyticsPage() {
     null
   );
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [isRealTimeUpdating, setIsRealTimeUpdating] = useState(false);
-  const [websocketStatus, setWebsocketStatus] = useState<{
-    connected: boolean;
-    socketId?: string;
-    reconnectAttempts: number;
-  }>({ connected: false, reconnectAttempts: 0 });
 
   // Debounce refs
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -517,68 +510,6 @@ export default function GlobalAIAnalyticsPage() {
     [getAccessToken, formatMonthDisplay]
   );
 
-  // Memoized WebSocket event handlers
-  const handleWebSocketConnect = useCallback(() => {
-    console.log("WebSocket connected in AI analytics page");
-    const status = websocketService.getConnectionStatus();
-    setWebsocketStatus(status);
-  }, []);
-
-  const handleWebSocketDisconnect = useCallback(() => {
-    console.log("WebSocket disconnected in AI analytics page");
-    const status = websocketService.getConnectionStatus();
-    setWebsocketStatus(status);
-  }, []);
-
-  const handleWebSocketError = useCallback((event: Event) => {
-    const customEvent = event as CustomEvent;
-    console.error("WebSocket error in AI analytics page:", customEvent.detail);
-    const status = websocketService.getConnectionStatus();
-    setWebsocketStatus(status);
-  }, []);
-
-  const handleAnalyticsUpdate = useCallback(
-    (event: Event) => {
-      const customEvent = event as CustomEvent;
-      console.log("Analytics data updated via WebSocket:", customEvent.detail);
-
-      // Refresh analytics data when updates are received
-      if (customEvent.detail?.type === "analytics_update") {
-        setIsRealTimeUpdating(true);
-        fetchAnalyticsData(selectedTimeRange, selectedConference).finally(
-          () => {
-            setIsRealTimeUpdating(false);
-          }
-        );
-      }
-    },
-    [fetchAnalyticsData, selectedTimeRange]
-  );
-
-  const handleConferenceUpdate = useCallback(
-    (event: Event) => {
-      const customEvent = event as CustomEvent;
-      console.log(
-        "Conference updated, refreshing analytics:",
-        customEvent.detail
-      );
-
-      // Refresh analytics data when conference data changes
-      if (
-        customEvent.detail?.type === "conference_update" ||
-        customEvent.detail?.type === "registration_update" ||
-        customEvent.detail?.type === "checkin_update"
-      ) {
-        setIsRealTimeUpdating(true);
-        fetchAnalyticsData(selectedTimeRange, selectedConference).finally(
-          () => {
-            setIsRealTimeUpdating(false);
-          }
-        );
-      }
-    },
-    [fetchAnalyticsData, selectedTimeRange]
-  );
 
   // Initial data fetch effect
   useEffect(() => {
@@ -609,48 +540,6 @@ export default function GlobalAIAnalyticsPage() {
     }
   }, [selectedTimeRange, fetchAnalyticsData]);
 
-  // WebSocket setup effect
-  useEffect(() => {
-    // Check WebSocket connection status
-    const checkWebSocketStatus = () => {
-      const status = websocketService.getConnectionStatus();
-      setWebsocketStatus(status);
-    };
-
-    // Initial check
-    checkWebSocketStatus();
-
-    // Set up periodic status checks (reduced frequency)
-    const statusInterval = setInterval(checkWebSocketStatus, 10000); // Changed from 5000 to 10000
-
-    // Add event listeners
-    window.addEventListener("websocket-connected", handleWebSocketConnect);
-    window.addEventListener(
-      "websocket-disconnected",
-      handleWebSocketDisconnect
-    );
-    window.addEventListener("websocket-error", handleWebSocketError);
-    window.addEventListener("analytics-update", handleAnalyticsUpdate);
-    window.addEventListener("conference-update", handleConferenceUpdate);
-
-    return () => {
-      clearInterval(statusInterval);
-      window.removeEventListener("websocket-connected", handleWebSocketConnect);
-      window.removeEventListener(
-        "websocket-disconnected",
-        handleWebSocketDisconnect
-      );
-      window.removeEventListener("websocket-error", handleWebSocketError);
-      window.removeEventListener("analytics-update", handleAnalyticsUpdate);
-      window.removeEventListener("conference-update", handleConferenceUpdate);
-    };
-  }, [
-    handleWebSocketConnect,
-    handleWebSocketDisconnect,
-    handleWebSocketError,
-    handleAnalyticsUpdate,
-    handleConferenceUpdate,
-  ]);
 
   // Memoized user data - MUST be called before any conditional returns
   const userRole = useMemo(
@@ -819,43 +708,11 @@ export default function GlobalAIAnalyticsPage() {
                       Phân tích dữ liệu từ tất cả hội nghị với trí tuệ nhân tạo
                     </p>
                     <div className="mt-4 flex items-center space-x-4">
-                      <div className="flex items-center space-x-2 rounded-full bg-white/20 px-4 py-2 backdrop-blur-sm">
-                        <div
-                          className={`h-3 w-3 rounded-full ${
-                            websocketStatus.connected
-                              ? "bg-green-400 animate-pulse"
-                              : "bg-red-400"
-                          }`}
-                        ></div>
-                        <span className="text-sm font-medium">
-                          {websocketStatus.connected
-                            ? "Kết nối WebSocket"
-                            : "Mất kết nối WebSocket"}
-                        </span>
-                      </div>
-                      {isRealTimeUpdating && (
-                        <div className="flex items-center space-x-2 rounded-full bg-blue-500/20 px-4 py-2 backdrop-blur-sm">
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400"></div>
-                          <span className="text-sm font-medium text-blue-100">
-                            Đang cập nhật real-time...
-                          </span>
-                        </div>
-                      )}
                       {lastUpdated && (
                         <div className="text-xs text-blue-100/80">
                           Cập nhật lần cuối:{" "}
                           {lastUpdated.toLocaleTimeString("vi-VN")}
                         </div>
-                      )}
-                      {!websocketStatus.connected && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => websocketService.forceReconnect()}
-                          className="bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm"
-                        >
-                          Kết nối lại
-                        </Button>
                       )}
                     </div>
                   </div>
