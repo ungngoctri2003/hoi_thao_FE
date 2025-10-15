@@ -8,12 +8,11 @@ export function useFrontendAudit() {
   const logAction = useCallback(async (action: string, page?: string, details?: string) => {
     // Audit logging temporarily disabled
     console.log('Audit logging disabled:', { action, page, details })
-    return
-    // try {
-    //   await apiClient.logFrontendAction(action, page, details)
-    // } catch (error) {
-    //   console.warn('Failed to log frontend action:', error)
-    // }
+    try {
+      await apiClient.logFrontendAction(action, page, details)
+    } catch (error) {
+      console.warn('Failed to log frontend action:', error)
+    }
   }, [])
 
   // Helper functions for common actions

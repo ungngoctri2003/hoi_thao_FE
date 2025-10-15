@@ -2526,30 +2526,26 @@ class ApiClient {
   }
 
   // Frontend Audit Logs - TEMPORARILY DISABLED
-  async logFrontendAction(
+ async logFrontendAction(
     action: string,
     page?: string,
     details?: string
   ): Promise<void> {
-    // Audit logging temporarily disabled
-    console.log('Audit API call disabled:', { action, page, details });
-    return;
-    
-    // try {
-    //   const logData = {
-    //     action,
-    //     page: page || this.getCurrentPage(),
-    //     details,
-    //     timestamp: new Date().toISOString(),
-    //   };
+    try {
+      const logData = {
+        action,
+        page: page || this.getCurrentPage(),
+        details,
+        timestamp: new Date().toISOString(),
+      };
 
-    //   await this.request("/audit/frontend", {
-    //     method: "POST",
-    //     body: JSON.stringify(logData),
-    //   });
-    // } catch (error) {
-    //   console.warn("Failed to log frontend action:", error);
-    // }
+      await this.request("/audit/frontend", {
+        method: "POST",
+        body: JSON.stringify(logData),
+      });
+    } catch (error) {
+      console.warn("Failed to log frontend action:", error);
+    }
   }
 
   // Get current page name
